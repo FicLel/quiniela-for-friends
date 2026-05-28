@@ -1,0 +1,1 @@
+- [Competitions Module](project-competitions-module.md) — World Cup match import feature: schema, client, service, repository, server action
