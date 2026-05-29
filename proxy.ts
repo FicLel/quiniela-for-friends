@@ -7,35 +7,67 @@
  *
  * Responsibilities:
  * - Public assets (_next/*, /api/*, favicon.ico): pass through immediately.
- * - Unauthenticated access to any private route → redirect to /login.
- * - Authenticated user on /login → redirect to /auth/change-password (if
- *   mustChangePassword is true) or /welcome.
+ * - Paths without a locale prefix: negotiate from Accept-Language header
+ *   (defaulting to DEFAULT_LOCALE) and redirect to /{locale}{pathname}.
+ * - Unauthenticated access to any private route → redirect to /{locale}/login.
+ * - Authenticated user on /{locale}/login → redirect to
+ *   /{locale}/auth/change-password (if mustChangePassword) or /{locale}/welcome.
  * - Authenticated user on any private route with mustChangePassword = true →
- *   redirect to /auth/change-password (unless already there).
- * - Authenticated user on /auth/change-password with mustChangePassword = false
- *   → redirect to /welcome (password already changed).
+ *   redirect to /{locale}/auth/change-password (unless already there).
+ * - Authenticated user on /{locale}/auth/change-password with
+ *   mustChangePassword = false → redirect to /{locale}/welcome.
  *
  * Uses AuthClient.getTokenFromRequest() because next/headers cookies() is
  * NOT available in the Proxy execution context.
  */
 
+import { match } from '@formatjs/intl-localematcher'
+import Negotiator from 'negotiator'
 import { NextRequest, NextResponse } from 'next/server'
 import { AuthClient } from '@/auth/AuthClient'
+import { LOCALES, DEFAULT_LOCALE } from '@/i18n/i18n.types'
+
+function negotiateLocale(request: NextRequest): string {
+  const acceptLanguage = request.headers.get('accept-language') ?? ''
+  const headers = { 'accept-language': acceptLanguage }
+  const languages = new Negotiator({ headers }).languages()
+  try {
+    return match(languages, [...LOCALES], DEFAULT_LOCALE)
+  } catch {
+    return DEFAULT_LOCALE
+  }
+}
 
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
-  const isLoginRoute = pathname === '/login'
-  const isChangePasswordRoute = pathname.startsWith('/auth/change-password')
   const isPublicAsset =
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
     pathname === '/favicon.ico'
 
-  // Fast path: static assets and API routes never need auth checks.
   if (isPublicAsset) {
     return NextResponse.next()
   }
+
+  // Detect if pathname already starts with a supported locale.
+  const detectedLocale = LOCALES.find(
+    (l) => pathname === `/${l}` || pathname.startsWith(`/${l}/`),
+  )
+
+  if (!detectedLocale) {
+    // No locale prefix — negotiate and redirect.
+    const locale = negotiateLocale(request)
+    request.nextUrl.pathname = `/${locale}${pathname}`
+    return NextResponse.redirect(request.nextUrl)
+  }
+
+  const locale = detectedLocale
+  // Bare path without locale prefix (e.g. "/login", "/welcome").
+  const barePath = pathname.slice(`/${locale}`.length) || '/'
+
+  const isLoginRoute = barePath === '/login'
+  const isChangePasswordRoute = barePath.startsWith('/auth/change-password')
 
   const authClient = new AuthClient()
   const token = authClient.getTokenFromRequest(request)
@@ -43,9 +75,9 @@ export async function proxy(request: NextRequest) {
   // Verify JWT; null means absent, expired, or tampered.
   const session = token ? await authClient.verifyToken(token) : null
 
-  // Unauthenticated: redirect all private routes to /login.
+  // Unauthenticated: redirect all private routes to /{locale}/login.
   if (!session && !isLoginRoute) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    return NextResponse.redirect(new URL(`/${locale}/login`, request.url))
   }
 
   // Authenticated: determine mustChangePassword for routing decisions.
@@ -53,15 +85,15 @@ export async function proxy(request: NextRequest) {
     const mustChange = session.mustChangePassword
 
     if (isLoginRoute) {
-      const dest = mustChange ? '/auth/change-password' : '/welcome'
+      const dest = mustChange ? `/${locale}/auth/change-password` : `/${locale}/welcome`
       return NextResponse.redirect(new URL(dest, request.url))
     }
 
     if (mustChange && !isChangePasswordRoute) {
-      return NextResponse.redirect(new URL('/auth/change-password', request.url))
+      return NextResponse.redirect(new URL(`/${locale}/auth/change-password`, request.url))
     }
     if (!mustChange && isChangePasswordRoute) {
-      return NextResponse.redirect(new URL('/welcome', request.url))
+      return NextResponse.redirect(new URL(`/${locale}/welcome`, request.url))
     }
   }
 

@@ -1,0 +1,90 @@
+{
+  "meta": {
+    "title": "Quiniela for Friends",
+    "description": "Soccer predictions with your friends"
+  },
+  "login": {
+    "signIn": "Sign in",
+    "tagline": "Your match. Your predictions.",
+    "enterEmailPassword": "Enter your email and password to access your account.",
+    "emailLabel": "Email address",
+    "emailPlaceholder": "you@example.com",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "••••••••",
+    "signingIn": "Signing in…",
+    "errors": {
+      "INVALID_CREDENTIALS": "Invalid email or password.",
+      "VALIDATION_ERROR": "Please enter a valid email address.",
+      "UNKNOWN_ERROR": "Something went wrong. Please try again."
+    }
+  },
+  "setup": {
+    "heading": "Set up your quiniela",
+    "subtitle": "Create the first admin account to get started.",
+    "emailLabel": "Email address",
+    "emailPlaceholder": "you@example.com",
+    "passwordLabel": "Password",
+    "confirmPasswordLabel": "Confirm password",
+    "passwordPlaceholder": "••••••••",
+    "createAccount": "Create admin account",
+    "creatingAccount": "Creating account…",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "showConfirmPassword": "Show confirm password",
+    "hideConfirmPassword": "Hide confirm password",
+    "logIn": "Log in",
+    "errors": {
+      "invalidEmail": "Please enter a valid email address.",
+      "passwordTooShort": "Password must be at least 8 characters.",
+      "passwordsMismatch": "Passwords do not match.",
+      "alreadyComplete": "Setup is already complete. Please log in.",
+      "unknown": "Something went wrong. Please try again."
+    }
+  },
+  "welcome": {
+    "heading": "Welcome to Quiniela for Friends",
+    "subtitle": "World Cup 2026 — Group Stage Schedule",
+    "group": "Group",
+    "importButton": "Import World Cup Matches",
+    "importing": "Importing…",
+    "importSuccess": "Imported {count} match(es) successfully.",
+    "emptyHeading": "No World Cup matches imported yet.",
+    "emptySubtitle": "Check back soon.",
+    "vs": "vs",
+    "importErrors": {
+      "FETCH_FAILED": "Failed to fetch matches from the external source. Please try again later.",
+      "DB_ERROR": "A database error occurred while saving matches. Please try again.",
+      "UNKNOWN_ERROR": "An unexpected error occurred. Please try again."
+    },
+    "status": {
+      "FINISHED": "FINISHED",
+      "IN_PLAY": "IN PLAY",
+      "PAUSED": "PAUSED",
+      "TIMED": "SCHEDULED",
+      "SCHEDULED": "SCHEDULED",
+      "POSTPONED": "POSTPONED",
+      "CANCELLED": "CANCELLED",
+      "SUSPENDED": "SUSPENDED"
+    }
+  },
+  "changePassword": {
+    "heading": "Set your new password",
+    "subtitle": "Choose a password you'll remember. It must have at least 8 characters, one uppercase, one lowercase, and one digit.",
+    "newPasswordLabel": "New password",
+    "confirmPasswordLabel": "Confirm new password",
+    "passwordPlaceholder": "••••••••",
+    "setPassword": "Set new password",
+    "saving": "Saving…",
+    "errors": {
+      "POLICY_VIOLATION": "Password must be at least 8 characters and contain an uppercase letter, a lowercase letter, and a digit.",
+      "PASSWORDS_DO_NOT_MATCH": "Passwords do not match.",
+      "FLAG_UPDATE_FAILED": "Your password was changed but we could not update your account. Please contact support.",
+      "UNAUTHORIZED": "Your session has expired. Please log in again.",
+      "UNKNOWN_ERROR": "Something went wrong. Please try again."
+    }
+  },
+  "navbar": {
+    "appName": "Quiniela for Friends",
+    "switchLanguage": "Switch language"
+  }
+}

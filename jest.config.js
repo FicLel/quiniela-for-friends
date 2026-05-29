@@ -18,8 +18,8 @@ const config = {
     ],
   },
   testMatch: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.test.tsx'],
-  // Exclude node_modules and Next.js build artefacts
-  testPathIgnorePatterns: ['/node_modules/', '/.next/'],
+  // Exclude node_modules, Next.js build artefacts, and agent worktrees
+  testPathIgnorePatterns: ['/node_modules/', '/.next/', '/.claude/worktrees/'],
   // Extends Jest matchers with @testing-library/jest-dom after env setup
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
 }

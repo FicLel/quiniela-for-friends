@@ -1,0 +1,90 @@
+{
+  "meta": {
+    "title": "Quiniela para Amigos",
+    "description": "Predicciones de fútbol con tus amigos"
+  },
+  "login": {
+    "signIn": "Iniciar sesión",
+    "tagline": "Tu partido. Tus predicciones.",
+    "enterEmailPassword": "Ingresa tu correo y contraseña para acceder a tu cuenta.",
+    "emailLabel": "Correo electrónico",
+    "emailPlaceholder": "tu@ejemplo.com",
+    "passwordLabel": "Contraseña",
+    "passwordPlaceholder": "••••••••",
+    "signingIn": "Iniciando sesión…",
+    "errors": {
+      "INVALID_CREDENTIALS": "Correo o contraseña incorrectos.",
+      "VALIDATION_ERROR": "Ingresa un correo electrónico válido.",
+      "UNKNOWN_ERROR": "Algo salió mal. Inténtalo de nuevo."
+    }
+  },
+  "setup": {
+    "heading": "Configura tu quiniela",
+    "subtitle": "Crea la primera cuenta de administrador para comenzar.",
+    "emailLabel": "Correo electrónico",
+    "emailPlaceholder": "tu@ejemplo.com",
+    "passwordLabel": "Contraseña",
+    "confirmPasswordLabel": "Confirmar contraseña",
+    "passwordPlaceholder": "••••••••",
+    "createAccount": "Crear cuenta de administrador",
+    "creatingAccount": "Creando cuenta…",
+    "showPassword": "Mostrar contraseña",
+    "hidePassword": "Ocultar contraseña",
+    "showConfirmPassword": "Mostrar confirmación de contraseña",
+    "hideConfirmPassword": "Ocultar confirmación de contraseña",
+    "logIn": "Iniciar sesión",
+    "errors": {
+      "invalidEmail": "Ingresa un correo electrónico válido.",
+      "passwordTooShort": "La contraseña debe tener al menos 8 caracteres.",
+      "passwordsMismatch": "Las contraseñas no coinciden.",
+      "alreadyComplete": "La configuración ya fue completada. Por favor inicia sesión.",
+      "unknown": "Algo salió mal. Inténtalo de nuevo."
+    }
+  },
+  "welcome": {
+    "heading": "Bienvenido a Quiniela para Amigos",
+    "subtitle": "Copa del Mundo 2026 — Fase de Grupos",
+    "group": "Grupo",
+    "importButton": "Importar partidos del Mundial",
+    "importing": "Importando…",
+    "importSuccess": "Se importaron {count} partido(s) exitosamente.",
+    "emptyHeading": "Aún no hay partidos del Mundial importados.",
+    "emptySubtitle": "Vuelve pronto.",
+    "vs": "vs",
+    "importErrors": {
+      "FETCH_FAILED": "Error al obtener los partidos de la fuente externa. Inténtalo más tarde.",
+      "DB_ERROR": "Error de base de datos al guardar los partidos. Inténtalo de nuevo.",
+      "UNKNOWN_ERROR": "Ocurrió un error inesperado. Inténtalo de nuevo."
+    },
+    "status": {
+      "FINISHED": "FINALIZADO",
+      "IN_PLAY": "EN JUEGO",
+      "PAUSED": "PAUSADO",
+      "TIMED": "PROGRAMADO",
+      "SCHEDULED": "PROGRAMADO",
+      "POSTPONED": "POSPUESTO",
+      "CANCELLED": "CANCELADO",
+      "SUSPENDED": "SUSPENDIDO"
+    }
+  },
+  "changePassword": {
+    "heading": "Establece tu nueva contraseña",
+    "subtitle": "Elige una contraseña que recuerdes. Debe tener al menos 8 caracteres, una mayúscula, una minúscula y un dígito.",
+    "newPasswordLabel": "Nueva contraseña",
+    "confirmPasswordLabel": "Confirmar nueva contraseña",
+    "passwordPlaceholder": "••••••••",
+    "setPassword": "Establecer nueva contraseña",
+    "saving": "Guardando…",
+    "errors": {
+      "POLICY_VIOLATION": "La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un dígito.",
+      "PASSWORDS_DO_NOT_MATCH": "Las contraseñas no coinciden.",
+      "FLAG_UPDATE_FAILED": "Tu contraseña fue cambiada pero no pudimos actualizar tu cuenta. Contacta al soporte.",
+      "UNAUTHORIZED": "Tu sesión ha expirado. Por favor inicia sesión de nuevo.",
+      "UNKNOWN_ERROR": "Algo salió mal. Inténtalo de nuevo."
+    }
+  },
+  "navbar": {
+    "appName": "Quiniela para Amigos",
+    "switchLanguage": "Cambiar idioma"
+  }
+}
