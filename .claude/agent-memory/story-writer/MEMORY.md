@@ -1,0 +1,1 @@
+- [User Role](user_role.md) — product owner / lead dev, quiniela SaaS, provides rough features + mapper findings, wants tight one-page stories

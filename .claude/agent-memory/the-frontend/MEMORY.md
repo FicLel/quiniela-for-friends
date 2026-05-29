@@ -1,0 +1,7 @@
+- [Jest jsdom override](feedback_jest_env.md) — Component tests need `@jest-environment jsdom` docblock; global config is `node`
+- [Testing libs available](feedback_testing_libs.md) — Only @testing-library/react + jest-dom installed; no user-event, use fireEvent
+- [Next.js 16 server action patterns](feedback_nextjs16_patterns.md) — Use useState+useTransition for client-side server action calls; redirect() never returns success to client
+- [getByLabelText aria-label conflict](feedback_getbylabeltext_aria.md) — Use exact label strings when adjacent buttons have aria-labels with same substring; avoids "multiple elements" errors
+- [Worktree Setup](project-worktree-setup.md) — sparse worktree lacks untracked main files (auth/, jest.config.js); node_modules shared via pnpm
+- [Jest Setup Detail](project-jest-setup.md) — setupFilesAfterEnv (correct option name), jsdom directive, --testPathPatterns plural in Jest 30+
+- [Auth Session](project-auth-session.md) — read role server-side via AuthClient.getTokenFromServerAction + verifyToken

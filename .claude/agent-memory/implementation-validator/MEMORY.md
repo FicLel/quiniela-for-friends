@@ -1,0 +1,3 @@
+- [Auth OTP Patterns & Gap Types](project-auth-ota-patterns.md) — Recurring patterns from Email OTP login validation: getSession vs getUser, missing test scenarios, proxy patterns
+- [Auth Password Flow Patterns & Gap Types](project-auth-password-patterns.md) — Recurring patterns from Email+Password login post-fix validation: type surface mismatch, proxy DB double-read, missing proxy tests
+- [Create First Admin Patterns & Gap Types](project-create-first-admin-patterns.md) — Recurring patterns from Create First Admin validation: Repository imports in views, missing action/page tests, validation error masking

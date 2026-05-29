@@ -1,0 +1,4 @@
+- [Architecture patterns](arch-patterns.md) — Hexagonal architecture: Views → Services → Clients/Repositories. No global infra folder.
+- [Next.js 16 conventions](nextjs16-conventions.md) — `middleware.ts` is deprecated; file is now `proxy.ts` with exported `proxy` function.
+- [Tenant isolation baseline](tenant-isolation.md) — No leagueId/tenantId pattern exists yet; auth module is greenfield.
+- [Auth module patterns](auth-module-patterns.md) — AuthClient factory methods, proxy cookie strategy, Server Action wiring, unit test mock shape.

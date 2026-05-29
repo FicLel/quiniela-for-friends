@@ -1,0 +1,9 @@
+-- The public.users table uses RLS policies for Supabase PostgREST (anon/authenticated roles).
+-- Direct Postgres connections (TypeORM via DATABASE_URL) use the 'postgres' superuser role,
+-- which bypasses RLS by default in PostgreSQL (superusers are exempt from RLS unless
+-- FORCE ROW LEVEL SECURITY is applied to the table, which it is NOT here).
+-- This means TypeORM operations (e.g., setMustChangePassword) bypass RLS intentionally.
+-- If FORCE ROW LEVEL SECURITY is ever applied, add a bypass policy for the service role:
+--   CREATE POLICY "service_role_bypass" ON public.users USING (true) WITH CHECK (true);
+--   (and grant it only to the service_role/postgres user)
+-- No DDL change is required at this time.
