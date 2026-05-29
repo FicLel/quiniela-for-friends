@@ -2,12 +2,35 @@ import { CompetitionsService } from '../CompetitionsService'
 import type {
   ICompetitionsClient,
   ICompetitionsRepository,
+  Match,
   MatchImportRecord,
 } from '../competitions.types'
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
+
+const MATCH: Match = {
+  id: 'uuid-1',
+  externalId: 123456,
+  stage: 'GROUP_STAGE',
+  group: 'GROUP_A',
+  matchday: 1,
+  status: 'SCHEDULED',
+  scheduledAt: new Date('2026-06-14T16:00:00Z'),
+  homeTeamExternalId: 759,
+  homeTeamName: 'Germany',
+  homeTeamShortName: 'Germany',
+  homeTeamTla: 'GER',
+  homeTeamCrest: 'https://crests.football-data.org/759.svg',
+  awayTeamExternalId: 762,
+  awayTeamName: 'Scotland',
+  awayTeamShortName: 'Scotland',
+  awayTeamTla: 'SCO',
+  awayTeamCrest: 'https://crests.football-data.org/762.svg',
+  createdAt: new Date('2026-01-01T00:00:00Z'),
+  updatedAt: new Date('2026-01-01T00:00:00Z'),
+}
 
 const RECORD: MatchImportRecord = {
   externalId: 123456,
@@ -47,6 +70,7 @@ function makeRepository(
   return {
     upsertMatches: jest.fn().mockResolvedValue(1),
     findAllGroupStageMatches: jest.fn().mockResolvedValue([]),
+    findAllMatches: jest.fn().mockResolvedValue([]),
     ...override,
   }
 }
@@ -54,6 +78,30 @@ function makeRepository(
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe('CompetitionsService – getAllMatches', () => {
+  it('delegates to repository.findAllMatches() and returns its result', async () => {
+    const repository = makeRepository({
+      findAllMatches: jest.fn().mockResolvedValue([MATCH]),
+    })
+    const service = new CompetitionsService(makeClient(), repository)
+
+    const result = await service.getAllMatches()
+
+    expect(result).toEqual([MATCH])
+    expect(repository.findAllMatches).toHaveBeenCalledTimes(1)
+  })
+
+  it('propagates repository errors to the caller without wrapping', async () => {
+    const error = new Error('findAllMatches failed: connection refused')
+    const repository = makeRepository({
+      findAllMatches: jest.fn().mockRejectedValue(error),
+    })
+    const service = new CompetitionsService(makeClient(), repository)
+
+    await expect(service.getAllMatches()).rejects.toThrow('findAllMatches failed: connection refused')
+  })
+})
 
 describe('CompetitionsService – importGroupStageMatches', () => {
   it('returns { success: true, count } on happy path', async () => {

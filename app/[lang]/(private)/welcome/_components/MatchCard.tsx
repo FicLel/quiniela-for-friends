@@ -16,6 +16,7 @@ export type MatchCardData = {
   awayTeamCrest: string | null
   scheduledAt: string   // ISO 8601 UTC — formatted client-side
   status: string
+  stage: string
 }
 
 type MatchCardProps = MatchCardData & {
@@ -23,20 +24,23 @@ type MatchCardProps = MatchCardData & {
   lang: Locale
 }
 
-type TeamCrestProps = {
-  crest: string | null
-  tla: string
-  name: string
-}
+// ---------------------------------------------------------------------------
+// TeamCrest
+// ---------------------------------------------------------------------------
+
+type TeamCrestProps = { crest: string | null; tla: string; name: string }
 
 function TeamCrest({ crest, tla, name }: TeamCrestProps) {
   const [imgFailed, setImgFailed] = useState(false)
+
+  const cls =
+    'h-14 w-14 rounded-full ring-2 ring-gray-200 sm:h-14 sm:w-14 lg:h-14 lg:w-14'
 
   if (!crest || imgFailed) {
     return (
       <div
         aria-label={tla}
-        className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600"
+        className={`${cls} flex items-center justify-center bg-gray-100 text-xs font-bold text-gray-600`}
       >
         {tla}
       </div>
@@ -48,35 +52,32 @@ function TeamCrest({ crest, tla, name }: TeamCrestProps) {
     <img
       src={crest}
       alt={name}
-      width={40}
-      height={40}
-      className="h-10 w-10 rounded-full object-contain"
+      width={56}
+      height={56}
+      className={`${cls} object-contain`}
       onError={() => setImgFailed(true)}
     />
   )
 }
 
-function FormattedDate({ scheduledAt, lang }: { scheduledAt: string; lang: Locale }) {
-  // suppressHydrationWarning: server renders UTC string; client renders local timezone.
+// ---------------------------------------------------------------------------
+// FormattedTime — HH:MM only
+// ---------------------------------------------------------------------------
+
+function FormattedTime({ scheduledAt, lang }: { scheduledAt: string; lang: Locale }) {
   const formatted = new Intl.DateTimeFormat(lang, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    timeZoneName: 'short',
   }).format(new Date(scheduledAt))
 
-  return <span suppressHydrationWarning>{formatted}</span>
+  return <time suppressHydrationWarning>{formatted}</time>
 }
 
-function StatusBadge({
-  status,
-  dict,
-}: {
-  status: string
-  dict: Dictionary['welcome']
-}) {
+// ---------------------------------------------------------------------------
+// StatusBadge
+// ---------------------------------------------------------------------------
+
+function StatusBadge({ status, dict }: { status: string; dict: Dictionary['welcome'] }) {
   const label =
     status in dict.status
       ? dict.status[status as keyof typeof dict.status]
@@ -98,6 +99,97 @@ function StatusBadge({
   )
 }
 
+// ---------------------------------------------------------------------------
+// ScoreCounter — vertical box widget, min 0
+// ---------------------------------------------------------------------------
+
+type ScoreCounterProps = {
+  incrementLabel: string
+  decrementLabel: string
+}
+
+function ScoreCounter({ incrementLabel, decrementLabel }: ScoreCounterProps) {
+  const [count, setCount] = useState(0)
+
+  return (
+    <div className="flex w-10 flex-col overflow-hidden rounded-lg border border-gray-200 sm:w-12 lg:w-14">
+      {/* Up button */}
+      <button
+        type="button"
+        aria-label={incrementLabel}
+        onClick={() => setCount((c) => c + 1)}
+        className="flex h-7 w-full items-center justify-center bg-gray-50 text-gray-500 transition hover:bg-green-50 hover:text-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-400 sm:h-8"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          className="h-3 w-3"
+          aria-hidden="true"
+        >
+          <path
+            fillRule="evenodd"
+            d="M9.47 6.47a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 1 1-1.06 1.06L10 8.06l-3.72 3.72a.75.75 0 0 1-1.06-1.06l4.25-4.25z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </button>
+
+      {/* Score display */}
+      <div className="flex h-8 w-full items-center justify-center border-y border-gray-200 bg-white sm:h-9 lg:h-10">
+        <span className="text-base font-bold tabular-nums text-gray-800 sm:text-lg lg:text-xl">
+          {count}
+        </span>
+      </div>
+
+      {/* Down button */}
+      <button
+        type="button"
+        aria-label={decrementLabel}
+        onClick={() => setCount((c) => Math.max(0, c - 1))}
+        disabled={count === 0}
+        className="flex h-7 w-full items-center justify-center bg-gray-50 text-gray-500 transition hover:bg-green-50 hover:text-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-400 disabled:cursor-not-allowed disabled:opacity-40 sm:h-8"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          className="h-3 w-3"
+          aria-hidden="true"
+        >
+          <path
+            fillRule="evenodd"
+            d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// WinBadge — circle letter (W/V) + 50%
+// ---------------------------------------------------------------------------
+
+function WinBadge({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-1">
+      <span
+        className="flex h-4 w-4 items-center justify-center rounded-full border border-green-600 text-[10px] font-bold leading-none text-green-700"
+        aria-hidden="true"
+      >
+        {label}
+      </span>
+      <span className="text-xs text-gray-400">50%</span>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// MatchCard
+// ---------------------------------------------------------------------------
+
 export default function MatchCard({
   homeTeamName,
   homeTeamTla,
@@ -111,27 +203,56 @@ export default function MatchCard({
   lang,
 }: MatchCardProps) {
   return (
-    <div className="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
-      <div className="flex items-center gap-3">
-        <div className="flex flex-1 items-center gap-2">
-          <TeamCrest crest={homeTeamCrest} tla={homeTeamTla} name={homeTeamName} />
-          <span className="text-sm font-semibold text-gray-800">{homeTeamName}</span>
-        </div>
+    <div className="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm sm:px-5 sm:py-4 lg:px-6 lg:py-4">
 
-        <span className="text-sm font-bold text-gray-400">{dict.vs}</span>
-
-        <div className="flex flex-1 items-center justify-end gap-2">
-          <span className="text-sm font-semibold text-gray-800">{awayTeamName}</span>
-          <TeamCrest crest={awayTeamCrest} tla={awayTeamTla} name={awayTeamName} />
-        </div>
-      </div>
-
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <p className="text-xs text-gray-500">
-          <FormattedDate scheduledAt={scheduledAt} lang={lang} />
+      {/* Row 1: match time (left) + status badge (right) */}
+      <div className="mb-3 flex items-center justify-between sm:mb-4">
+        <p className="text-xs font-medium text-gray-500">
+          <FormattedTime scheduledAt={scheduledAt} lang={lang} />
         </p>
         <StatusBadge status={status} dict={dict} />
       </div>
+
+      {/* Row 2: home team | score counters | away team */}
+      <div className="flex items-center justify-between gap-2 sm:gap-4">
+
+        {/* Home team column */}
+        <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
+          <TeamCrest crest={homeTeamCrest} tla={homeTeamTla} name={homeTeamName} />
+          <span className="max-w-[72px] truncate text-center text-xs font-semibold leading-tight text-gray-800 sm:max-w-none sm:text-sm">
+            {homeTeamName}
+          </span>
+        </div>
+
+        {/* Score counters */}
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <ScoreCounter
+            incrementLabel={`Increase ${homeTeamName} score`}
+            decrementLabel={`Decrease ${homeTeamName} score`}
+          />
+          <span className="text-sm font-bold text-gray-400">:</span>
+          <ScoreCounter
+            incrementLabel={`Increase ${awayTeamName} score`}
+            decrementLabel={`Decrease ${awayTeamName} score`}
+          />
+        </div>
+
+        {/* Away team column */}
+        <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
+          <TeamCrest crest={awayTeamCrest} tla={awayTeamTla} name={awayTeamName} />
+          <span className="max-w-[72px] truncate text-center text-xs font-semibold leading-tight text-gray-800 sm:max-w-none sm:text-sm">
+            {awayTeamName}
+          </span>
+        </div>
+
+      </div>
+
+      {/* Row 3: win probability — extra top margin for breathing room */}
+      <div className="mt-3 flex items-center justify-between px-2 sm:mt-4 sm:px-4 lg:px-6">
+        <WinBadge label={dict.winLabel} />
+        <WinBadge label={dict.winLabel} />
+      </div>
+
     </div>
   )
 }

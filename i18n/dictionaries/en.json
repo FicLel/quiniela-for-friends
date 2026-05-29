@@ -51,11 +51,18 @@
     "emptyHeading": "No World Cup matches imported yet.",
     "emptySubtitle": "Check back soon.",
     "vs": "vs",
+    "winLabel": "W",
     "importErrors": {
       "FETCH_FAILED": "Failed to fetch matches from the external source. Please try again later.",
       "DB_ERROR": "A database error occurred while saving matches. Please try again.",
       "UNKNOWN_ERROR": "An unexpected error occurred. Please try again."
     },
+    "viewByDate": "By Date",
+    "viewByGroup": "By Group",
+    "knockoutRoundOf16": "Round of 16",
+    "knockoutQuarterFinals": "Quarter-finals",
+    "knockoutSemiFinals": "Semi-finals",
+    "knockoutFinal": "Final",
     "status": {
       "FINISHED": "FINISHED",
       "IN_PLAY": "IN PLAY",

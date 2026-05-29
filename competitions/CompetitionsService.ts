@@ -16,6 +16,7 @@ import type {
   ICompetitionsRepository,
   ICompetitionsService,
   ImportMatchesResult,
+  Match,
 } from '@/competitions/competitions.types'
 
 export class CompetitionsService implements ICompetitionsService {
@@ -35,6 +36,10 @@ export class CompetitionsService implements ICompetitionsService {
    * 3. Any other unexpected throw → { success: false, error: 'UNKNOWN_ERROR' }.
    * 4. On success → { success: true, count } where count is the number of records upserted.
    */
+  async getAllMatches(): Promise<Match[]> {
+    return this.repository.findAllMatches()
+  }
+
   async importGroupStageMatches(): Promise<ImportMatchesResult> {
     let records
     try {

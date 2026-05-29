@@ -1,15 +1,20 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getDictionary, hasLocale } from '@/i18n/getDictionary'
+import { CompetitionsClient } from '@/competitions/CompetitionsClient'
 import { CompetitionsRepository } from '@/competitions/CompetitionsRepository'
+import { CompetitionsService } from '@/competitions/CompetitionsService'
 import { AuthClient } from '@/auth/AuthClient'
 import ImportMatchesButton from './_components/ImportMatchesButton'
-import GroupAccordion from './_components/GroupAccordion'
+import WelcomeMatchList from './_components/WelcomeMatchList'
 import EmptyState from './_components/EmptyState'
 import type { MatchCardData } from './_components/MatchCard'
 import type { Locale } from '@/i18n/i18n.types'
 
-type PageProps = { params: Promise<{ lang: string }> }
+type PageProps = {
+  params: Promise<{ lang: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { lang } = await params
@@ -18,8 +23,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return { title: `${dict.welcome.heading} — ${dict.meta.title}` }
 }
 
-export default async function WelcomePage({ params }: PageProps) {
-  const { lang } = await params
+export default async function WelcomePage({ params, searchParams }: PageProps) {
+  const [{ lang }, resolvedSearchParams] = await Promise.all([params, searchParams])
   if (!hasLocale(lang)) notFound()
 
   const dict = await getDictionary(lang)
@@ -30,16 +35,22 @@ export default async function WelcomePage({ params }: PageProps) {
   const session = token ? await authClient.verifyToken(token) : null
   const userRole = session?.role ?? 'player'
 
-  const repository = new CompetitionsRepository()
-  const matches = await repository.findAllGroupStageMatches()
+  // Derive view mode from URL param — default to 'date'
+  const viewParam = resolvedSearchParams.view
+  const viewMode: 'date' | 'group' =
+    viewParam === 'group' ? 'group' : 'date'
 
+  const service = new CompetitionsService(new CompetitionsClient(), new CompetitionsRepository())
+  const allMatches = await service.getAllMatches()
+
+  const knockoutStages = new Set(['ROUND_OF_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'FINAL'])
+
+  const groupStageMatches: MatchCardData[] = []
+  const knockoutMatches: MatchCardData[] = []
   const groupMap = new Map<string, MatchCardData[]>()
-  for (const match of matches) {
-    const group = match.group
-    if (!groupMap.has(group)) {
-      groupMap.set(group, [])
-    }
-    groupMap.get(group)!.push({
+
+  for (const match of allMatches) {
+    const cardData: MatchCardData = {
       id: match.id,
       homeTeamName: match.homeTeamName,
       homeTeamShortName: match.homeTeamShortName,
@@ -51,7 +62,20 @@ export default async function WelcomePage({ params }: PageProps) {
       awayTeamCrest: match.awayTeamCrest,
       scheduledAt: match.scheduledAt.toISOString(),
       status: match.status,
-    })
+      stage: match.stage,
+    }
+
+    if (knockoutStages.has(match.stage)) {
+      knockoutMatches.push(cardData)
+    } else if (match.stage === 'GROUP_STAGE') {
+      groupStageMatches.push(cardData)
+      // Build group map using the domain object's group field
+      const group = match.group
+      if (!groupMap.has(group)) {
+        groupMap.set(group, [])
+      }
+      groupMap.get(group)!.push(cardData)
+    }
   }
 
   const sortedGroups = Array.from(groupMap.entries()).sort(([a], [b]) => a.localeCompare(b))
@@ -64,24 +88,23 @@ export default async function WelcomePage({ params }: PageProps) {
           <p className="mt-3 text-base text-green-700">{dict.welcome.subtitle}</p>
         </div>
 
-        <div className="mb-6">
-          <ImportMatchesButton userRole={userRole} dict={dict.welcome} />
-        </div>
+        {userRole === 'admin' && (
+          <div className="mb-6">
+            <ImportMatchesButton userRole={userRole} dict={dict.welcome} />
+          </div>
+        )}
 
-        {sortedGroups.length === 0 ? (
+        {groupStageMatches.length === 0 && knockoutMatches.length === 0 ? (
           <EmptyState dict={dict.welcome} />
         ) : (
-          <div className="flex flex-col gap-4">
-            {sortedGroups.map(([group, groupMatches]) => (
-              <GroupAccordion
-                key={group}
-                group={group}
-                matches={groupMatches}
-                dict={dict.welcome}
-                lang={locale}
-              />
-            ))}
-          </div>
+          <WelcomeMatchList
+            viewMode={viewMode}
+            groupStageMatches={groupStageMatches}
+            knockoutMatches={knockoutMatches}
+            sortedGroups={sortedGroups}
+            dict={dict.welcome}
+            lang={locale}
+          />
         )}
       </div>
     </main>

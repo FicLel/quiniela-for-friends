@@ -51,11 +51,18 @@
     "emptyHeading": "Aún no hay partidos del Mundial importados.",
     "emptySubtitle": "Vuelve pronto.",
     "vs": "vs",
+    "winLabel": "V",
     "importErrors": {
       "FETCH_FAILED": "Error al obtener los partidos de la fuente externa. Inténtalo más tarde.",
       "DB_ERROR": "Error de base de datos al guardar los partidos. Inténtalo de nuevo.",
       "UNKNOWN_ERROR": "Ocurrió un error inesperado. Inténtalo de nuevo."
     },
+    "viewByDate": "Por Fecha",
+    "viewByGroup": "Por Grupo",
+    "knockoutRoundOf16": "16avos de Final",
+    "knockoutQuarterFinals": "Cuartos de Final",
+    "knockoutSemiFinals": "Semifinales",
+    "knockoutFinal": "Final",
     "status": {
       "FINISHED": "FINALIZADO",
       "IN_PLAY": "EN JUEGO",

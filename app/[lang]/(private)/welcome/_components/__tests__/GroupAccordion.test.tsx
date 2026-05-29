@@ -17,6 +17,7 @@ const sampleMatches: MatchCardData[] = [
     awayTeamCrest: null,
     scheduledAt: '2026-06-14T18:00:00Z',
     status: 'SCHEDULED',
+    stage: 'GROUP_STAGE',
   },
 ]
 

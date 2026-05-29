@@ -30,6 +30,14 @@ const mockFindOrder3 = jest.fn()
 const mockFindOrder2 = jest.fn(() => ({ order: mockFindOrder3 }))
 const mockFindOrder1 = jest.fn(() => ({ order: mockFindOrder2 }))
 
+// findAllMatches: .select('*').order('scheduled_at') — single order, terminates
+const mockFindAllOrder = jest.fn()
+
+// Controls which chain select('*') routes to.
+// false (default) → three-order chain (findAllGroupStageMatches)
+// true            → single-order chain (findAllMatches)
+let useFindAllChain = false
+
 // upsertMatches: .upsert(rows, opts)
 const mockUpsert = jest.fn()
 
@@ -45,7 +53,10 @@ const mockSelect = jest.fn((arg: string) => {
   if (arg === 'id') {
     return { limit: mockSchemaSelectLimit }
   }
-  // arg === '*' → findAllGroupStageMatches chain
+  // arg === '*' — route based on which method is under test
+  if (useFindAllChain) {
+    return { order: mockFindAllOrder }
+  }
   return { order: mockFindOrder1 }
 })
 
@@ -104,6 +115,28 @@ const DB_ROW = {
   updated_at: '2026-05-28T00:00:00Z',
 }
 
+const DB_ROW_KNOCKOUT = {
+  id: 'match-uuid-2',
+  external_id: 654321,
+  stage: 'ROUND_OF_16',
+  group: '',
+  matchday: 0,
+  status: 'SCHEDULED',
+  scheduled_at: '2026-07-05T20:00:00Z',
+  home_team_external_id: 759,
+  home_team_name: 'Germany',
+  home_team_short_name: 'Germany',
+  home_team_tla: 'GER',
+  home_team_crest: 'https://crests.football-data.org/759.svg',
+  away_team_external_id: 762,
+  away_team_name: 'Scotland',
+  away_team_short_name: 'Scotland',
+  away_team_tla: 'SCO',
+  away_team_crest: 'https://crests.football-data.org/762.svg',
+  created_at: '2026-05-28T00:00:00Z',
+  updated_at: '2026-05-28T00:00:00Z',
+}
+
 /**
  * Set env vars, prime the schema-check mock, and return a new repo instance.
  */
@@ -126,8 +159,19 @@ function setEnvVars() {
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
 }
 
+/**
+ * Set useFindAllChain = true, prime the schema-check mock, and return a new
+ * repo instance. select('*') will route to the single-order findAllMatches
+ * chain for the duration of the test.
+ */
+function makeRepoForFindAllMatches(schemaExists = true) {
+  useFindAllChain = true
+  return makeRepo(schemaExists)
+}
+
 beforeEach(() => {
   jest.clearAllMocks()
+  useFindAllChain = false
 })
 
 // ---------------------------------------------------------------------------
@@ -360,5 +404,114 @@ describe('CompetitionsRepository – findAllGroupStageMatches', () => {
     expect(mockFindOrder1).toHaveBeenCalledWith('group')
     expect(mockFindOrder2).toHaveBeenCalledWith('matchday')
     expect(mockFindOrder3).toHaveBeenCalledWith('scheduled_at')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// findAllMatches
+// ---------------------------------------------------------------------------
+
+describe('CompetitionsRepository – findAllMatches', () => {
+  it('maps mixed GROUP_STAGE and ROUND_OF_16 rows to Match domain objects', async () => {
+    const repo = makeRepoForFindAllMatches()
+    mockFindAllOrder.mockResolvedValueOnce({
+      data: [DB_ROW, DB_ROW_KNOCKOUT],
+      error: null,
+    })
+
+    const matches = await repo.findAllMatches()
+
+    expect(matches).toHaveLength(2)
+    expect(matches[0]).toEqual({
+      id: 'match-uuid-1',
+      externalId: 123456,
+      stage: 'GROUP_STAGE',
+      group: 'GROUP_A',
+      matchday: 1,
+      status: 'SCHEDULED',
+      scheduledAt: new Date('2026-06-14T16:00:00Z'),
+      homeTeamExternalId: 759,
+      homeTeamName: 'Germany',
+      homeTeamShortName: 'Germany',
+      homeTeamTla: 'GER',
+      homeTeamCrest: 'https://crests.football-data.org/759.svg',
+      awayTeamExternalId: 762,
+      awayTeamName: 'Scotland',
+      awayTeamShortName: 'Scotland',
+      awayTeamTla: 'SCO',
+      awayTeamCrest: 'https://crests.football-data.org/762.svg',
+      createdAt: new Date('2026-05-28T00:00:00Z'),
+      updatedAt: new Date('2026-05-28T00:00:00Z'),
+    })
+    expect(matches[1]).toEqual({
+      id: 'match-uuid-2',
+      externalId: 654321,
+      stage: 'ROUND_OF_16',
+      group: '',
+      matchday: 0,
+      status: 'SCHEDULED',
+      scheduledAt: new Date('2026-07-05T20:00:00Z'),
+      homeTeamExternalId: 759,
+      homeTeamName: 'Germany',
+      homeTeamShortName: 'Germany',
+      homeTeamTla: 'GER',
+      homeTeamCrest: 'https://crests.football-data.org/759.svg',
+      awayTeamExternalId: 762,
+      awayTeamName: 'Scotland',
+      awayTeamShortName: 'Scotland',
+      awayTeamTla: 'SCO',
+      awayTeamCrest: 'https://crests.football-data.org/762.svg',
+      createdAt: new Date('2026-05-28T00:00:00Z'),
+      updatedAt: new Date('2026-05-28T00:00:00Z'),
+    })
+  })
+
+  it('returns an empty array when data is null', async () => {
+    const repo = makeRepoForFindAllMatches()
+    mockFindAllOrder.mockResolvedValueOnce({ data: null, error: null })
+
+    const matches = await repo.findAllMatches()
+    expect(matches).toEqual([])
+  })
+
+  it('returns an empty array when data is an empty array', async () => {
+    const repo = makeRepoForFindAllMatches()
+    mockFindAllOrder.mockResolvedValueOnce({ data: [], error: null })
+
+    const matches = await repo.findAllMatches()
+    expect(matches).toEqual([])
+  })
+
+  it('calls .select("*").order("scheduled_at") — single order call', async () => {
+    const repo = makeRepoForFindAllMatches()
+    mockFindAllOrder.mockResolvedValueOnce({ data: [], error: null })
+
+    await repo.findAllMatches()
+
+    expect(mockSelect).toHaveBeenCalledWith('*')
+    expect(mockFindAllOrder).toHaveBeenCalledWith('scheduled_at')
+    // The three-order chain mocks must not have been called
+    expect(mockFindOrder1).not.toHaveBeenCalled()
+    expect(mockFindOrder2).not.toHaveBeenCalled()
+    expect(mockFindOrder3).not.toHaveBeenCalled()
+  })
+
+  it('throws "findAllMatches failed: <message>" on Supabase error', async () => {
+    const repo = makeRepoForFindAllMatches()
+    mockFindAllOrder.mockResolvedValueOnce({
+      error: { message: 'permission denied' },
+    })
+
+    await expect(repo.findAllMatches()).rejects.toThrow(
+      'findAllMatches failed: permission denied',
+    )
+  })
+
+  it('throws the schema-missing error when the matches table does not exist', async () => {
+    const repo = makeRepoForFindAllMatches(false)
+
+    await expect(repo.findAllMatches()).rejects.toThrow(
+      'Supabase table "public.matches" does not exist — run pending migrations before starting the application.',
+    )
   })
 })

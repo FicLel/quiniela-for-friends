@@ -80,8 +80,12 @@ export interface ICompetitionsRepository {
 
   /** Return all matches ordered by group → matchday → scheduled_at. */
   findAllGroupStageMatches(): Promise<Match[]>
+
+  /** Return all matches (all stages) ordered by scheduled_at. */
+  findAllMatches(): Promise<Match[]>
 }
 
 export interface ICompetitionsService {
   importGroupStageMatches(): Promise<ImportMatchesResult>
+  getAllMatches(): Promise<Match[]>
 }

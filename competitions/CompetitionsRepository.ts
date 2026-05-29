@@ -149,4 +149,26 @@ export class CompetitionsRepository implements ICompetitionsRepository {
 
     return data.map((row) => this.toMatch(row as Record<string, unknown>))
   }
+
+  /**
+   * Return all matches (all stages) ordered by scheduled_at.
+   * Returns [] if the table is empty or data is null.
+   * Throws on Supabase error.
+   */
+  async findAllMatches(): Promise<Match[]> {
+    await this.verifySchema()
+
+    const { data, error } = await this.supabase
+      .from('matches')
+      .select('*')
+      .order('scheduled_at')
+
+    if (error) {
+      throw new Error(`findAllMatches failed: ${error.message}`)
+    }
+
+    if (!data || data.length === 0) return []
+
+    return data.map((row) => this.toMatch(row as Record<string, unknown>))
+  }
 }
