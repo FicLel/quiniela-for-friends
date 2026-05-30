@@ -2,19 +2,12 @@ import { notFound } from 'next/navigation'
 import { getDictionary, hasLocale } from '@/i18n/getDictionary'
 import { AuthClient } from '@/auth/AuthClient'
 import { InvitationsRepository } from '@/invitations/InvitationsRepository'
-import { UsersRepository } from '@/users/UsersRepository'
 import type { Locale } from '@/i18n/i18n.types'
 import InviteAcceptanceFlow, { type PageData } from './_components/InviteAcceptanceFlow'
 import { acceptInviteAsExistingUser, acceptInviteAsNewUser } from './actions'
 
 type PageProps = {
   params: Promise<{ lang: string; shortCode: string }>
-}
-
-function maskEmail(email: string): string {
-  const atIdx = email.indexOf('@')
-  if (atIdx <= 0) return email
-  return `${email[0]}***${email.slice(atIdx)}`
 }
 
 export default async function InvitePage({ params }: PageProps) {
@@ -24,7 +17,6 @@ export default async function InvitePage({ params }: PageProps) {
   const dict = await getDictionary(lang)
   const locale = lang as Locale
 
-  // Read the invitation from the DB by shortCode
   const invitationsRepo = new InvitationsRepository()
   const invitation = await invitationsRepo.findByShortCode(shortCode)
 
@@ -32,34 +24,19 @@ export default async function InvitePage({ params }: PageProps) {
 
   if (!invitation) {
     pageData = { status: 'invalid', reason: 'NOT_FOUND' }
-  } else if (invitation.acceptedAt !== null) {
-    pageData = { status: 'invalid', reason: 'ALREADY_ACCEPTED' }
   } else if (invitation.revokedAt !== null) {
     pageData = { status: 'invalid', reason: 'REVOKED' }
   } else if (invitation.expiresAt < new Date()) {
     pageData = { status: 'invalid', reason: 'EXPIRED' }
   } else {
-    // Invitation is valid — check session
     const authClient = new AuthClient()
     const sessionToken = await authClient.getTokenFromServerAction()
     const session = sessionToken ? await authClient.verifyToken(sessionToken) : null
 
-    const hasSession = session !== null
-    const sessionEmailMatches =
-      hasSession &&
-      session!.email.toLowerCase() === invitation.email.toLowerCase()
-
-    // Check if the invited user already has an account
-    const usersRepo = new UsersRepository()
-    const existingUser = await usersRepo.findByEmail(invitation.email)
-
     pageData = {
       status: 'valid',
       quinielaId: invitation.quinielaId,
-      maskedEmail: maskEmail(invitation.email),
-      userExists: existingUser !== null,
-      hasSession,
-      sessionEmailMatches,
+      hasSession: session !== null,
       shortCode,
     }
   }

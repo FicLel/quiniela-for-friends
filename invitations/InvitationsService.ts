@@ -56,27 +56,22 @@ export class InvitationsService implements IInvitationsService {
   }
 
   /**
-   * Send an invitation to join a quiniela.
+   * Send an open invitation link for a quiniela (no email required).
    *
    * Flow:
-   * 1. Lowercase and trim email.
-   * 2. Verify caller is admin in the quiniela → CALLER_NOT_QUINIELA_ADMIN.
-   * 3. Check invited email is not already a member → ALREADY_A_MEMBER.
-   * 4. Revoke any existing active invitations for (email, quinielaId).
-   * 5. Generate a 64-char hex raw token; hash it with SHA-256.
-   * 6. Insert invitation row (expires_at = now + 7 days).
-   * 7. Return { success: true, invitationId, inviteUrl: `${baseUrl}/invite/${rawToken}` }.
+   * 1. Verify caller is admin in the quiniela → CALLER_NOT_QUINIELA_ADMIN.
+   * 2. Find any active open invite for this quiniela → if found, revoke it.
+   * 3. Generate short code with retry-on-collision logic (up to 5 retries).
+   * 4. INSERT new invitation row with email = null (expires_at = now + 7 days).
+   * 5. Return { success: true, invitationId, inviteUrl: `${baseUrl}/invite/${shortCode}` }.
    */
   async sendInvite(input: {
     quinielaId: string
-    email: string
     roleToAssign: 'admin' | 'member'
     callerUserId: string
     baseUrl: string
   }): Promise<SendInviteResult> {
     try {
-      const email = input.email.toLowerCase().trim()
-
       // 1. Verify caller is admin
       const callerMembership = await this.membershipsRepository.findByQuinielaAndUser(
         input.quinielaId,
@@ -86,32 +81,19 @@ export class InvitationsService implements IInvitationsService {
         return { success: false, error: 'CALLER_NOT_QUINIELA_ADMIN' }
       }
 
-      // 2. Check invited email is not already a member
-      const invitedUser = await this.usersRepository.findByEmail(email)
-      if (invitedUser !== null) {
-        const existingMembership = await this.membershipsRepository.findByQuinielaAndUser(
-          input.quinielaId,
-          invitedUser.id,
-        )
-        if (existingMembership !== null) {
-          return { success: false, error: 'ALREADY_A_MEMBER' }
-        }
-      }
-
-      // 3. Revoke any existing active invitations
-      const activeInvitations = await this.invitationsRepository.findActiveByEmailAndQuiniela(
-        email,
+      // 2. Revoke any existing active open invite for this quiniela
+      const existingOpenInvite = await this.invitationsRepository.findActiveOpenByQuiniela(
         input.quinielaId,
       )
-      for (const activeInvite of activeInvitations) {
-        await this.invitationsRepository.markRevoked(activeInvite.id)
+      if (existingOpenInvite) {
+        await this.invitationsRepository.markRevoked(existingOpenInvite.id)
       }
 
-      // 4. Generate token and hash
+      // 3. Generate token and hash
       const rawToken = randomBytes(32).toString('hex')
       const tokenHash = this.hashToken(rawToken)
 
-      // 5. Insert invitation row — retry on short_code unique constraint collision
+      // 4. Insert invitation row — retry on short_code unique constraint collision
       const expiresAt = new Date()
       expiresAt.setDate(expiresAt.getDate() + INVITE_EXPIRY_DAYS)
 
@@ -122,7 +104,7 @@ export class InvitationsService implements IInvitationsService {
         try {
           invitation = await this.invitationsRepository.create({
             quinielaId: input.quinielaId,
-            email,
+            email: null,
             roleToAssign: input.roleToAssign,
             tokenHash,
             shortCode,
@@ -161,14 +143,17 @@ export class InvitationsService implements IInvitationsService {
    * 3. Check expiresAt < now() → TOKEN_EXPIRED.
    * 4. Check revokedAt !== null → TOKEN_REVOKED.
    * 5. Check acceptedAt !== null → TOKEN_ALREADY_ACCEPTED.
-   * 6. If callerUserId is set: fetch caller user, verify email matches → EMAIL_MISMATCH.
-   *    Create membership, mark accepted, return { wasNewUser: false }.
+   * 6. If callerUserId is set:
+   *    - Check if caller is already a member → return { success: true, alreadyMember: true }.
+   *    - Create membership (approved_at = NULL), do NOT mark accepted.
+   *    - Return { success: true, quinielaId, pendingApproval: true }.
    * 7. If callerUserId is null (new-user path):
-   *    - Check if email already exists in DB → EMAIL_MISMATCH (action should redirect to login).
+   *    - Check if email already exists in DB → EMAIL_ALREADY_EXISTS (prompt to log in).
    *    - Require newPassword → PASSWORD_REQUIRED.
    *    - Validate min 8 chars → WEAK_PASSWORD.
-   *    - Hash with bcrypt (cost 12), create user (mustChangePassword: false),
-   *      create membership, mark accepted, return { wasNewUser: true }.
+   *    - Hash with bcrypt (cost 12), create user, create membership.
+   *    - Do NOT mark accepted.
+   *    - Return { success: true, quinielaId, pendingApproval: true, wasNewUser: true }.
    */
   async acceptInvite(input: {
     rawToken: string
@@ -202,26 +187,31 @@ export class InvitationsService implements IInvitationsService {
 
       if (input.callerUserId !== null) {
         // 6. Logged-in user path
-        const callerUser = await this.usersRepository.findById(input.callerUserId)
-        if (!callerUser || callerUser.email !== invitation.email) {
-          return { success: false, error: 'EMAIL_MISMATCH' }
+        const alreadyMember = await this.membershipsRepository.isMember(
+          invitation.quinielaId,
+          input.callerUserId,
+        )
+        if (alreadyMember) {
+          return { success: true, quinielaId: invitation.quinielaId, alreadyMember: true }
         }
 
         await this.membershipsRepository.create({
           quinielaId: invitation.quinielaId,
-          userId: callerUser.id,
+          userId: input.callerUserId,
           role: invitation.roleToAssign,
         })
-        await this.invitationsRepository.markAccepted(invitation.id)
+        // Do NOT mark accepted — open invite stays valid for next user
 
-        return { success: true, quinielaId: invitation.quinielaId, wasNewUser: false }
+        return { success: true, quinielaId: invitation.quinielaId, pendingApproval: true }
       } else {
         // 7. New-user path (callerUserId is null)
 
-        // Check if email already exists → redirect to login
-        const existingUser = await this.usersRepository.findByEmail(invitation.email)
-        if (existingUser !== null) {
-          return { success: false, error: 'EMAIL_MISMATCH' }
+        // Check if email already exists → prompt to log in
+        if (invitation.email !== null) {
+          const existingUser = await this.usersRepository.findByEmail(invitation.email)
+          if (existingUser !== null) {
+            return { success: false, error: 'EMAIL_ALREADY_EXISTS' }
+          }
         }
 
         // Require password
@@ -237,7 +227,7 @@ export class InvitationsService implements IInvitationsService {
         // Hash password and create user
         const passwordHash = await bcrypt.hash(input.newPassword, BCRYPT_SALT_ROUNDS)
         const newUser = await this.usersRepository.create({
-          email: invitation.email,
+          email: invitation.email ?? '',
           passwordHash,
           role: 'player',
           mustChangePassword: false,
@@ -248,9 +238,9 @@ export class InvitationsService implements IInvitationsService {
           userId: newUser.id,
           role: invitation.roleToAssign,
         })
-        await this.invitationsRepository.markAccepted(invitation.id)
+        // Do NOT mark accepted — open invite stays valid for next user
 
-        return { success: true, quinielaId: invitation.quinielaId, wasNewUser: true }
+        return { success: true, quinielaId: invitation.quinielaId, pendingApproval: true, wasNewUser: true }
       }
     } catch {
       return { success: false, error: 'UNKNOWN_ERROR' }
@@ -263,21 +253,24 @@ export class InvitationsService implements IInvitationsService {
    * Mirrors `acceptInvite` exactly, but resolves the invitation via
    * `findByShortCode` instead of `findByTokenHash`.
    *
-   * This is the method used by the new `/invite/[shortCode]` route.
+   * This is the method used by the `/invite/[shortCode]` route.
    * The raw cryptographic token is NOT exposed in the URL with this path.
    *
-   * Flow:
+   * Open-invite flow (email = null):
    * 1. findByShortCode → TOKEN_NOT_FOUND.
    * 2. Check expiresAt → TOKEN_EXPIRED.
    * 3. Check revokedAt → TOKEN_REVOKED.
-   * 4. Check acceptedAt → TOKEN_ALREADY_ACCEPTED.
-   * 5a. If callerUserId set: verify email, create membership, mark accepted → wasNewUser: false.
-   * 5b. If callerUserId null: validate email uniqueness + password, create user + membership → wasNewUser: true.
+   * 4. (No TOKEN_ALREADY_ACCEPTED check — open invites are reusable.)
+   * 5a. Logged-in user: check already a member → alreadyMember: true.
+   *     Otherwise create membership (approved_at NULL), do NOT mark accepted.
+   * 5b. New-user path: if email already exists → EMAIL_ALREADY_EXISTS.
+   *     Validate password, create user + membership. Do NOT mark accepted.
    */
   async acceptInviteByShortCode(input: {
     shortCode: string
     callerUserId: string | null
     newPassword?: string
+    newUserEmail?: string
   }): Promise<AcceptInviteResult> {
     try {
       // 1. Find invitation by short code
@@ -296,33 +289,37 @@ export class InvitationsService implements IInvitationsService {
         return { success: false, error: 'TOKEN_REVOKED' }
       }
 
-      // 4. Check already accepted
-      if (invitation.acceptedAt !== null) {
-        return { success: false, error: 'TOKEN_ALREADY_ACCEPTED' }
-      }
-
       if (input.callerUserId !== null) {
         // 5a. Logged-in user path
-        const callerUser = await this.usersRepository.findById(input.callerUserId)
-        if (!callerUser || callerUser.email !== invitation.email) {
-          return { success: false, error: 'EMAIL_MISMATCH' }
+        const alreadyMember = await this.membershipsRepository.isMember(
+          invitation.quinielaId,
+          input.callerUserId,
+        )
+        if (alreadyMember) {
+          return { success: true, quinielaId: invitation.quinielaId, alreadyMember: true }
         }
 
         await this.membershipsRepository.create({
           quinielaId: invitation.quinielaId,
-          userId: callerUser.id,
+          userId: input.callerUserId,
           role: invitation.roleToAssign,
         })
-        await this.invitationsRepository.markAccepted(invitation.id)
+        // Do NOT mark accepted — open invite stays valid for next user
 
-        return { success: true, quinielaId: invitation.quinielaId, wasNewUser: false }
+        return { success: true, quinielaId: invitation.quinielaId, pendingApproval: true }
       } else {
         // 5b. New-user path (callerUserId is null)
 
+        // Resolve the email: use the one from the invite, or the one provided by the user
+        const resolvedEmail = invitation.email ?? input.newUserEmail ?? ''
+        if (!resolvedEmail) {
+          return { success: false, error: 'UNKNOWN_ERROR' }
+        }
+
         // Check if email already exists → redirect to login
-        const existingUser = await this.usersRepository.findByEmail(invitation.email)
+        const existingUser = await this.usersRepository.findByEmail(resolvedEmail)
         if (existingUser !== null) {
-          return { success: false, error: 'EMAIL_MISMATCH' }
+          return { success: false, error: 'EMAIL_ALREADY_EXISTS' }
         }
 
         // Require password
@@ -338,7 +335,7 @@ export class InvitationsService implements IInvitationsService {
         // Hash password and create user
         const passwordHash = await bcrypt.hash(input.newPassword, BCRYPT_SALT_ROUNDS)
         const newUser = await this.usersRepository.create({
-          email: invitation.email,
+          email: resolvedEmail,
           passwordHash,
           role: 'player',
           mustChangePassword: false,
@@ -349,9 +346,9 @@ export class InvitationsService implements IInvitationsService {
           userId: newUser.id,
           role: invitation.roleToAssign,
         })
-        await this.invitationsRepository.markAccepted(invitation.id)
+        // Do NOT mark accepted — open invite stays valid for next user
 
-        return { success: true, quinielaId: invitation.quinielaId, wasNewUser: true }
+        return { success: true, quinielaId: invitation.quinielaId, pendingApproval: true, wasNewUser: true }
       }
     } catch {
       return { success: false, error: 'UNKNOWN_ERROR' }

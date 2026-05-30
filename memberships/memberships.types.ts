@@ -43,6 +43,7 @@ export interface IMembershipsRepository {
   deleteById(membershipId: string): Promise<void>
   countAdmins(quinielaId: string): Promise<number>
   approve(membershipId: string): Promise<void>
+  isMember(quinielaId: string, userId: string): Promise<boolean>
 }
 
 export interface IMembershipsService {

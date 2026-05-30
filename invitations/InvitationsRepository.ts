@@ -40,7 +40,7 @@ export class InvitationsRepository implements IInvitationsRepository {
     return {
       id: row.id as string,
       quinielaId: row.quiniela_id as string,
-      email: row.email as string,
+      email: row.email != null ? (row.email as string) : null,
       roleToAssign: row.role_to_assign as 'admin' | 'member',
       tokenHash: row.token_hash as string,
       shortCode: row.short_code as string,
@@ -54,7 +54,7 @@ export class InvitationsRepository implements IInvitationsRepository {
 
   async create(input: {
     quinielaId: string
-    email: string
+    email: string | null
     roleToAssign: 'admin' | 'member'
     tokenHash: string
     shortCode: string
@@ -66,7 +66,7 @@ export class InvitationsRepository implements IInvitationsRepository {
       .from('quiniela_invitations')
       .insert({
         quiniela_id: input.quinielaId,
-        email: input.email,
+        email: input.email ?? null,
         role_to_assign: input.roleToAssign,
         token_hash: input.tokenHash,
         short_code: input.shortCode,
@@ -126,6 +126,28 @@ export class InvitationsRepository implements IInvitationsRepository {
     if (error) throw new Error(`findActiveByEmailAndQuiniela failed: ${error.message}`)
     if (!data) return []
     return (data as Record<string, unknown>[]).map((row) => this.toInvitation(row))
+  }
+
+  /**
+   * Find the single active open (email=NULL) invitation for a quiniela.
+   * Returns null if no active open invite exists.
+   */
+  async findActiveOpenByQuiniela(quinielaId: string): Promise<Invitation | null> {
+    await this.verifySchema()
+    const now = new Date().toISOString()
+    const { data, error } = await this.supabase
+      .from('quiniela_invitations')
+      .select('*')
+      .eq('quiniela_id', quinielaId)
+      .is('email', null)
+      .is('accepted_at', null)
+      .is('revoked_at', null)
+      .gt('expires_at', now)
+      .limit(1)
+      .single()
+
+    if (error || !data) return null
+    return this.toInvitation(data as Record<string, unknown>)
   }
 
   async markAccepted(invitationId: string): Promise<void> {

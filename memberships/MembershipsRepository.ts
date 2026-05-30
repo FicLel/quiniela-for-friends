@@ -154,4 +154,16 @@ export class MembershipsRepository implements IMembershipsRepository {
     if (error) throw new Error(`countAdmins failed: ${error.message}`)
     return count ?? 0
   }
+
+  async isMember(quinielaId: string, userId: string): Promise<boolean> {
+    await this.verifySchema()
+    const { count, error } = await this.supabase
+      .from('quiniela_memberships')
+      .select('id', { count: 'exact' })
+      .eq('quiniela_id', quinielaId)
+      .eq('user_id', userId)
+
+    if (error) throw new Error(`isMember failed: ${error.message}`)
+    return (count ?? 0) > 0
+  }
 }

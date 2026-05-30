@@ -75,7 +75,7 @@ const defaultProps = {
   quinielaId: 'quiniela-1',
   lang: 'en' as const,
   dict: membersDict,
-  inviteMemberAction: jest.fn().mockResolvedValue({ success: true, invitationId: 'inv-1', inviteUrl: 'http://localhost:3000/invite/abc123' }),
+  inviteMemberAction: jest.fn().mockResolvedValue({ success: true, invitationId: 'inv-1', inviteUrl: 'http://localhost:3000/invite/abc123de' }),
   removeMemberAction: jest.fn().mockResolvedValue({ success: true }),
   revokeInviteAction: jest.fn().mockResolvedValue({ success: true }),
   leaveQuinielaAction: jest.fn().mockResolvedValue({ success: true }),
@@ -142,7 +142,7 @@ describe('MembersClient', () => {
   it('shows invite form for admin', () => {
     render(<MembersClient {...defaultProps} />)
     expect(screen.getByText(membersDict.inviteMember)).toBeInTheDocument()
-    expect(screen.getByLabelText(membersDict.emailLabel)).toBeInTheDocument()
+    expect(screen.getByText(membersDict.inviteButton)).toBeInTheDocument()
   })
 
   it('does not show invite form for non-admin', () => {
@@ -155,16 +155,13 @@ describe('MembersClient', () => {
     expect(screen.queryByText(membersDict.inviteMember)).not.toBeInTheDocument()
   })
 
-  it('shows generated invite URL and copy button after successful invite', async () => {
+  it('shows generated invite URL and copy button after generating invite', async () => {
     render(<MembersClient {...defaultProps} />)
 
-    fireEvent.change(screen.getByLabelText(membersDict.emailLabel), {
-      target: { value: 'newmember@example.com' },
-    })
-    fireEvent.submit(screen.getByLabelText(membersDict.emailLabel).closest('form')!)
+    fireEvent.click(screen.getByText(membersDict.inviteButton))
 
     await waitFor(() => {
-      expect(screen.getByText('http://localhost:3000/invite/abc123')).toBeInTheDocument()
+      expect(screen.getByText('http://localhost:3000/invite/abc123de')).toBeInTheDocument()
       expect(screen.getByText(membersDict.copyLink)).toBeInTheDocument()
     })
   })
@@ -173,10 +170,7 @@ describe('MembersClient', () => {
     jest.useFakeTimers()
     render(<MembersClient {...defaultProps} />)
 
-    fireEvent.change(screen.getByLabelText(membersDict.emailLabel), {
-      target: { value: 'newmember@example.com' },
-    })
-    fireEvent.submit(screen.getByLabelText(membersDict.emailLabel).closest('form')!)
+    fireEvent.click(screen.getByText(membersDict.inviteButton))
 
     await waitFor(() => {
       expect(screen.getByText(membersDict.copyLink)).toBeInTheDocument()
@@ -184,7 +178,7 @@ describe('MembersClient', () => {
 
     fireEvent.click(screen.getByText(membersDict.copyLink))
     await waitFor(() => {
-      expect(mockWriteText).toHaveBeenCalledWith('http://localhost:3000/invite/abc123')
+      expect(mockWriteText).toHaveBeenCalledWith('http://localhost:3000/invite/abc123de')
     })
 
     // After clipboard write, button should show "Copied!"
@@ -204,10 +198,10 @@ describe('MembersClient', () => {
   // Pending invitations
   // -------------------------------------------------------------------------
 
-  it('shows pending invitations section when there are pending invites', () => {
+  it('shows active invite link section when there are pending invites', () => {
     render(<MembersClient {...defaultProps} invitations={[pendingInvitation]} />)
-    expect(screen.getByText(membersDict.pendingInvites)).toBeInTheDocument()
-    expect(screen.getByText('invited@example.com')).toBeInTheDocument()
+    expect(screen.getByText(membersDict.activeInviteLink ?? membersDict.pendingInvites)).toBeInTheDocument()
+    expect(screen.getByText(`…/invite/${pendingInvitation.shortCode}`)).toBeInTheDocument()
   })
 
   it('shows revoke button for pending invitations', () => {

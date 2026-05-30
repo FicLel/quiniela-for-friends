@@ -4,7 +4,7 @@
  * All repositories and bcryptjs are mocked at the boundary.
  * node:crypto is mocked so we control raw token generation.
  * Tests cover: token generation/hashing security, all error branches,
- * and happy paths for sendInvite, acceptInvite, revokeInvite, listInvitations.
+ * and happy paths for sendInvite, acceptInviteByShortCode, revokeInvite, listInvitations.
  */
 
 import { InvitationsService } from '../InvitationsService'
@@ -56,7 +56,7 @@ function makeInvitation(overrides: Partial<Invitation> = {}): Invitation {
   return {
     id: 'invitation-uuid',
     quinielaId: 'quiniela-uuid',
-    email: 'invited@example.com',
+    email: null, // open invite — no email
     roleToAssign: 'member',
     tokenHash: FIXED_TOKEN_HASH,
     shortCode: FIXED_SHORT_CODE_HEX,
@@ -102,6 +102,7 @@ function makeInvitationsRepository(
     findByTokenHash: jest.fn().mockResolvedValue(makeInvitation()),
     findByShortCode: jest.fn().mockResolvedValue(makeInvitation()),
     findActiveByEmailAndQuiniela: jest.fn().mockResolvedValue([]),
+    findActiveOpenByQuiniela: jest.fn().mockResolvedValue(null),
     markAccepted: jest.fn().mockResolvedValue(undefined),
     markRevoked: jest.fn().mockResolvedValue(undefined),
     findAllByQuiniela: jest.fn().mockResolvedValue([makeInvitation()]),
@@ -120,6 +121,7 @@ function makeMembershipsRepository(
     deleteById: jest.fn().mockResolvedValue(undefined),
     countAdmins: jest.fn().mockResolvedValue(1),
     approve: jest.fn().mockResolvedValue(undefined),
+    isMember: jest.fn().mockResolvedValue(false),
     ...overrides,
   } as unknown as IMembershipsRepository
 }
@@ -157,7 +159,6 @@ beforeEach(() => {
 describe('InvitationsService.sendInvite', () => {
   const BASE_INPUT = {
     quinielaId: 'quiniela-uuid',
-    email: 'Invited@Example.com', // mixed case intentional
     roleToAssign: 'member' as const,
     callerUserId: 'admin-uuid',
     baseUrl: 'https://app.example.com',
@@ -181,16 +182,16 @@ describe('InvitationsService.sendInvite', () => {
     })
   })
 
-  it('lowercases and trims the email before processing', async () => {
+  it('creates the invitation with email=null (open invite)', async () => {
     const invRepo = makeInvitationsRepository()
     const membRepo = makeMembershipsRepository()
     const usersRepo = makeUsersRepository()
     const service = new InvitationsService(invRepo, membRepo, usersRepo)
 
-    await service.sendInvite({ ...BASE_INPUT, email: '  Invited@Example.COM  ' })
+    await service.sendInvite(BASE_INPUT)
 
     expect(invRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ email: 'invited@example.com' }),
+      expect.objectContaining({ email: null }),
     )
   })
 
@@ -218,24 +219,6 @@ describe('InvitationsService.sendInvite', () => {
 
     const call = (invRepo.create as jest.Mock).mock.calls[0][0]
     expect(call.shortCode).toHaveLength(8)
-  })
-
-  it('new membership created via acceptInvite has approvedAt=null (pending state)', async () => {
-    const membRepo = makeMembershipsRepository({
-      create: jest.fn().mockResolvedValue(makeMembership({ approvedAt: null })),
-    })
-    const result = makeMembership({ approvedAt: null })
-    const membRepoWithCapture = makeMembershipsRepository({
-      create: jest.fn().mockResolvedValue(result),
-    })
-    const service = new InvitationsService(makeInvitationsRepository(), membRepoWithCapture, makeUsersRepository())
-
-    // The service does not set approved_at — it calls membershipsRepository.create
-    // which in real DB leaves approved_at NULL. The mock just verifies the field isn't set.
-    await service.sendInvite(BASE_INPUT)
-    // Verify create was not called with approved_at (the service never passes it)
-    expect(membRepoWithCapture.create).not.toHaveBeenCalled()
-    void membRepo
   })
 
   it('inviteUrl uses the shortCode (not the raw token or hash)', async () => {
@@ -284,47 +267,23 @@ describe('InvitationsService.sendInvite', () => {
     expect(result).toEqual({ success: false, error: 'CALLER_NOT_QUINIELA_ADMIN' })
   })
 
-  it('returns ALREADY_A_MEMBER when invited email already has a membership', async () => {
-    const existingUser = makeUserRow({ id: 'existing-user-uuid', email: 'invited@example.com' })
-    const usersRepo = makeUsersRepository({
-      findByEmail: jest.fn().mockResolvedValue(existingUser),
-    })
-    const membRepo = makeMembershipsRepository({
-      // First call: caller check (admin); second call: invited user check (member exists)
-      findByQuinielaAndUser: jest.fn()
-        .mockResolvedValueOnce(makeMembership({ role: 'admin' }))
-        .mockResolvedValueOnce(makeMembership({ userId: existingUser.id, role: 'member' })),
-    })
-    const service = new InvitationsService(
-      makeInvitationsRepository(),
-      membRepo,
-      usersRepo,
-    )
-
-    const result = await service.sendInvite(BASE_INPUT)
-
-    expect(result).toEqual({ success: false, error: 'ALREADY_A_MEMBER' })
-  })
-
-  it('revokes existing active invitations for the same email+quiniela before creating a new one', async () => {
-    const existingActive = makeInvitation({ id: 'old-invitation-uuid' })
+  it('revokes the existing active open invite before creating a new one', async () => {
+    const existingOpenInvite = makeInvitation({ id: 'old-open-invite-uuid' })
     const invRepo = makeInvitationsRepository({
-      findActiveByEmailAndQuiniela: jest.fn().mockResolvedValue([existingActive]),
+      findActiveOpenByQuiniela: jest.fn().mockResolvedValue(existingOpenInvite),
       markRevoked: jest.fn().mockResolvedValue(undefined),
     })
     const service = new InvitationsService(invRepo, makeMembershipsRepository(), makeUsersRepository())
 
     await service.sendInvite(BASE_INPUT)
 
-    expect(invRepo.markRevoked).toHaveBeenCalledWith('old-invitation-uuid')
+    expect(invRepo.markRevoked).toHaveBeenCalledWith('old-open-invite-uuid')
     expect(invRepo.create).toHaveBeenCalled()
   })
 
-  it('does NOT revoke already-accepted invitations — only active ones are revoked', async () => {
-    // findActiveByEmailAndQuiniela only returns pending invitations (not accepted),
-    // so the service never sees accepted invitations in this list.
+  it('does NOT call markRevoked when no active open invite exists', async () => {
     const invRepo = makeInvitationsRepository({
-      findActiveByEmailAndQuiniela: jest.fn().mockResolvedValue([]), // accepted ones not in active list
+      findActiveOpenByQuiniela: jest.fn().mockResolvedValue(null),
     })
     const service = new InvitationsService(invRepo, makeMembershipsRepository(), makeUsersRepository())
 
@@ -398,71 +357,68 @@ describe('InvitationsService.acceptInvite — token checks', () => {
 // ---------------------------------------------------------------------------
 
 describe('InvitationsService.acceptInvite — existing logged-in user', () => {
-  it('returns { success: true, quinielaId, wasNewUser: false } when emails match', async () => {
-    const invitation = makeInvitation({ email: 'invited@example.com' })
-    const callerUser = makeUserRow({ id: 'caller-uuid', email: 'invited@example.com' })
+  it('returns { success: true, quinielaId, pendingApproval: true } when user is not already a member', async () => {
+    const invitation = makeInvitation()
 
     const invRepo = makeInvitationsRepository({
       findByTokenHash: jest.fn().mockResolvedValue(invitation),
-      markAccepted: jest.fn().mockResolvedValue(undefined),
     })
     const membRepo = makeMembershipsRepository({
+      isMember: jest.fn().mockResolvedValue(false),
       create: jest.fn().mockResolvedValue(makeMembership()),
     })
-    const usersRepo = makeUsersRepository({
-      findById: jest.fn().mockResolvedValue(callerUser),
-    })
-    const service = new InvitationsService(invRepo, membRepo, usersRepo)
+    const service = new InvitationsService(invRepo, membRepo, makeUsersRepository())
 
     const result = await service.acceptInvite({
       rawToken: FIXED_RAW_TOKEN,
       callerUserId: 'caller-uuid',
     })
 
-    expect(result).toEqual({ success: true, quinielaId: 'quiniela-uuid', wasNewUser: false })
+    expect(result).toEqual({ success: true, quinielaId: 'quiniela-uuid', pendingApproval: true })
     expect(membRepo.create).toHaveBeenCalledWith({
       quinielaId: 'quiniela-uuid',
       userId: 'caller-uuid',
       role: 'member',
     })
-    expect(invRepo.markAccepted).toHaveBeenCalledWith('invitation-uuid')
   })
 
-  it('returns EMAIL_MISMATCH when caller email does not match invitation email', async () => {
-    const invitation = makeInvitation({ email: 'invited@example.com' })
-    const callerUser = makeUserRow({ id: 'caller-uuid', email: 'different@example.com' })
+  it('does NOT call markAccepted — open invite stays valid for next user', async () => {
+    const invitation = makeInvitation()
+    const invRepo = makeInvitationsRepository({
+      findByTokenHash: jest.fn().mockResolvedValue(invitation),
+      markAccepted: jest.fn().mockResolvedValue(undefined),
+    })
+    const membRepo = makeMembershipsRepository({
+      isMember: jest.fn().mockResolvedValue(false),
+    })
+    const service = new InvitationsService(invRepo, membRepo, makeUsersRepository())
 
+    await service.acceptInvite({
+      rawToken: FIXED_RAW_TOKEN,
+      callerUserId: 'caller-uuid',
+    })
+
+    expect(invRepo.markAccepted).not.toHaveBeenCalled()
+  })
+
+  it('returns { success: true, alreadyMember: true } when user is already a member', async () => {
+    const invitation = makeInvitation()
     const invRepo = makeInvitationsRepository({
       findByTokenHash: jest.fn().mockResolvedValue(invitation),
     })
-    const usersRepo = makeUsersRepository({
-      findById: jest.fn().mockResolvedValue(callerUser),
+    const membRepo = makeMembershipsRepository({
+      isMember: jest.fn().mockResolvedValue(true),
+      create: jest.fn(),
     })
-    const service = new InvitationsService(invRepo, makeMembershipsRepository(), usersRepo)
+    const service = new InvitationsService(invRepo, membRepo, makeUsersRepository())
 
     const result = await service.acceptInvite({
       rawToken: FIXED_RAW_TOKEN,
-      callerUserId: 'caller-uuid',
+      callerUserId: 'existing-member-uuid',
     })
 
-    expect(result).toEqual({ success: false, error: 'EMAIL_MISMATCH' })
-  })
-
-  it('returns EMAIL_MISMATCH when caller user is not found', async () => {
-    const invRepo = makeInvitationsRepository({
-      findByTokenHash: jest.fn().mockResolvedValue(makeInvitation()),
-    })
-    const usersRepo = makeUsersRepository({
-      findById: jest.fn().mockResolvedValue(null),
-    })
-    const service = new InvitationsService(invRepo, makeMembershipsRepository(), usersRepo)
-
-    const result = await service.acceptInvite({
-      rawToken: FIXED_RAW_TOKEN,
-      callerUserId: 'caller-uuid',
-    })
-
-    expect(result).toEqual({ success: false, error: 'EMAIL_MISMATCH' })
+    expect(result).toEqual({ success: true, quinielaId: 'quiniela-uuid', alreadyMember: true })
+    expect(membRepo.create).not.toHaveBeenCalled()
   })
 })
 
@@ -471,19 +427,18 @@ describe('InvitationsService.acceptInvite — existing logged-in user', () => {
 // ---------------------------------------------------------------------------
 
 describe('InvitationsService.acceptInvite — new user path', () => {
-  it('returns { success: true, quinielaId, wasNewUser: true } on happy path', async () => {
+  it('returns { success: true, quinielaId, pendingApproval: true, wasNewUser: true } on happy path', async () => {
     mockBcryptHash.mockResolvedValueOnce('$2b$12$newhash')
     const newUser = makeUserRow({ id: 'new-user-uuid', email: 'invited@example.com' })
 
     const invRepo = makeInvitationsRepository({
       findByTokenHash: jest.fn().mockResolvedValue(makeInvitation()),
-      markAccepted: jest.fn().mockResolvedValue(undefined),
     })
     const membRepo = makeMembershipsRepository({
       create: jest.fn().mockResolvedValue(makeMembership()),
     })
     const usersRepo = makeUsersRepository({
-      findByEmail: jest.fn().mockResolvedValue(null), // email does not exist yet
+      findByEmail: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue(newUser),
     })
     const service = new InvitationsService(invRepo, membRepo, usersRepo)
@@ -494,39 +449,35 @@ describe('InvitationsService.acceptInvite — new user path', () => {
       newPassword: 'SecurePass123',
     })
 
-    expect(result).toEqual({ success: true, quinielaId: 'quiniela-uuid', wasNewUser: true })
-    expect(usersRepo.create).toHaveBeenCalledWith({
-      email: 'invited@example.com',
-      passwordHash: '$2b$12$newhash',
-      role: 'player',
-      mustChangePassword: false,
-    })
+    expect(result).toEqual({ success: true, quinielaId: 'quiniela-uuid', pendingApproval: true, wasNewUser: true })
     expect(membRepo.create).toHaveBeenCalledWith({
       quinielaId: 'quiniela-uuid',
       userId: 'new-user-uuid',
       role: 'member',
     })
-    expect(invRepo.markAccepted).toHaveBeenCalledWith('invitation-uuid')
   })
 
-  it('returns EMAIL_MISMATCH when email already exists in DB (user has account but is not logged in)', async () => {
-    const existingUser = makeUserRow({ email: 'invited@example.com' })
-    const usersRepo = makeUsersRepository({
-      findByEmail: jest.fn().mockResolvedValue(existingUser),
-    })
-    const service = new InvitationsService(
-      makeInvitationsRepository(),
-      makeMembershipsRepository(),
-      usersRepo,
-    )
+  it('does NOT call markAccepted on new user path', async () => {
+    mockBcryptHash.mockResolvedValueOnce('$2b$12$newhash')
+    const newUser = makeUserRow({ id: 'new-user-uuid' })
 
-    const result = await service.acceptInvite({
+    const invRepo = makeInvitationsRepository({
+      findByTokenHash: jest.fn().mockResolvedValue(makeInvitation()),
+      markAccepted: jest.fn().mockResolvedValue(undefined),
+    })
+    const usersRepo = makeUsersRepository({
+      findByEmail: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue(newUser),
+    })
+    const service = new InvitationsService(invRepo, makeMembershipsRepository(), usersRepo)
+
+    await service.acceptInvite({
       rawToken: FIXED_RAW_TOKEN,
       callerUserId: null,
       newPassword: 'SecurePass123',
     })
 
-    expect(result).toEqual({ success: false, error: 'EMAIL_MISMATCH' })
+    expect(invRepo.markAccepted).not.toHaveBeenCalled()
   })
 
   it('returns PASSWORD_REQUIRED when newPassword is not provided', async () => {
@@ -696,7 +647,6 @@ describe('Token security', () => {
 
     await service.sendInvite({
       quinielaId: 'quiniela-uuid',
-      email: 'invited@example.com',
       roleToAssign: 'member',
       callerUserId: 'admin-uuid',
       baseUrl: 'https://app.example.com',
@@ -713,7 +663,6 @@ describe('Token security', () => {
 
     const result = await service.sendInvite({
       quinielaId: 'quiniela-uuid',
-      email: 'invited@example.com',
       roleToAssign: 'member',
       callerUserId: 'admin-uuid',
       baseUrl: 'https://app.example.com',
@@ -833,77 +782,59 @@ describe('InvitationsService.acceptInviteByShortCode — token validation checks
 
     expect(result).toEqual({ success: false, error: 'TOKEN_REVOKED' })
   })
-
-  it('returns TOKEN_ALREADY_ACCEPTED when invitation has acceptedAt set', async () => {
-    const accepted = makeInvitation({ acceptedAt: new Date('2026-01-01T00:00:00Z') })
-    const invRepo = makeInvitationsRepository({
-      findByShortCode: jest.fn().mockResolvedValue(accepted),
-    })
-    const service = new InvitationsService(invRepo, makeMembershipsRepository(), makeUsersRepository())
-
-    const result = await service.acceptInviteByShortCode({
-      shortCode: FIXED_SHORT_CODE_HEX,
-      callerUserId: 'user-uuid',
-    })
-
-    expect(result).toEqual({ success: false, error: 'TOKEN_ALREADY_ACCEPTED' })
-  })
 })
 
 describe('InvitationsService.acceptInviteByShortCode — existing logged-in user', () => {
-  it('returns { success: true, quinielaId, wasNewUser: false } when emails match', async () => {
-    const invitation = makeInvitation({ email: 'invited@example.com' })
-    const callerUser = makeUserRow({ id: 'caller-uuid', email: 'invited@example.com' })
+  it('returns { success: true, quinielaId, pendingApproval: true } when user is not already a member', async () => {
+    const invitation = makeInvitation()
 
     const invRepo = makeInvitationsRepository({
       findByShortCode: jest.fn().mockResolvedValue(invitation),
       markAccepted: jest.fn().mockResolvedValue(undefined),
     })
     const membRepo = makeMembershipsRepository({
+      isMember: jest.fn().mockResolvedValue(false),
       create: jest.fn().mockResolvedValue(makeMembership()),
     })
-    const usersRepo = makeUsersRepository({
-      findById: jest.fn().mockResolvedValue(callerUser),
-    })
-    const service = new InvitationsService(invRepo, membRepo, usersRepo)
+    const service = new InvitationsService(invRepo, membRepo, makeUsersRepository())
 
     const result = await service.acceptInviteByShortCode({
       shortCode: FIXED_SHORT_CODE_HEX,
       callerUserId: 'caller-uuid',
     })
 
-    expect(result).toEqual({ success: true, quinielaId: 'quiniela-uuid', wasNewUser: false })
+    expect(result).toEqual({ success: true, quinielaId: 'quiniela-uuid', pendingApproval: true })
     expect(membRepo.create).toHaveBeenCalledWith({
       quinielaId: 'quiniela-uuid',
       userId: 'caller-uuid',
       role: 'member',
     })
-    expect(invRepo.markAccepted).toHaveBeenCalledWith('invitation-uuid')
+    expect(invRepo.markAccepted).not.toHaveBeenCalled()
   })
 
-  it('returns EMAIL_MISMATCH when caller email does not match invitation email', async () => {
-    const invitation = makeInvitation({ email: 'invited@example.com' })
-    const callerUser = makeUserRow({ id: 'caller-uuid', email: 'different@example.com' })
-
+  it('returns { success: true, alreadyMember: true } when user is already a member, no new membership created', async () => {
+    const invitation = makeInvitation()
     const invRepo = makeInvitationsRepository({
       findByShortCode: jest.fn().mockResolvedValue(invitation),
     })
-    const usersRepo = makeUsersRepository({
-      findById: jest.fn().mockResolvedValue(callerUser),
+    const membRepo = makeMembershipsRepository({
+      isMember: jest.fn().mockResolvedValue(true),
+      create: jest.fn(),
     })
-    const service = new InvitationsService(invRepo, makeMembershipsRepository(), usersRepo)
+    const service = new InvitationsService(invRepo, membRepo, makeUsersRepository())
 
     const result = await service.acceptInviteByShortCode({
       shortCode: FIXED_SHORT_CODE_HEX,
-      callerUserId: 'caller-uuid',
+      callerUserId: 'already-member-uuid',
     })
 
-    expect(result).toEqual({ success: false, error: 'EMAIL_MISMATCH' })
+    expect(result).toEqual({ success: true, quinielaId: 'quiniela-uuid', alreadyMember: true })
+    expect(membRepo.create).not.toHaveBeenCalled()
   })
 })
 
 describe('InvitationsService.acceptInviteByShortCode — new user path', () => {
-  it('returns { success: true, quinielaId, wasNewUser: true } on happy path', async () => {
+  it('returns { success: true, quinielaId, pendingApproval: true, wasNewUser: true } on happy path', async () => {
     mockBcryptHash.mockResolvedValueOnce('$2b$12$newhash')
     const newUser = makeUserRow({ id: 'new-user-uuid', email: 'invited@example.com' })
 
@@ -924,21 +855,16 @@ describe('InvitationsService.acceptInviteByShortCode — new user path', () => {
       shortCode: FIXED_SHORT_CODE_HEX,
       callerUserId: null,
       newPassword: 'SecurePass123',
+      newUserEmail: 'invited@example.com',
     })
 
-    expect(result).toEqual({ success: true, quinielaId: 'quiniela-uuid', wasNewUser: true })
-    expect(usersRepo.create).toHaveBeenCalledWith({
-      email: 'invited@example.com',
-      passwordHash: '$2b$12$newhash',
-      role: 'player',
-      mustChangePassword: false,
-    })
+    expect(result).toEqual({ success: true, quinielaId: 'quiniela-uuid', pendingApproval: true, wasNewUser: true })
     expect(membRepo.create).toHaveBeenCalledWith({
       quinielaId: 'quiniela-uuid',
       userId: 'new-user-uuid',
       role: 'member',
     })
-    expect(invRepo.markAccepted).toHaveBeenCalledWith('invitation-uuid')
+    expect(invRepo.markAccepted).not.toHaveBeenCalled()
   })
 
   it('returns PASSWORD_REQUIRED when newPassword is not provided', async () => {
@@ -950,6 +876,7 @@ describe('InvitationsService.acceptInviteByShortCode — new user path', () => {
     const result = await service.acceptInviteByShortCode({
       shortCode: FIXED_SHORT_CODE_HEX,
       callerUserId: null,
+      newUserEmail: 'invited@example.com',
     })
 
     expect(result).toEqual({ success: false, error: 'PASSWORD_REQUIRED' })
@@ -965,28 +892,9 @@ describe('InvitationsService.acceptInviteByShortCode — new user path', () => {
       shortCode: FIXED_SHORT_CODE_HEX,
       callerUserId: null,
       newPassword: 'short',
+      newUserEmail: 'invited@example.com',
     })
 
     expect(result).toEqual({ success: false, error: 'WEAK_PASSWORD' })
-  })
-
-  it('returns EMAIL_MISMATCH when email already exists in DB', async () => {
-    const existingUser = makeUserRow({ email: 'invited@example.com' })
-    const usersRepo = makeUsersRepository({
-      findByEmail: jest.fn().mockResolvedValue(existingUser),
-    })
-    const service = new InvitationsService(
-      makeInvitationsRepository(),
-      makeMembershipsRepository(),
-      usersRepo,
-    )
-
-    const result = await service.acceptInviteByShortCode({
-      shortCode: FIXED_SHORT_CODE_HEX,
-      callerUserId: null,
-      newPassword: 'SecurePass123',
-    })
-
-    expect(result).toEqual({ success: false, error: 'EMAIL_MISMATCH' })
   })
 })

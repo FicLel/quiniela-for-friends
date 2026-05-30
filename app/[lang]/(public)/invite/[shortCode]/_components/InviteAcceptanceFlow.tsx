@@ -6,28 +6,11 @@ import type { Dictionary } from '@/i18n/getDictionary'
 import type { Locale } from '@/i18n/i18n.types'
 import type { AcceptInviteResult } from '@/invitations/invitations.types'
 
-/**
- * PageData shapes passed from the server component.
- *
- * For valid invitations:
- *  - sessionEmailMatches: true  → caller is logged in with the correct email → show join button
- *  - hasSession: true, sessionEmailMatches: false → logged in with wrong account → email mismatch
- *  - hasSession: false, userExists: true → not logged in, user has account → show login prompt
- *  - hasSession: false, userExists: false → not logged in, new user → show signup form
- */
 export type PageData =
-  | { status: 'invalid'; reason: 'NOT_FOUND' | 'EXPIRED' | 'REVOKED' | 'ALREADY_ACCEPTED' }
-  | {
-      status: 'valid'
-      quinielaId: string
-      maskedEmail: string
-      userExists: boolean
-      hasSession: boolean
-      sessionEmailMatches: boolean
-      shortCode: string
-    }
+  | { status: 'invalid'; reason: 'NOT_FOUND' | 'EXPIRED' | 'REVOKED' }
+  | { status: 'valid'; quinielaId: string; hasSession: boolean; shortCode: string }
 
-type AcceptInviteResultWithPending = AcceptInviteResult & { pendingApproval?: boolean }
+type AcceptInviteResultWithPending = AcceptInviteResult & { pendingApproval?: boolean; alreadyMember?: boolean }
 
 type Props = {
   pageData: PageData
@@ -35,7 +18,7 @@ type Props = {
   dict: Dictionary['invite']
   pendingApprovalDict: Dictionary['pendingApproval']
   acceptAsExistingAction: () => Promise<AcceptInviteResult>
-  acceptAsNewAction: (password: string) => Promise<AcceptInviteResultWithPending>
+  acceptAsNewAction: (email: string, password: string) => Promise<AcceptInviteResultWithPending>
 }
 
 export default function InviteAcceptanceFlow({
@@ -50,29 +33,19 @@ export default function InviteAcceptanceFlow({
     return <InvalidState reason={pageData.reason} dict={dict} />
   }
 
-  const { maskedEmail, userExists, hasSession, sessionEmailMatches } = pageData
-
-  if (sessionEmailMatches) {
+  if (pageData.hasSession) {
     return (
       <ReadyToJoinState
-        maskedEmail={maskedEmail}
         dict={dict}
+        pendingApprovalDict={pendingApprovalDict}
+        lang={lang}
         acceptAsExistingAction={acceptAsExistingAction}
       />
     )
   }
 
-  if (hasSession && !sessionEmailMatches) {
-    return <EmailMismatchState dict={dict} lang={lang} />
-  }
-
-  if (userExists) {
-    return <LoginPromptState maskedEmail={maskedEmail} dict={dict} lang={lang} />
-  }
-
   return (
     <SignUpState
-      maskedEmail={maskedEmail}
       lang={lang}
       dict={dict}
       pendingApprovalDict={pendingApprovalDict}
@@ -89,13 +62,12 @@ function InvalidState({
   reason,
   dict,
 }: {
-  reason: 'NOT_FOUND' | 'EXPIRED' | 'REVOKED' | 'ALREADY_ACCEPTED'
+  reason: 'NOT_FOUND' | 'EXPIRED' | 'REVOKED'
   dict: Dictionary['invite']
 }) {
   const messageMap: Record<string, string> = {
     EXPIRED: dict.expiredMessage,
     REVOKED: dict.revokedMessage,
-    ALREADY_ACCEPTED: dict.alreadyAcceptedMessage,
     NOT_FOUND: dict.notFoundMessage,
   }
 
@@ -108,20 +80,43 @@ function InvalidState({
 }
 
 // ---------------------------------------------------------------------------
-// Ready to join (logged-in user, email matches)
+// Ready to join (logged-in user)
 // ---------------------------------------------------------------------------
 
 function ReadyToJoinState({
-  maskedEmail,
   dict,
+  pendingApprovalDict,
+  lang,
   acceptAsExistingAction,
 }: {
-  maskedEmail: string
   dict: Dictionary['invite']
+  pendingApprovalDict: Dictionary['pendingApproval']
+  lang: Locale
   acceptAsExistingAction: () => Promise<AcceptInviteResult>
 }) {
   const [error, setError] = useState<string | undefined>(undefined)
   const [isPending, startTransition] = useTransition()
+  const [showPending, setShowPending] = useState(false)
+  const [alreadyMember, setAlreadyMember] = useState(false)
+
+  if (showPending) {
+    return <PendingApprovalInviteState dict={dict} pendingApprovalDict={pendingApprovalDict} lang={lang} />
+  }
+
+  if (alreadyMember) {
+    return (
+      <div className="rounded-2xl bg-white px-8 py-10 shadow-xl text-center">
+        <h1 className="mb-3 text-2xl font-bold text-green-900">{dict.joinHeading}</h1>
+        <p className="mb-6 text-sm text-gray-600">{dict.alreadyMember}</p>
+        <Link
+          href={`/${lang}/quinielas`}
+          className="inline-block rounded-lg bg-green-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+        >
+          {pendingApprovalDict.backLink}
+        </Link>
+      </div>
+    )
+  }
 
   function handleJoin() {
     setError(undefined)
@@ -130,14 +125,19 @@ function ReadyToJoinState({
       if (result && !result.success) {
         const errKey = result.error as keyof typeof dict.errors
         setError(dict.errors[errKey] ?? dict.errors.UNKNOWN_ERROR)
+      } else if (result && result.success) {
+        if ((result as AcceptInviteResultWithPending).alreadyMember) {
+          setAlreadyMember(true)
+        } else {
+          setShowPending(true)
+        }
       }
     })
   }
 
   return (
     <div className="rounded-2xl bg-white px-8 py-10 shadow-xl">
-      <h1 className="mb-2 text-2xl font-bold text-green-900">{dict.joinHeading}</h1>
-      <p className="mb-6 text-sm text-gray-500">{maskedEmail}</p>
+      <h1 className="mb-6 text-2xl font-bold text-green-900">{dict.joinHeading}</h1>
 
       {error && (
         <p role="alert" className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -165,75 +165,21 @@ function ReadyToJoinState({
 }
 
 // ---------------------------------------------------------------------------
-// Email mismatch state
-// ---------------------------------------------------------------------------
-
-function EmailMismatchState({
-  dict,
-  lang,
-}: {
-  dict: Dictionary['invite']
-  lang: Locale
-}) {
-  return (
-    <div className="rounded-2xl bg-white px-8 py-10 shadow-xl">
-      <h1 className="mb-3 text-2xl font-bold text-green-900">{dict.emailMismatchHeading}</h1>
-      <p className="mb-4 text-sm text-gray-600">{dict.emailMismatchMessage}</p>
-      <Link
-        href={`/${lang}/login`}
-        className="text-sm font-medium text-green-700 underline hover:text-green-800"
-      >
-        {dict.logoutLink}
-      </Link>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Login prompt (user exists, no session)
-// ---------------------------------------------------------------------------
-
-function LoginPromptState({
-  maskedEmail,
-  dict,
-  lang,
-}: {
-  maskedEmail: string
-  dict: Dictionary['invite']
-  lang: Locale
-}) {
-  return (
-    <div className="rounded-2xl bg-white px-8 py-10 shadow-xl">
-      <h1 className="mb-2 text-2xl font-bold text-green-900">{dict.loginHeading}</h1>
-      <p className="mb-1 text-sm text-gray-500">{dict.loginSubtitle}</p>
-      <p className="mb-6 text-sm font-medium text-green-700">{maskedEmail}</p>
-      <Link
-        href={`/${lang}/login`}
-        className="flex w-full items-center justify-center rounded-lg bg-green-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-      >
-        {dict.loginHeading}
-      </Link>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Sign up state (new user) — shows pending state after successful registration
+// Sign up state (logged-out user) — email + password, then pending approval
 // ---------------------------------------------------------------------------
 
 function SignUpState({
-  maskedEmail,
   lang,
   dict,
   pendingApprovalDict,
   acceptAsNewAction,
 }: {
-  maskedEmail: string
   lang: Locale
   dict: Dictionary['invite']
   pendingApprovalDict: Dictionary['pendingApproval']
-  acceptAsNewAction: (password: string) => Promise<AcceptInviteResultWithPending>
+  acceptAsNewAction: (email: string, password: string) => Promise<AcceptInviteResultWithPending>
 }) {
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | undefined>(undefined)
@@ -248,6 +194,11 @@ function SignUpState({
     e.preventDefault()
     setError(undefined)
 
+    if (!email || !email.includes('@')) {
+      setError(dict.errors.UNKNOWN_ERROR)
+      return
+    }
+
     if (password.length < 8) {
       setError(dict.errors.WEAK_PASSWORD)
       return
@@ -259,12 +210,11 @@ function SignUpState({
     }
 
     startTransition(async () => {
-      const result = await acceptAsNewAction(password)
+      const result = await acceptAsNewAction(email, password)
       if (result && !result.success) {
         const errKey = result.error as keyof typeof dict.errors
         setError(dict.errors[errKey] ?? dict.errors.UNKNOWN_ERROR)
       } else if (result && result.success && result.pendingApproval) {
-        // Show pending approval state — do NOT redirect
         setShowPendingState(true)
       }
     })
@@ -273,15 +223,29 @@ function SignUpState({
   return (
     <div className="rounded-2xl bg-white px-8 py-10 shadow-xl">
       <h1 className="mb-2 text-2xl font-bold text-green-900">{dict.signupHeading}</h1>
-      <p className="mb-1 text-sm text-gray-500">{dict.signupSubtitle}</p>
-      <p className="mb-6 text-sm font-medium text-green-700">{maskedEmail}</p>
+      <p className="mb-6 text-sm text-gray-500">{dict.signupSubtitle}</p>
 
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
         <div>
-          <label
-            htmlFor="invite-password"
-            className="mb-1.5 block text-sm font-medium text-gray-700"
-          >
+          <label htmlFor="invite-email" className="mb-1.5 block text-sm font-medium text-gray-700">
+            {dict.emailLabel}
+          </label>
+          <input
+            id="invite-email"
+            type="email"
+            name="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={isPending}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-200 disabled:bg-gray-50 disabled:text-gray-400"
+            placeholder="you@example.com"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="invite-password" className="mb-1.5 block text-sm font-medium text-gray-700">
             {dict.passwordLabel}
           </label>
           <input
@@ -299,10 +263,7 @@ function SignUpState({
         </div>
 
         <div>
-          <label
-            htmlFor="invite-confirm-password"
-            className="mb-1.5 block text-sm font-medium text-gray-700"
-          >
+          <label htmlFor="invite-confirm-password" className="mb-1.5 block text-sm font-medium text-gray-700">
             {dict.confirmPasswordLabel}
           </label>
           <input
@@ -339,13 +300,20 @@ function SignUpState({
             dict.joinButton
           )}
         </button>
+
+        <p className="text-center text-xs text-gray-500">
+          {dict.loginSubtitle}{' '}
+          <Link href={`/${lang}/login`} className="font-medium text-green-700 underline hover:text-green-800">
+            {dict.loginHeading}
+          </Link>
+        </p>
       </form>
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Pending approval state — shown after new-user registration
+// Pending approval state — shown after registration
 // ---------------------------------------------------------------------------
 
 function PendingApprovalInviteState({

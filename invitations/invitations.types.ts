@@ -3,7 +3,7 @@ export type InvitationStatus = 'pending' | 'accepted' | 'revoked' | 'expired'
 export type Invitation = {
   id: string
   quinielaId: string
-  email: string
+  email: string | null
   roleToAssign: 'admin' | 'member'
   tokenHash: string
   shortCode: string
@@ -18,11 +18,11 @@ export type InvitationWithStatus = Invitation & { status: InvitationStatus }
 
 export type SendInviteResult =
   | { success: true; invitationId: string; inviteUrl: string }
-  | { success: false; error: 'CALLER_NOT_QUINIELA_ADMIN' | 'ALREADY_A_MEMBER' | 'DB_ERROR' | 'UNKNOWN_ERROR' }
+  | { success: false; error: 'CALLER_NOT_QUINIELA_ADMIN' | 'DB_ERROR' | 'UNKNOWN_ERROR' }
 
 export type AcceptInviteResult =
-  | { success: true; quinielaId: string; wasNewUser: boolean }
-  | { success: false; error: 'TOKEN_NOT_FOUND' | 'TOKEN_EXPIRED' | 'TOKEN_REVOKED' | 'TOKEN_ALREADY_ACCEPTED' | 'EMAIL_MISMATCH' | 'PASSWORD_REQUIRED' | 'WEAK_PASSWORD' | 'DB_ERROR' | 'UNKNOWN_ERROR' }
+  | { success: true; quinielaId: string; wasNewUser?: boolean; alreadyMember?: boolean; pendingApproval?: boolean }
+  | { success: false; error: 'TOKEN_NOT_FOUND' | 'TOKEN_EXPIRED' | 'TOKEN_REVOKED' | 'TOKEN_ALREADY_ACCEPTED' | 'EMAIL_ALREADY_EXISTS' | 'PASSWORD_REQUIRED' | 'WEAK_PASSWORD' | 'DB_ERROR' | 'UNKNOWN_ERROR' }
 
 export type RevokeInviteResult =
   | { success: true }
@@ -35,7 +35,7 @@ export type ListInvitationsResult =
 export interface IInvitationsRepository {
   create(input: {
     quinielaId: string
-    email: string
+    email: string | null
     roleToAssign: 'admin' | 'member'
     tokenHash: string
     shortCode: string
@@ -45,6 +45,7 @@ export interface IInvitationsRepository {
   findByTokenHash(tokenHash: string): Promise<Invitation | null>
   findByShortCode(shortCode: string): Promise<Invitation | null>
   findActiveByEmailAndQuiniela(email: string, quinielaId: string): Promise<Invitation[]>
+  findActiveOpenByQuiniela(quinielaId: string): Promise<Invitation | null>
   markAccepted(invitationId: string): Promise<void>
   markRevoked(invitationId: string): Promise<void>
   findAllByQuiniela(quinielaId: string): Promise<Invitation[]>
@@ -53,7 +54,6 @@ export interface IInvitationsRepository {
 export interface IInvitationsService {
   sendInvite(input: {
     quinielaId: string
-    email: string
     roleToAssign: 'admin' | 'member'
     callerUserId: string
     baseUrl: string
@@ -67,6 +67,7 @@ export interface IInvitationsService {
     shortCode: string
     callerUserId: string | null
     newPassword?: string
+    newUserEmail?: string
   }): Promise<AcceptInviteResult>
   revokeInvite(
     invitationId: string,

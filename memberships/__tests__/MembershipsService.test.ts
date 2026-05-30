@@ -48,6 +48,7 @@ function makeRepository(
     deleteById: jest.fn().mockResolvedValue(undefined),
     countAdmins: jest.fn().mockResolvedValue(2),
     approve: jest.fn().mockResolvedValue(undefined),
+    isMember: jest.fn().mockResolvedValue(false),
     ...overrides,
   } as unknown as IMembershipsRepository
 }

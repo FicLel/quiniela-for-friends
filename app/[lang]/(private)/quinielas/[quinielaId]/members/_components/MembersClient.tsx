@@ -15,14 +15,13 @@ type Props = {
   quinielaId: string
   lang: Locale
   dict: Dictionary['members']
-  inviteMemberAction: (email: string, roleToAssign: 'admin' | 'member') => Promise<SendInviteResult>
+  inviteMemberAction: (roleToAssign: 'admin' | 'member') => Promise<SendInviteResult>
   removeMemberAction: (targetMembershipId: string) => Promise<RemoveMemberResult>
   revokeInviteAction: (invitationId: string) => Promise<RevokeInviteResult>
   leaveQuinielaAction: () => Promise<LeaveQuinielaResult>
   approveMemberAction?: (membershipId: string) => Promise<ApproveMemberResult>
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function MembersClient({
   members: initialMembers,
@@ -44,7 +43,6 @@ export default function MembersClient({
   const [isApproving, startApproveTransition] = useTransition()
 
   // Invite form state
-  const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member')
   const [inviteError, setInviteError] = useState<string | undefined>(undefined)
   const [generatedUrl, setGeneratedUrl] = useState<string | undefined>(undefined)
@@ -71,16 +69,10 @@ export default function MembersClient({
     setInviteError(undefined)
     setGeneratedUrl(undefined)
 
-    if (!EMAIL_RE.test(inviteEmail)) {
-      setInviteError(dict.errors.UNKNOWN_ERROR)
-      return
-    }
-
     startInviteTransition(async () => {
-      const result = await inviteMemberAction(inviteEmail, inviteRole)
+      const result = await inviteMemberAction(inviteRole)
       if (result.success) {
         setGeneratedUrl(result.inviteUrl)
-        setInviteEmail('')
       } else {
         const errKey = result.error as keyof typeof dict.errors
         setInviteError(dict.errors[errKey] ?? dict.errors.UNKNOWN_ERROR)
@@ -249,26 +241,6 @@ export default function MembersClient({
           <form onSubmit={handleInviteSubmit} noValidate className="space-y-4">
             <div>
               <label
-                htmlFor="invite-email"
-                className="mb-1.5 block text-sm font-medium text-gray-700"
-              >
-                {dict.emailLabel}
-              </label>
-              <input
-                id="invite-email"
-                type="email"
-                name="email"
-                required
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                disabled={isInviting}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-200 disabled:bg-gray-50 disabled:text-gray-400"
-                placeholder={dict.emailPlaceholder}
-              />
-            </div>
-
-            <div>
-              <label
                 htmlFor="invite-role"
                 className="mb-1.5 block text-sm font-medium text-gray-700"
               >
@@ -325,10 +297,10 @@ export default function MembersClient({
         </section>
       )}
 
-      {/* Pending invitations — admins only */}
+      {/* Active invite links — admins only */}
       {isAdmin && pendingInvitations.length > 0 && (
         <section className="rounded-2xl bg-white p-6 shadow-lg">
-          <h2 className="mb-4 text-lg font-semibold text-green-900">{dict.pendingInvites}</h2>
+          <h2 className="mb-4 text-lg font-semibold text-green-900">{dict.activeInviteLink ?? dict.pendingInvites}</h2>
 
           {revokeError && (
             <p role="alert" className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -338,18 +310,15 @@ export default function MembersClient({
 
           <ul className="divide-y divide-gray-100">
             {pendingInvitations.map((inv) => (
-              <li key={inv.id} className="flex items-center justify-between py-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-900">{inv.email}</span>
-                  <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
-                    {dict.statusPending}
-                  </span>
-                </div>
+              <li key={inv.id} className="flex items-center justify-between gap-3 py-3">
+                <span className="min-w-0 flex-1 truncate text-sm font-mono text-gray-700">
+                  {inv.shortCode ? `…/invite/${inv.shortCode}` : (inv.email ?? '—')}
+                </span>
                 <button
                   type="button"
                   disabled={isRevoking && revokingId === inv.id}
                   onClick={() => handleRevokeInvite(inv.id)}
-                  className="rounded-lg border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="shrink-0 rounded-lg border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {dict.revokeInvite}
                 </button>

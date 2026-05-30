@@ -112,6 +112,7 @@ export async function acceptInviteAsExistingUser(
 export async function acceptInviteAsNewUser(
   _lang: Locale,
   shortCode: string,
+  email: string,
   password: string,
 ): Promise<AcceptInviteResult & { pendingApproval?: boolean }> {
   const passwordParsed = passwordSchema.safeParse(password)
@@ -119,43 +120,31 @@ export async function acceptInviteAsNewUser(
     return { success: false, error: 'WEAK_PASSWORD' }
   }
 
-  // 1. Look up the invitation to get the email (needed for JWT issuance after creation)
-  const invitationsRepo = new InvitationsRepository()
-  const invitation = await invitationsRepo.findByShortCode(shortCode)
-  if (!invitation) {
-    return { success: false, error: 'TOKEN_NOT_FOUND' }
-  }
-
-  // 2. Call acceptInviteByShortCode (new-user path)
   const service = buildInvitationsService()
   const result = await service.acceptInviteByShortCode({
     shortCode,
     callerUserId: null,
     newPassword: password,
+    newUserEmail: email,
   })
 
   if (!result.success) {
     return result
   }
 
-  // 3. Fetch the newly created user to issue a JWT
+  // Fetch the newly created user to issue a JWT session cookie
   const usersRepo = new UsersRepository()
-  const newUser = await usersRepo.findByEmail(invitation.email)
-  if (!newUser) {
-    // User was created but cannot be fetched — return pending state
-    return { success: true, quinielaId: result.quinielaId, wasNewUser: true, pendingApproval: true }
+  const newUser = await usersRepo.findByEmail(email)
+  if (newUser) {
+    const authClient = new AuthClient()
+    const jwtToken = await authClient.createToken({
+      sub: newUser.id,
+      email: newUser.email,
+      role: 'player',
+      mustChangePassword: false,
+    })
+    await authClient.setSessionCookieOnServerAction(jwtToken)
   }
 
-  // 4. Issue JWT and set session cookie
-  const authClient = new AuthClient()
-  const jwtToken = await authClient.createToken({
-    sub: newUser.id,
-    email: newUser.email,
-    role: 'player',
-    mustChangePassword: false,
-  })
-  await authClient.setSessionCookieOnServerAction(jwtToken)
-
-  // 5. Return pending approval state (no redirect — page shows pending UI)
   return { success: true, quinielaId: result.quinielaId, wasNewUser: true, pendingApproval: true }
 }

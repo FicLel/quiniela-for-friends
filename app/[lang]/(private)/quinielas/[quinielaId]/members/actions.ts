@@ -13,7 +13,6 @@ import type { RemoveMemberResult, LeaveQuinielaResult, ApproveMemberResult } fro
 import type { RevokeInviteResult } from '@/invitations/invitations.types'
 import type { Locale } from '@/i18n/i18n.types'
 
-const emailSchema = z.object({ email: z.string().email() })
 const roleSchema = z.enum(['admin', 'member'])
 
 async function getCallerUserId(): Promise<string | null> {
@@ -24,19 +23,14 @@ async function getCallerUserId(): Promise<string | null> {
 }
 
 /**
- * Send an invite to a new member. Returns result (includes inviteUrl on success).
+ * Generate an open invite link for a quiniela. No email required.
+ * Returns result (includes inviteUrl on success).
  */
 export async function inviteMember(
   _lang: Locale,
   quinielaId: string,
-  email: string,
   roleToAssign: 'admin' | 'member',
 ): Promise<SendInviteResult> {
-  const emailParsed = emailSchema.safeParse({ email })
-  if (!emailParsed.success) {
-    return { success: false, error: 'UNKNOWN_ERROR' }
-  }
-
   const roleParsed = roleSchema.safeParse(roleToAssign)
   if (!roleParsed.success) {
     return { success: false, error: 'UNKNOWN_ERROR' }
@@ -57,7 +51,6 @@ export async function inviteMember(
 
   return service.sendInvite({
     quinielaId,
-    email: emailParsed.data.email,
     roleToAssign: roleParsed.data,
     callerUserId,
     baseUrl,
