@@ -6,3 +6,5 @@
 - [Jest Setup Detail](project-jest-setup.md) — setupFilesAfterEnv (correct option name), jsdom directive, --testPathPatterns plural in Jest 30+
 - [Auth Session](project-auth-session.md) — read role server-side via AuthClient.getTokenFromServerAction + verifyToken
 - [getByText multiple elements](feedback_getbytext_multiple.md) — When form selects and badges share text (e.g. "Admin"/"Member"), use getAllByText(...).length > 0 not getByText
+- [act() with fake timers](feedback_act_fake_timers.md) — Wrap jest.advanceTimersByTime() in await act(async () => {...}) when timers trigger React state updates
+- [Dropdown/badge text collision](feedback_getbytext_dropdown_collision.md) — Status filter options and table badges share text; use getAllByText for "Active"/"Pending" in filter+badge contexts

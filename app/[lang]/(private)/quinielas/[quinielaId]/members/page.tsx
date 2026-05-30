@@ -9,7 +9,8 @@ import { UsersRepository } from '@/users/UsersRepository'
 import type { Locale } from '@/i18n/i18n.types'
 import type { InvitationWithStatus } from '@/invitations/invitations.types'
 import MembersClient from './_components/MembersClient'
-import { inviteMember, removeMember, revokeInvite, leaveQuiniela } from './actions'
+import PendingApprovalScreen from '@/app/[lang]/(private)/_components/PendingApprovalScreen'
+import { inviteMember, removeMember, revokeInvite, leaveQuiniela, approveMember } from './actions'
 
 type PageProps = {
   params: Promise<{ lang: string; quinielaId: string }>
@@ -48,6 +49,11 @@ export default async function MembersPage({ params }: PageProps) {
 
   const isAdmin = callerMembership.role === 'admin'
 
+  // AC-13: Gate pending members — show pending approval screen if not yet approved
+  if (callerMembership.approvedAt === null) {
+    return <PendingApprovalScreen lang={locale} dict={dict.pendingApproval} />
+  }
+
   // Only fetch invitations for admins (service enforces this)
   let invitations: InvitationWithStatus[] = []
   if (isAdmin) {
@@ -66,6 +72,9 @@ export default async function MembersPage({ params }: PageProps) {
   const boundRemoveMember = removeMember.bind(null, locale, quinielaId)
   const boundRevokeInvite = revokeInvite.bind(null, locale, quinielaId)
   const boundLeaveQuiniela = leaveQuiniela.bind(null, locale, quinielaId)
+  const boundApproveMember = isAdmin
+    ? approveMember.bind(null, locale, quinielaId)
+    : undefined
 
   return (
     <main className="min-h-screen bg-green-50 px-4 py-8">
@@ -84,6 +93,7 @@ export default async function MembersPage({ params }: PageProps) {
           removeMemberAction={boundRemoveMember}
           revokeInviteAction={boundRevokeInvite}
           leaveQuinielaAction={boundLeaveQuiniela}
+          approveMemberAction={boundApproveMember}
         />
       </div>
     </main>

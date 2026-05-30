@@ -6,7 +6,7 @@ import type { Locale } from '@/i18n/i18n.types'
 import type { MemberWithUser, MembershipRole } from '@/memberships/memberships.types'
 import type { InvitationWithStatus } from '@/invitations/invitations.types'
 import type { SendInviteResult, RevokeInviteResult } from '@/invitations/invitations.types'
-import type { RemoveMemberResult, LeaveQuinielaResult } from '@/memberships/memberships.types'
+import type { RemoveMemberResult, LeaveQuinielaResult, ApproveMemberResult } from '@/memberships/memberships.types'
 
 type Props = {
   members: MemberWithUser[]
@@ -19,12 +19,13 @@ type Props = {
   removeMemberAction: (targetMembershipId: string) => Promise<RemoveMemberResult>
   revokeInviteAction: (invitationId: string) => Promise<RevokeInviteResult>
   leaveQuinielaAction: () => Promise<LeaveQuinielaResult>
+  approveMemberAction?: (membershipId: string) => Promise<ApproveMemberResult>
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function MembersClient({
-  members,
+  members: initialMembers,
   invitations: initialInvitations,
   callerMembership,
   dict,
@@ -32,8 +33,15 @@ export default function MembersClient({
   removeMemberAction,
   revokeInviteAction,
   leaveQuinielaAction,
+  approveMemberAction,
 }: Props) {
   const isAdmin = callerMembership.role === 'admin'
+
+  // Members list state (for optimistic approve updates)
+  const [members, setMembers] = useState(initialMembers)
+  const [approvingMembershipId, setApprovingMembershipId] = useState<string | undefined>(undefined)
+  const [approveError, setApproveError] = useState<string | undefined>(undefined)
+  const [isApproving, startApproveTransition] = useTransition()
 
   // Invite form state
   const [inviteEmail, setInviteEmail] = useState('')
@@ -136,6 +144,27 @@ export default function MembersClient({
     })
   }
 
+  function handleApproveMember(membershipId: string) {
+    if (!approveMemberAction) return
+    setApproveError(undefined)
+    setApprovingMembershipId(membershipId)
+
+    startApproveTransition(async () => {
+      const result = await approveMemberAction(membershipId)
+      setApprovingMembershipId(undefined)
+      if (result.ok) {
+        // Optimistically flip badge to approved
+        setMembers((prev) =>
+          prev.map((m) =>
+            m.membershipId === membershipId ? { ...m, approvedAt: new Date() } : m,
+          ),
+        )
+      } else {
+        setApproveError(dict.errors.UNKNOWN_ERROR)
+      }
+    })
+  }
+
   const pendingInvitations = invitations.filter((inv) => inv.status === 'pending')
 
   return (
@@ -150,12 +179,20 @@ export default function MembersClient({
           </p>
         )}
 
+        {approveError && (
+          <p role="alert" className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            {approveError}
+          </p>
+        )}
+
         <ul className="divide-y divide-gray-100">
           {members.map((member) => {
+            const isPending = member.approvedAt === null
             const canRemove =
               isAdmin &&
               member.role !== 'admin' &&
               member.membershipId !== callerMembership.membershipId
+            const canApprove = isAdmin && isPending && !!approveMemberAction
 
             return (
               <li key={member.membershipId} className="flex items-center justify-between py-3">
@@ -170,17 +207,34 @@ export default function MembersClient({
                   >
                     {member.role === 'admin' ? dict.roleAdmin : dict.roleMember}
                   </span>
+                  {isPending && (
+                    <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
+                      {dict.statusPending}
+                    </span>
+                  )}
                 </div>
-                {canRemove && (
-                  <button
-                    type="button"
-                    disabled={isRemoving && removingId === member.membershipId}
-                    onClick={() => handleRemoveMember(member.membershipId)}
-                    className="rounded-lg border border-red-200 px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {dict.removeMember}
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {canApprove && (
+                    <button
+                      type="button"
+                      disabled={isApproving && approvingMembershipId === member.membershipId}
+                      onClick={() => handleApproveMember(member.membershipId)}
+                      className="rounded-lg border border-green-200 px-3 py-1 text-xs font-medium text-green-700 transition hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {dict.approveButton ?? 'Approve'}
+                    </button>
+                  )}
+                  {canRemove && (
+                    <button
+                      type="button"
+                      disabled={isRemoving && removingId === member.membershipId}
+                      onClick={() => handleRemoveMember(member.membershipId)}
+                      className="rounded-lg border border-red-200 px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {dict.removeMember}
+                    </button>
+                  )}
+                </div>
               </li>
             )
           })}

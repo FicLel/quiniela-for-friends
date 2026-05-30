@@ -43,6 +43,7 @@ export class InvitationsRepository implements IInvitationsRepository {
       email: row.email as string,
       roleToAssign: row.role_to_assign as 'admin' | 'member',
       tokenHash: row.token_hash as string,
+      shortCode: row.short_code as string,
       expiresAt: new Date(row.expires_at as string),
       acceptedAt: row.accepted_at ? new Date(row.accepted_at as string) : null,
       revokedAt: row.revoked_at ? new Date(row.revoked_at as string) : null,
@@ -56,6 +57,7 @@ export class InvitationsRepository implements IInvitationsRepository {
     email: string
     roleToAssign: 'admin' | 'member'
     tokenHash: string
+    shortCode: string
     expiresAt: Date
     invitedByUserId: string
   }): Promise<Invitation> {
@@ -67,6 +69,7 @@ export class InvitationsRepository implements IInvitationsRepository {
         email: input.email,
         role_to_assign: input.roleToAssign,
         token_hash: input.tokenHash,
+        short_code: input.shortCode,
         expires_at: input.expiresAt.toISOString(),
         invited_by_user_id: input.invitedByUserId,
       })
@@ -85,6 +88,17 @@ export class InvitationsRepository implements IInvitationsRepository {
       .from('quiniela_invitations')
       .select('*')
       .eq('token_hash', tokenHash)
+      .single()
+    if (error || !data) return null
+    return this.toInvitation(data as Record<string, unknown>)
+  }
+
+  async findByShortCode(shortCode: string): Promise<Invitation | null> {
+    await this.verifySchema()
+    const { data, error } = await this.supabase
+      .from('quiniela_invitations')
+      .select('*')
+      .eq('short_code', shortCode)
       .single()
     if (error || !data) return null
     return this.toInvitation(data as Record<string, unknown>)

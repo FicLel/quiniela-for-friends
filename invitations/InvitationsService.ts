@@ -22,6 +22,7 @@ import type { IUsersRepository } from '@/users/users.types'
 const INVITE_EXPIRY_DAYS = 7
 const MIN_PASSWORD_LENGTH = 8
 const BCRYPT_SALT_ROUNDS = 12
+const SHORT_CODE_MAX_RETRIES = 5
 
 export class InvitationsService implements IInvitationsService {
   constructor(
@@ -45,6 +46,13 @@ export class InvitationsService implements IInvitationsService {
    */
   private hashToken(rawToken: string): string {
     return createHash('sha256').update(rawToken).digest('hex')
+  }
+
+  /**
+   * Generate a random 8-character hex short code.
+   */
+  private generateShortCode(): string {
+    return randomBytes(4).toString('hex')
   }
 
   /**
@@ -103,20 +111,40 @@ export class InvitationsService implements IInvitationsService {
       const rawToken = randomBytes(32).toString('hex')
       const tokenHash = this.hashToken(rawToken)
 
-      // 5. Insert invitation row
+      // 5. Insert invitation row — retry on short_code unique constraint collision
       const expiresAt = new Date()
       expiresAt.setDate(expiresAt.getDate() + INVITE_EXPIRY_DAYS)
 
-      const invitation = await this.invitationsRepository.create({
-        quinielaId: input.quinielaId,
-        email,
-        roleToAssign: input.roleToAssign,
-        tokenHash,
-        expiresAt,
-        invitedByUserId: input.callerUserId,
-      })
+      let invitation
+      let lastError: unknown
+      for (let attempt = 0; attempt < SHORT_CODE_MAX_RETRIES; attempt++) {
+        const shortCode = this.generateShortCode()
+        try {
+          invitation = await this.invitationsRepository.create({
+            quinielaId: input.quinielaId,
+            email,
+            roleToAssign: input.roleToAssign,
+            tokenHash,
+            shortCode,
+            expiresAt,
+            invitedByUserId: input.callerUserId,
+          })
+          break
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          if (msg.includes('short_code') || msg.includes('unique')) {
+            lastError = err
+            continue
+          }
+          throw err
+        }
+      }
 
-      const inviteUrl = `${input.baseUrl}/invite/${rawToken}`
+      if (!invitation) {
+        throw lastError ?? new Error('Failed to generate unique short_code after retries')
+      }
+
+      const inviteUrl = `${input.baseUrl}/invite/${invitation.shortCode}`
 
       return { success: true, invitationId: invitation.id, inviteUrl }
     } catch {
@@ -189,6 +217,107 @@ export class InvitationsService implements IInvitationsService {
         return { success: true, quinielaId: invitation.quinielaId, wasNewUser: false }
       } else {
         // 7. New-user path (callerUserId is null)
+
+        // Check if email already exists → redirect to login
+        const existingUser = await this.usersRepository.findByEmail(invitation.email)
+        if (existingUser !== null) {
+          return { success: false, error: 'EMAIL_MISMATCH' }
+        }
+
+        // Require password
+        if (!input.newPassword) {
+          return { success: false, error: 'PASSWORD_REQUIRED' }
+        }
+
+        // Validate password strength
+        if (input.newPassword.length < MIN_PASSWORD_LENGTH) {
+          return { success: false, error: 'WEAK_PASSWORD' }
+        }
+
+        // Hash password and create user
+        const passwordHash = await bcrypt.hash(input.newPassword, BCRYPT_SALT_ROUNDS)
+        const newUser = await this.usersRepository.create({
+          email: invitation.email,
+          passwordHash,
+          role: 'player',
+          mustChangePassword: false,
+        })
+
+        await this.membershipsRepository.create({
+          quinielaId: invitation.quinielaId,
+          userId: newUser.id,
+          role: invitation.roleToAssign,
+        })
+        await this.invitationsRepository.markAccepted(invitation.id)
+
+        return { success: true, quinielaId: invitation.quinielaId, wasNewUser: true }
+      }
+    } catch {
+      return { success: false, error: 'UNKNOWN_ERROR' }
+    }
+  }
+
+  /**
+   * Accept an invitation using the 8-character shortCode (from the invite URL).
+   *
+   * Mirrors `acceptInvite` exactly, but resolves the invitation via
+   * `findByShortCode` instead of `findByTokenHash`.
+   *
+   * This is the method used by the new `/invite/[shortCode]` route.
+   * The raw cryptographic token is NOT exposed in the URL with this path.
+   *
+   * Flow:
+   * 1. findByShortCode → TOKEN_NOT_FOUND.
+   * 2. Check expiresAt → TOKEN_EXPIRED.
+   * 3. Check revokedAt → TOKEN_REVOKED.
+   * 4. Check acceptedAt → TOKEN_ALREADY_ACCEPTED.
+   * 5a. If callerUserId set: verify email, create membership, mark accepted → wasNewUser: false.
+   * 5b. If callerUserId null: validate email uniqueness + password, create user + membership → wasNewUser: true.
+   */
+  async acceptInviteByShortCode(input: {
+    shortCode: string
+    callerUserId: string | null
+    newPassword?: string
+  }): Promise<AcceptInviteResult> {
+    try {
+      // 1. Find invitation by short code
+      const invitation = await this.invitationsRepository.findByShortCode(input.shortCode)
+      if (!invitation) {
+        return { success: false, error: 'TOKEN_NOT_FOUND' }
+      }
+
+      // 2. Check expiry
+      if (invitation.expiresAt < new Date()) {
+        return { success: false, error: 'TOKEN_EXPIRED' }
+      }
+
+      // 3. Check revoked
+      if (invitation.revokedAt !== null) {
+        return { success: false, error: 'TOKEN_REVOKED' }
+      }
+
+      // 4. Check already accepted
+      if (invitation.acceptedAt !== null) {
+        return { success: false, error: 'TOKEN_ALREADY_ACCEPTED' }
+      }
+
+      if (input.callerUserId !== null) {
+        // 5a. Logged-in user path
+        const callerUser = await this.usersRepository.findById(input.callerUserId)
+        if (!callerUser || callerUser.email !== invitation.email) {
+          return { success: false, error: 'EMAIL_MISMATCH' }
+        }
+
+        await this.membershipsRepository.create({
+          quinielaId: invitation.quinielaId,
+          userId: callerUser.id,
+          role: invitation.roleToAssign,
+        })
+        await this.invitationsRepository.markAccepted(invitation.id)
+
+        return { success: true, quinielaId: invitation.quinielaId, wasNewUser: false }
+      } else {
+        // 5b. New-user path (callerUserId is null)
 
         // Check if email already exists → redirect to login
         const existingUser = await this.usersRepository.findByEmail(invitation.email)

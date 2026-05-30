@@ -6,6 +6,7 @@ export type Invitation = {
   email: string
   roleToAssign: 'admin' | 'member'
   tokenHash: string
+  shortCode: string
   expiresAt: Date
   acceptedAt: Date | null
   revokedAt: Date | null
@@ -37,10 +38,12 @@ export interface IInvitationsRepository {
     email: string
     roleToAssign: 'admin' | 'member'
     tokenHash: string
+    shortCode: string
     expiresAt: Date
     invitedByUserId: string
   }): Promise<Invitation>
   findByTokenHash(tokenHash: string): Promise<Invitation | null>
+  findByShortCode(shortCode: string): Promise<Invitation | null>
   findActiveByEmailAndQuiniela(email: string, quinielaId: string): Promise<Invitation[]>
   markAccepted(invitationId: string): Promise<void>
   markRevoked(invitationId: string): Promise<void>
@@ -57,6 +60,11 @@ export interface IInvitationsService {
   }): Promise<SendInviteResult>
   acceptInvite(input: {
     rawToken: string
+    callerUserId: string | null
+    newPassword?: string
+  }): Promise<AcceptInviteResult>
+  acceptInviteByShortCode(input: {
+    shortCode: string
     callerUserId: string | null
     newPassword?: string
   }): Promise<AcceptInviteResult>

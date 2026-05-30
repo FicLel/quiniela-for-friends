@@ -1,5 +1,4 @@
 import { notFound } from 'next/navigation'
-import { createHash } from 'node:crypto'
 import { getDictionary, hasLocale } from '@/i18n/getDictionary'
 import { AuthClient } from '@/auth/AuthClient'
 import { InvitationsRepository } from '@/invitations/InvitationsRepository'
@@ -9,7 +8,7 @@ import InviteAcceptanceFlow, { type PageData } from './_components/InviteAccepta
 import { acceptInviteAsExistingUser, acceptInviteAsNewUser } from './actions'
 
 type PageProps = {
-  params: Promise<{ lang: string; token: string }>
+  params: Promise<{ lang: string; shortCode: string }>
 }
 
 function maskEmail(email: string): string {
@@ -18,21 +17,16 @@ function maskEmail(email: string): string {
   return `${email[0]}***${email.slice(atIdx)}`
 }
 
-function hashToken(rawToken: string): string {
-  return createHash('sha256').update(rawToken).digest('hex')
-}
-
 export default async function InvitePage({ params }: PageProps) {
-  const { lang, token: rawToken } = await params
+  const { lang, shortCode } = await params
   if (!hasLocale(lang)) notFound()
 
   const dict = await getDictionary(lang)
   const locale = lang as Locale
 
-  // Read the invitation from the DB to determine its status
+  // Read the invitation from the DB by shortCode
   const invitationsRepo = new InvitationsRepository()
-  const tokenHash = hashToken(rawToken)
-  const invitation = await invitationsRepo.findByTokenHash(tokenHash)
+  const invitation = await invitationsRepo.findByShortCode(shortCode)
 
   let pageData: PageData
 
@@ -66,20 +60,21 @@ export default async function InvitePage({ params }: PageProps) {
       userExists: existingUser !== null,
       hasSession,
       sessionEmailMatches,
-      rawToken,
+      shortCode,
     }
   }
 
-  const boundAcceptAsExisting = acceptInviteAsExistingUser.bind(null, locale, rawToken)
-  const boundAcceptAsNew = acceptInviteAsNewUser.bind(null, locale, rawToken)
+  const boundAcceptAsExisting = acceptInviteAsExistingUser.bind(null, locale, shortCode)
+  const boundAcceptAsNew = acceptInviteAsNewUser.bind(null, locale, shortCode)
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-green-900 to-green-700 px-4 py-12">
+    <main className="flex min-h-screen w-full items-center justify-center bg-gradient-to-b from-green-900 to-green-700 px-4 py-12">
       <div className="w-full max-w-sm">
         <InviteAcceptanceFlow
           pageData={pageData}
           lang={locale}
           dict={dict.invite}
+          pendingApprovalDict={dict.pendingApproval}
           acceptAsExistingAction={boundAcceptAsExisting}
           acceptAsNewAction={boundAcceptAsNew}
         />

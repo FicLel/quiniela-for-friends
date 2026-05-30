@@ -30,6 +30,7 @@ const adminMember: MemberWithUser = {
   email: 'admin@example.com',
   role: 'admin',
   joinedAt: new Date('2026-01-01'),
+  approvedAt: new Date('2026-01-01'),
 }
 
 const regularMember: MemberWithUser = {
@@ -39,6 +40,17 @@ const regularMember: MemberWithUser = {
   email: 'member@example.com',
   role: 'member',
   joinedAt: new Date('2026-01-02'),
+  approvedAt: new Date('2026-01-02'),
+}
+
+const pendingMember: MemberWithUser = {
+  membershipId: 'membership-pending-1',
+  quinielaId: 'quiniela-1',
+  userId: 'user-pending-1',
+  email: 'pending@example.com',
+  role: 'member',
+  joinedAt: new Date('2026-01-03'),
+  approvedAt: null,
 }
 
 const pendingInvitation: InvitationWithStatus = {
@@ -47,6 +59,7 @@ const pendingInvitation: InvitationWithStatus = {
   email: 'invited@example.com',
   roleToAssign: 'member',
   tokenHash: 'hash123',
+  shortCode: 'ab12cd34',
   expiresAt: new Date('2026-12-31'),
   acceptedAt: null,
   revokedAt: null,
@@ -242,5 +255,86 @@ describe('MembersClient', () => {
 
     fireEvent.click(screen.getByText(membersDict.leaveQuiniela))
     expect(defaultProps.leaveQuinielaAction).not.toHaveBeenCalled()
+  })
+
+  // -------------------------------------------------------------------------
+  // Approve member
+  // -------------------------------------------------------------------------
+
+  it('shows Pending badge for pending member', () => {
+    render(<MembersClient {...defaultProps} members={[adminMember, pendingMember]} />)
+    expect(screen.getByText(membersDict.statusPending)).toBeInTheDocument()
+    expect(screen.getByText('pending@example.com')).toBeInTheDocument()
+  })
+
+  it('shows Approve button for pending member when caller is admin and approveMemberAction provided', () => {
+    const mockApprove = jest.fn().mockResolvedValue({ ok: true })
+    render(
+      <MembersClient
+        {...defaultProps}
+        members={[adminMember, pendingMember]}
+        approveMemberAction={mockApprove}
+      />,
+    )
+    expect(screen.getByText(membersDict.approveButton)).toBeInTheDocument()
+  })
+
+  it('does not show Approve button when approveMemberAction is not provided', () => {
+    render(
+      <MembersClient
+        {...defaultProps}
+        members={[adminMember, pendingMember]}
+        approveMemberAction={undefined}
+      />,
+    )
+    expect(screen.queryByText(membersDict.approveButton)).not.toBeInTheDocument()
+  })
+
+  it('does not show Approve button for non-admin caller', () => {
+    const mockApprove = jest.fn().mockResolvedValue({ ok: true })
+    render(
+      <MembersClient
+        {...defaultProps}
+        members={[adminMember, pendingMember]}
+        callerMembership={{ role: 'member', membershipId: 'membership-member-1' }}
+        approveMemberAction={mockApprove}
+      />,
+    )
+    expect(screen.queryByText(membersDict.approveButton)).not.toBeInTheDocument()
+  })
+
+  it('calls approveMemberAction with the correct membershipId when Approve is clicked', async () => {
+    const mockApprove = jest.fn().mockResolvedValue({ ok: true })
+    render(
+      <MembersClient
+        {...defaultProps}
+        members={[adminMember, pendingMember]}
+        approveMemberAction={mockApprove}
+      />,
+    )
+
+    fireEvent.click(screen.getByText(membersDict.approveButton))
+
+    await waitFor(() => {
+      expect(mockApprove).toHaveBeenCalledWith('membership-pending-1')
+    })
+  })
+
+  it('removes Pending badge after successful approve', async () => {
+    const mockApprove = jest.fn().mockResolvedValue({ ok: true })
+    render(
+      <MembersClient
+        {...defaultProps}
+        members={[adminMember, pendingMember]}
+        approveMemberAction={mockApprove}
+      />,
+    )
+
+    fireEvent.click(screen.getByText(membersDict.approveButton))
+
+    await waitFor(() => {
+      expect(screen.queryByText(membersDict.statusPending)).not.toBeInTheDocument()
+      expect(screen.queryByText(membersDict.approveButton)).not.toBeInTheDocument()
+    })
   })
 })

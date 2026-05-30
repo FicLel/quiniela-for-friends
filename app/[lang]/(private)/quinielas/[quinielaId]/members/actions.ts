@@ -9,7 +9,7 @@ import { MembershipsService } from '@/memberships/MembershipsService'
 import { MembershipsRepository } from '@/memberships/MembershipsRepository'
 import { UsersRepository } from '@/users/UsersRepository'
 import type { SendInviteResult } from '@/invitations/invitations.types'
-import type { RemoveMemberResult, LeaveQuinielaResult } from '@/memberships/memberships.types'
+import type { RemoveMemberResult, LeaveQuinielaResult, ApproveMemberResult } from '@/memberships/memberships.types'
 import type { RevokeInviteResult } from '@/invitations/invitations.types'
 import type { Locale } from '@/i18n/i18n.types'
 
@@ -100,6 +100,26 @@ export async function revokeInvite(
     new UsersRepository(),
   )
   return service.revokeInvite(invitationId, quinielaId, callerUserId)
+}
+
+/**
+ * Approve a pending membership (admin-only).
+ * Idempotent — approving an already-approved membership succeeds silently.
+ */
+export async function approveMember(
+  _lang: Locale,
+  _quinielaId: string,
+  membershipId: string,
+): Promise<ApproveMemberResult> {
+  const authClient = new AuthClient()
+  const token = await authClient.getTokenFromServerAction()
+  const session = token ? await authClient.verifyToken(token) : null
+  if (!session) {
+    return { ok: false, error: 'CALLER_NOT_ADMIN' }
+  }
+
+  const service = new MembershipsService(new MembershipsRepository())
+  return service.approveMember(session.sub, membershipId)
 }
 
 /**

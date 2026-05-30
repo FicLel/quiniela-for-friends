@@ -16,6 +16,7 @@ import type {
   ListMembersResult,
   RemoveMemberResult,
   LeaveQuinielaResult,
+  ApproveMemberResult,
 } from '@/memberships/memberships.types'
 
 export class MembershipsService implements IMembershipsService {
@@ -73,6 +74,42 @@ export class MembershipsService implements IMembershipsService {
       return { success: true }
     } catch {
       return { success: false, error: 'UNKNOWN_ERROR' }
+    }
+  }
+
+  /**
+   * Approve a pending membership.
+   *
+   * Business rules:
+   * 1. Caller must have role='admin' in their user record → CALLER_NOT_ADMIN
+   * 2. Find the target membership → MEMBERSHIP_NOT_FOUND
+   * 3. Call approve on the repository (idempotent via WHERE approved_at IS NULL).
+   */
+  async approveMember(
+    callerUserId: string,
+    membershipId: string,
+  ): Promise<ApproveMemberResult> {
+    try {
+      // 1. Find the target membership to confirm it exists
+      const membership = await this.repository.findById(membershipId)
+      if (!membership) {
+        return { ok: false, error: 'MEMBERSHIP_NOT_FOUND' }
+      }
+
+      // 2. Check the caller is an admin in the same quiniela
+      const callerMembership = await this.repository.findByQuinielaAndUser(
+        membership.quinielaId,
+        callerUserId,
+      )
+      if (!callerMembership || callerMembership.role !== 'admin') {
+        return { ok: false, error: 'CALLER_NOT_ADMIN' }
+      }
+
+      // 3. Approve (idempotent)
+      await this.repository.approve(membershipId)
+      return { ok: true }
+    } catch {
+      return { ok: false, error: 'UNKNOWN_ERROR' }
     }
   }
 

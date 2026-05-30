@@ -6,6 +6,7 @@ export type Membership = {
   userId: string
   role: MembershipRole
   joinedAt: Date
+  approvedAt: Date | null
 }
 
 export type MemberWithUser = {
@@ -15,6 +16,7 @@ export type MemberWithUser = {
   email: string
   role: MembershipRole
   joinedAt: Date
+  approvedAt: Date | null
 }
 
 export type ListMembersResult =
@@ -24,6 +26,10 @@ export type ListMembersResult =
 export type RemoveMemberResult =
   | { success: true }
   | { success: false; error: 'MEMBERSHIP_NOT_FOUND' | 'CANNOT_REMOVE_ADMIN' | 'CALLER_NOT_QUINIELA_ADMIN' | 'UNKNOWN_ERROR' }
+
+export type ApproveMemberResult =
+  | { ok: true }
+  | { ok: false; error: 'CALLER_NOT_ADMIN' | 'MEMBERSHIP_NOT_FOUND' | 'UNKNOWN_ERROR' }
 
 export type LeaveQuinielaResult =
   | { success: true }
@@ -36,10 +42,12 @@ export interface IMembershipsRepository {
   findAllByQuiniela(quinielaId: string): Promise<MemberWithUser[]>
   deleteById(membershipId: string): Promise<void>
   countAdmins(quinielaId: string): Promise<number>
+  approve(membershipId: string): Promise<void>
 }
 
 export interface IMembershipsService {
   listMembers(quinielaId: string): Promise<ListMembersResult>
   removeMember(quinielaId: string, targetMembershipId: string, callerUserId: string): Promise<RemoveMemberResult>
   leaveQuiniela(quinielaId: string, callerUserId: string): Promise<LeaveQuinielaResult>
+  approveMember(callerUserId: string, membershipId: string): Promise<ApproveMemberResult>
 }

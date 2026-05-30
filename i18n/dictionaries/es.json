@@ -93,7 +93,8 @@
   "navbar": {
     "appName": "Quiniela para Amigos",
     "switchLanguage": "Cambiar idioma",
-    "quinielas": "Quinielas"
+    "quinielas": "Quinielas",
+    "users": "Usuarios"
   },
   "quinielas": {
     "heading": "Mis Quinielas",
@@ -131,6 +132,7 @@
     "statusAccepted": "Aceptado",
     "statusRevoked": "Revocado",
     "statusExpired": "Expirado",
+    "approveButton": "Aprobar",
     "errors": {
       "CALLER_NOT_QUINIELA_ADMIN": "No tienes permiso.",
       "CANNOT_REMOVE_ADMIN": "No puedes eliminar a un administrador.",
@@ -140,6 +142,35 @@
       "DB_ERROR": "No se pudo completar la acción. Inténtalo de nuevo.",
       "UNKNOWN_ERROR": "Ocurrió un error inesperado."
     }
+  },
+  "users": {
+    "heading": "Usuarios",
+    "searchPlaceholder": "Buscar por nombre o correo",
+    "filterStatus": "Estado",
+    "filterStatusAll": "Todos",
+    "filterStatusActive": "Activo",
+    "filterStatusPending": "Pendiente",
+    "filterQuiniela": "Quiniela",
+    "filterQuinielaAll": "Todas las quinielas",
+    "columnEmail": "Correo",
+    "columnStatus": "Estado",
+    "columnQuinielas": "Quinielas",
+    "badgeActive": "Activo",
+    "badgePending": "Pendiente",
+    "emptyState": "Ningún usuario coincide con los filtros actuales.",
+    "errorState": "No se pudieron cargar los usuarios.",
+    "retryButton": "Reintentar",
+    "approveButton": "Aprobar",
+    "approving": "Aprobando...",
+    "detailHeading": "Detalle de usuario",
+    "detailQuinielaRole": "Rol",
+    "detailJoinedAt": "Se unió",
+    "detailApproval": "Aprobación"
+  },
+  "pendingApproval": {
+    "heading": "Aprobación pendiente",
+    "message": "Tu membresía está esperando la aprobación del administrador. Serás notificado cuando se te conceda acceso.",
+    "backLink": "Volver a quinielas"
   },
   "invite": {
     "loading": "Validando invitación...",
@@ -164,6 +195,8 @@
     "successHeading": "¡Bienvenido!",
     "successMessage": "Te has unido a la quiniela.",
     "goToQuiniela": "Ir a la quiniela",
+    "pendingHeading": "Solicitud enviada",
+    "pendingMessage": "Tu cuenta ha sido creada. Tu membresía está pendiente de aprobación del administrador.",
     "errors": {
       "TOKEN_NOT_FOUND": "Enlace de invitación inválido o expirado.",
       "TOKEN_EXPIRED": "Este enlace de invitación ha expirado.",

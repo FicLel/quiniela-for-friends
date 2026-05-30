@@ -19,6 +19,7 @@ function makeMembership(overrides: Partial<Membership> = {}): Membership {
     userId: 'user-uuid',
     role: 'admin',
     joinedAt: new Date('2026-01-01T00:00:00Z'),
+    approvedAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides,
   }
 }
@@ -31,6 +32,7 @@ function makeMemberWithUser(overrides: Partial<MemberWithUser> = {}): MemberWith
     email: 'user@example.com',
     role: 'admin',
     joinedAt: new Date('2026-01-01T00:00:00Z'),
+    approvedAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides,
   }
 }
@@ -45,6 +47,7 @@ function makeRepository(
     findAllByQuiniela: jest.fn().mockResolvedValue([makeMemberWithUser()]),
     deleteById: jest.fn().mockResolvedValue(undefined),
     countAdmins: jest.fn().mockResolvedValue(2),
+    approve: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   } as unknown as IMembershipsRepository
 }
@@ -270,5 +273,138 @@ describe('MembershipsService.leaveQuiniela', () => {
     const result = await service.leaveQuiniela(QUINIELA_ID, CALLER_USER_ID)
 
     expect(result).toEqual({ success: false, error: 'UNKNOWN_ERROR' })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// MembershipsService.approveMember
+// ---------------------------------------------------------------------------
+
+describe('MembershipsService.approveMember', () => {
+  const CALLER_USER_ID = 'admin-user-uuid'
+  const MEMBERSHIP_ID = 'pending-membership-uuid'
+  const QUINIELA_ID = 'quiniela-uuid'
+
+  it('returns { ok: true } when caller is admin and membership exists', async () => {
+    const pendingMembership = makeMembership({
+      id: MEMBERSHIP_ID,
+      quinielaId: QUINIELA_ID,
+      userId: 'other-user-uuid',
+      role: 'member',
+      approvedAt: null,
+    })
+    const callerMembership = makeMembership({
+      userId: CALLER_USER_ID,
+      quinielaId: QUINIELA_ID,
+      role: 'admin',
+    })
+
+    const repo = makeRepository({
+      findById: jest.fn().mockResolvedValue(pendingMembership),
+      findByQuinielaAndUser: jest.fn().mockResolvedValue(callerMembership),
+      approve: jest.fn().mockResolvedValue(undefined),
+    })
+    const service = new MembershipsService(repo)
+
+    const result = await service.approveMember(CALLER_USER_ID, MEMBERSHIP_ID)
+
+    expect(result).toEqual({ ok: true })
+    expect(repo.approve).toHaveBeenCalledWith(MEMBERSHIP_ID)
+  })
+
+  it('is idempotent — calling approve on an already-approved membership still returns { ok: true }', async () => {
+    const alreadyApproved = makeMembership({
+      id: MEMBERSHIP_ID,
+      quinielaId: QUINIELA_ID,
+      userId: 'other-user-uuid',
+      role: 'member',
+      approvedAt: new Date('2026-01-01T00:00:00Z'),
+    })
+    const callerMembership = makeMembership({
+      userId: CALLER_USER_ID,
+      quinielaId: QUINIELA_ID,
+      role: 'admin',
+    })
+
+    const repo = makeRepository({
+      findById: jest.fn().mockResolvedValue(alreadyApproved),
+      findByQuinielaAndUser: jest.fn().mockResolvedValue(callerMembership),
+      approve: jest.fn().mockResolvedValue(undefined), // DB UPDATE with WHERE approved_at IS NULL is a no-op
+    })
+    const service = new MembershipsService(repo)
+
+    const result = await service.approveMember(CALLER_USER_ID, MEMBERSHIP_ID)
+
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('returns MEMBERSHIP_NOT_FOUND when membership does not exist', async () => {
+    const repo = makeRepository({
+      findById: jest.fn().mockResolvedValue(null),
+    })
+    const service = new MembershipsService(repo)
+
+    const result = await service.approveMember(CALLER_USER_ID, MEMBERSHIP_ID)
+
+    expect(result).toEqual({ ok: false, error: 'MEMBERSHIP_NOT_FOUND' })
+    expect(repo.approve).not.toHaveBeenCalled()
+  })
+
+  it('returns CALLER_NOT_ADMIN when caller has no membership in the quiniela', async () => {
+    const pendingMembership = makeMembership({
+      id: MEMBERSHIP_ID,
+      quinielaId: QUINIELA_ID,
+      userId: 'other-user-uuid',
+      role: 'member',
+      approvedAt: null,
+    })
+
+    const repo = makeRepository({
+      findById: jest.fn().mockResolvedValue(pendingMembership),
+      findByQuinielaAndUser: jest.fn().mockResolvedValue(null),
+    })
+    const service = new MembershipsService(repo)
+
+    const result = await service.approveMember(CALLER_USER_ID, MEMBERSHIP_ID)
+
+    expect(result).toEqual({ ok: false, error: 'CALLER_NOT_ADMIN' })
+    expect(repo.approve).not.toHaveBeenCalled()
+  })
+
+  it('returns CALLER_NOT_ADMIN when caller has role=member in the quiniela', async () => {
+    const pendingMembership = makeMembership({
+      id: MEMBERSHIP_ID,
+      quinielaId: QUINIELA_ID,
+      userId: 'other-user-uuid',
+      role: 'member',
+      approvedAt: null,
+    })
+    const callerMembership = makeMembership({
+      userId: CALLER_USER_ID,
+      quinielaId: QUINIELA_ID,
+      role: 'member', // not admin
+    })
+
+    const repo = makeRepository({
+      findById: jest.fn().mockResolvedValue(pendingMembership),
+      findByQuinielaAndUser: jest.fn().mockResolvedValue(callerMembership),
+    })
+    const service = new MembershipsService(repo)
+
+    const result = await service.approveMember(CALLER_USER_ID, MEMBERSHIP_ID)
+
+    expect(result).toEqual({ ok: false, error: 'CALLER_NOT_ADMIN' })
+    expect(repo.approve).not.toHaveBeenCalled()
+  })
+
+  it('returns UNKNOWN_ERROR when repository throws unexpectedly', async () => {
+    const repo = makeRepository({
+      findById: jest.fn().mockRejectedValue(new Error('DB error')),
+    })
+    const service = new MembershipsService(repo)
+
+    const result = await service.approveMember(CALLER_USER_ID, MEMBERSHIP_ID)
+
+    expect(result).toEqual({ ok: false, error: 'UNKNOWN_ERROR' })
   })
 })

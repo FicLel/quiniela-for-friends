@@ -48,6 +48,7 @@ export class MembershipsRepository implements IMembershipsRepository {
       userId: row.user_id as string,
       role: row.role as MembershipRole,
       joinedAt: new Date(row.joined_at as string),
+      approvedAt: row.approved_at ? new Date(row.approved_at as string) : null,
     }
   }
 
@@ -118,8 +119,19 @@ export class MembershipsRepository implements IMembershipsRepository {
         email: users.email as string,
         role: row.role as MembershipRole,
         joinedAt: new Date(row.joined_at as string),
+        approvedAt: row.approved_at ? new Date(row.approved_at as string) : null,
       }
     })
+  }
+
+  async approve(membershipId: string): Promise<void> {
+    await this.verifySchema()
+    const { error } = await this.supabase
+      .from('quiniela_memberships')
+      .update({ approved_at: new Date().toISOString() })
+      .eq('id', membershipId)
+      .is('approved_at', null)
+    if (error) throw new Error(`approve failed: ${error.message}`)
   }
 
   async deleteById(membershipId: string): Promise<void> {

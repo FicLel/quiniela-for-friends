@@ -93,7 +93,8 @@
   "navbar": {
     "appName": "Quiniela for Friends",
     "switchLanguage": "Switch language",
-    "quinielas": "Quinielas"
+    "quinielas": "Quinielas",
+    "users": "Users"
   },
   "quinielas": {
     "heading": "My Quinielas",
@@ -131,6 +132,7 @@
     "statusAccepted": "Accepted",
     "statusRevoked": "Revoked",
     "statusExpired": "Expired",
+    "approveButton": "Approve",
     "errors": {
       "CALLER_NOT_QUINIELA_ADMIN": "You do not have permission.",
       "CANNOT_REMOVE_ADMIN": "You cannot remove a quiniela admin.",
@@ -140,6 +142,35 @@
       "DB_ERROR": "Could not complete the action. Please try again.",
       "UNKNOWN_ERROR": "An unexpected error occurred."
     }
+  },
+  "users": {
+    "heading": "Users",
+    "searchPlaceholder": "Search by name or email",
+    "filterStatus": "Status",
+    "filterStatusAll": "All",
+    "filterStatusActive": "Active",
+    "filterStatusPending": "Pending",
+    "filterQuiniela": "Quiniela",
+    "filterQuinielaAll": "All quinielas",
+    "columnEmail": "Email",
+    "columnStatus": "Status",
+    "columnQuinielas": "Quinielas",
+    "badgeActive": "Active",
+    "badgePending": "Pending",
+    "emptyState": "No users match the current filters.",
+    "errorState": "Could not load users.",
+    "retryButton": "Retry",
+    "approveButton": "Approve",
+    "approving": "Approving...",
+    "detailHeading": "User detail",
+    "detailQuinielaRole": "Role",
+    "detailJoinedAt": "Joined",
+    "detailApproval": "Approval"
+  },
+  "pendingApproval": {
+    "heading": "Approval pending",
+    "message": "Your membership is awaiting admin approval. You will be notified when access is granted.",
+    "backLink": "Back to quinielas"
   },
   "invite": {
     "loading": "Validating invite...",
@@ -164,6 +195,8 @@
     "successHeading": "Welcome!",
     "successMessage": "You have joined the quiniela.",
     "goToQuiniela": "Go to quiniela",
+    "pendingHeading": "Request sent",
+    "pendingMessage": "Your account has been created. Your membership is pending admin approval.",
     "errors": {
       "TOKEN_NOT_FOUND": "Invalid or expired invite link.",
       "TOKEN_EXPIRED": "This invite link has expired.",

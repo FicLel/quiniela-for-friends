@@ -24,21 +24,25 @@ export type PageData =
       userExists: boolean
       hasSession: boolean
       sessionEmailMatches: boolean
-      rawToken: string
+      shortCode: string
     }
+
+type AcceptInviteResultWithPending = AcceptInviteResult & { pendingApproval?: boolean }
 
 type Props = {
   pageData: PageData
   lang: Locale
   dict: Dictionary['invite']
+  pendingApprovalDict: Dictionary['pendingApproval']
   acceptAsExistingAction: () => Promise<AcceptInviteResult>
-  acceptAsNewAction: (password: string) => Promise<AcceptInviteResult>
+  acceptAsNewAction: (password: string) => Promise<AcceptInviteResultWithPending>
 }
 
 export default function InviteAcceptanceFlow({
   pageData,
   lang,
   dict,
+  pendingApprovalDict,
   acceptAsExistingAction,
   acceptAsNewAction,
 }: Props) {
@@ -69,7 +73,9 @@ export default function InviteAcceptanceFlow({
   return (
     <SignUpState
       maskedEmail={maskedEmail}
+      lang={lang}
       dict={dict}
+      pendingApprovalDict={pendingApprovalDict}
       acceptAsNewAction={acceptAsNewAction}
     />
   )
@@ -212,22 +218,31 @@ function LoginPromptState({
 }
 
 // ---------------------------------------------------------------------------
-// Sign up state (new user)
+// Sign up state (new user) — shows pending state after successful registration
 // ---------------------------------------------------------------------------
 
 function SignUpState({
   maskedEmail,
+  lang,
   dict,
+  pendingApprovalDict,
   acceptAsNewAction,
 }: {
   maskedEmail: string
+  lang: Locale
   dict: Dictionary['invite']
-  acceptAsNewAction: (password: string) => Promise<AcceptInviteResult>
+  pendingApprovalDict: Dictionary['pendingApproval']
+  acceptAsNewAction: (password: string) => Promise<AcceptInviteResultWithPending>
 }) {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | undefined>(undefined)
   const [isPending, startTransition] = useTransition()
+  const [showPendingState, setShowPendingState] = useState(false)
+
+  if (showPendingState) {
+    return <PendingApprovalInviteState dict={dict} pendingApprovalDict={pendingApprovalDict} lang={lang} />
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -248,6 +263,9 @@ function SignUpState({
       if (result && !result.success) {
         const errKey = result.error as keyof typeof dict.errors
         setError(dict.errors[errKey] ?? dict.errors.UNKNOWN_ERROR)
+      } else if (result && result.success && result.pendingApproval) {
+        // Show pending approval state — do NOT redirect
+        setShowPendingState(true)
       }
     })
   }
@@ -322,6 +340,50 @@ function SignUpState({
           )}
         </button>
       </form>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Pending approval state — shown after new-user registration
+// ---------------------------------------------------------------------------
+
+function PendingApprovalInviteState({
+  dict,
+  pendingApprovalDict,
+  lang,
+}: {
+  dict: Dictionary['invite']
+  pendingApprovalDict: Dictionary['pendingApproval']
+  lang: Locale
+}) {
+  return (
+    <div className="rounded-2xl bg-white px-8 py-10 shadow-xl text-center">
+      <div className="mb-4 flex justify-center">
+        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            className="h-6 w-6 text-yellow-600"
+            aria-hidden="true"
+          >
+            <path
+              fillRule="evenodd"
+              d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3V12.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </span>
+      </div>
+      <h1 className="mb-2 text-2xl font-bold text-green-900">{dict.pendingHeading}</h1>
+      <p className="mb-6 text-sm text-gray-600">{dict.pendingMessage}</p>
+      <Link
+        href={`/${lang}/quinielas`}
+        className="inline-block rounded-lg bg-green-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+      >
+        {pendingApprovalDict.backLink}
+      </Link>
     </div>
   )
 }
