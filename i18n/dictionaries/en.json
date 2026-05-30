@@ -92,6 +92,88 @@
   },
   "navbar": {
     "appName": "Quiniela for Friends",
-    "switchLanguage": "Switch language"
+    "switchLanguage": "Switch language",
+    "quinielas": "Quinielas"
+  },
+  "quinielas": {
+    "heading": "My Quinielas",
+    "empty": "You are not part of any quiniela yet.",
+    "createNew": "Create Quiniela",
+    "nameLabel": "Quiniela name",
+    "namePlaceholder": "e.g. World Cup 2026",
+    "createButton": "Create",
+    "creating": "Creating...",
+    "errors": {
+      "NAME_EMPTY": "Name cannot be empty.",
+      "DB_ERROR": "Could not save. Please try again.",
+      "UNKNOWN_ERROR": "An unexpected error occurred."
+    }
+  },
+  "members": {
+    "heading": "Members",
+    "inviteMember": "Invite member",
+    "emailLabel": "Email address",
+    "emailPlaceholder": "friend@example.com",
+    "roleLabel": "Role",
+    "roleAdmin": "Admin",
+    "roleMember": "Member",
+    "inviteButton": "Generate link",
+    "inviting": "Generating...",
+    "copyLink": "Copy link",
+    "linkCopied": "Copied!",
+    "removeMember": "Remove",
+    "confirmRemove": "Remove this member?",
+    "leaveQuiniela": "Leave quiniela",
+    "confirmLeave": "Leave this quiniela?",
+    "pendingInvites": "Pending invitations",
+    "revokeInvite": "Revoke",
+    "statusPending": "Pending",
+    "statusAccepted": "Accepted",
+    "statusRevoked": "Revoked",
+    "statusExpired": "Expired",
+    "errors": {
+      "CALLER_NOT_QUINIELA_ADMIN": "You do not have permission.",
+      "CANNOT_REMOVE_ADMIN": "You cannot remove a quiniela admin.",
+      "MEMBERSHIP_NOT_FOUND": "Membership not found.",
+      "LAST_ADMIN_CANNOT_LEAVE": "You are the only admin. Promote another member before leaving.",
+      "ALREADY_A_MEMBER": "This person is already a member.",
+      "DB_ERROR": "Could not complete the action. Please try again.",
+      "UNKNOWN_ERROR": "An unexpected error occurred."
+    }
+  },
+  "invite": {
+    "loading": "Validating invite...",
+    "invalidHeading": "Invalid invitation",
+    "expiredMessage": "This invitation has expired. Ask the quiniela admin to generate a new link.",
+    "revokedMessage": "This invitation was cancelled.",
+    "alreadyAcceptedMessage": "This invitation has already been used.",
+    "notFoundMessage": "This invitation link is invalid.",
+    "joinHeading": "You have been invited to join",
+    "asRole": "as",
+    "emailMismatchHeading": "Wrong account",
+    "emailMismatchMessage": "This invite was sent to a different email. Please log out and use the correct account.",
+    "logoutLink": "Log out",
+    "loginHeading": "Sign in to continue",
+    "loginSubtitle": "Sign in with the invited email to accept.",
+    "signupHeading": "Create your account",
+    "signupSubtitle": "Set a password to join",
+    "passwordLabel": "Password",
+    "confirmPasswordLabel": "Confirm password",
+    "joinButton": "Join quiniela",
+    "joining": "Joining...",
+    "successHeading": "Welcome!",
+    "successMessage": "You have joined the quiniela.",
+    "goToQuiniela": "Go to quiniela",
+    "errors": {
+      "TOKEN_NOT_FOUND": "Invalid or expired invite link.",
+      "TOKEN_EXPIRED": "This invite link has expired.",
+      "TOKEN_REVOKED": "This invite link was cancelled.",
+      "TOKEN_ALREADY_ACCEPTED": "This invite link has already been used.",
+      "EMAIL_MISMATCH": "This invite is for a different email address.",
+      "PASSWORD_REQUIRED": "Please set a password.",
+      "WEAK_PASSWORD": "Password must be at least 8 characters.",
+      "DB_ERROR": "Something went wrong. Please try again.",
+      "UNKNOWN_ERROR": "An unexpected error occurred."
+    }
   }
 }

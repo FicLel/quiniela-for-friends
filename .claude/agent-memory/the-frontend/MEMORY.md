@@ -5,3 +5,4 @@
 - [Worktree Setup](project-worktree-setup.md) — sparse worktree lacks untracked main files (auth/, jest.config.js); node_modules shared via pnpm
 - [Jest Setup Detail](project-jest-setup.md) — setupFilesAfterEnv (correct option name), jsdom directive, --testPathPatterns plural in Jest 30+
 - [Auth Session](project-auth-session.md) — read role server-side via AuthClient.getTokenFromServerAction + verifyToken
+- [getByText multiple elements](feedback_getbytext_multiple.md) — When form selects and badges share text (e.g. "Admin"/"Member"), use getAllByText(...).length > 0 not getByText

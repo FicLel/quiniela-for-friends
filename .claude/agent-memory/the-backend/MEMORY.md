@@ -1,1 +1,2 @@
 - [Competitions Module](project-competitions-module.md) — World Cup match import feature: schema, client, service, repository, server action
+- [Quinielas / Memberships / Invitations Module](project-quinielas-memberships-invitations.md) — Invitation+membership system: migration, 3 modules, cross-service deps, token security, 58 tests

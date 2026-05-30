@@ -2,3 +2,4 @@
 - [Auth Password Flow Patterns & Gap Types](project-auth-password-patterns.md) — Recurring patterns from Email+Password login post-fix validation: type surface mismatch, proxy DB double-read, missing proxy tests
 - [Create First Admin Patterns & Gap Types](project-create-first-admin-patterns.md) — Recurring patterns from Create First Admin validation: Repository imports in views, missing action/page tests, validation error masking
 - [Welcome View Toggle Patterns & Gap Types](project-welcome-view-toggle-patterns.md) — Recurring patterns from Welcome page view-toggle + knockout validation: brief-approved arch bypass, timezone grouping, missing edge-case tests
+- [Invitations & Memberships Patterns](project-invitations-memberships-patterns.md) — Redirect to dead route, duplicate hashToken, missing NOT_A_MEMBER i18n key, missing interaction error-path tests, wrong error key for password mismatch

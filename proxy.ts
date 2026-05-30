@@ -68,6 +68,7 @@ export async function proxy(request: NextRequest) {
 
   const isLoginRoute = barePath === '/login'
   const isChangePasswordRoute = barePath.startsWith('/auth/change-password')
+  const isInviteRoute = barePath.startsWith('/invite/')
 
   const authClient = new AuthClient()
   const token = authClient.getTokenFromRequest(request)
@@ -76,7 +77,7 @@ export async function proxy(request: NextRequest) {
   const session = token ? await authClient.verifyToken(token) : null
 
   // Unauthenticated: redirect all private routes to /{locale}/login.
-  if (!session && !isLoginRoute) {
+  if (!session && !isLoginRoute && !isInviteRoute) {
     return NextResponse.redirect(new URL(`/${locale}/login`, request.url))
   }
 

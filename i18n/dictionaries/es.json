@@ -92,6 +92,88 @@
   },
   "navbar": {
     "appName": "Quiniela para Amigos",
-    "switchLanguage": "Cambiar idioma"
+    "switchLanguage": "Cambiar idioma",
+    "quinielas": "Quinielas"
+  },
+  "quinielas": {
+    "heading": "Mis Quinielas",
+    "empty": "Aún no formas parte de ninguna quiniela.",
+    "createNew": "Crear Quiniela",
+    "nameLabel": "Nombre de la quiniela",
+    "namePlaceholder": "ej. Copa del Mundo 2026",
+    "createButton": "Crear",
+    "creating": "Creando...",
+    "errors": {
+      "NAME_EMPTY": "El nombre no puede estar vacío.",
+      "DB_ERROR": "No se pudo guardar. Inténtalo de nuevo.",
+      "UNKNOWN_ERROR": "Ocurrió un error inesperado."
+    }
+  },
+  "members": {
+    "heading": "Miembros",
+    "inviteMember": "Invitar miembro",
+    "emailLabel": "Correo electrónico",
+    "emailPlaceholder": "amigo@ejemplo.com",
+    "roleLabel": "Rol",
+    "roleAdmin": "Administrador",
+    "roleMember": "Miembro",
+    "inviteButton": "Generar enlace",
+    "inviting": "Generando...",
+    "copyLink": "Copiar enlace",
+    "linkCopied": "¡Copiado!",
+    "removeMember": "Eliminar",
+    "confirmRemove": "¿Eliminar a este miembro?",
+    "leaveQuiniela": "Salir de la quiniela",
+    "confirmLeave": "¿Salir de esta quiniela?",
+    "pendingInvites": "Invitaciones pendientes",
+    "revokeInvite": "Revocar",
+    "statusPending": "Pendiente",
+    "statusAccepted": "Aceptado",
+    "statusRevoked": "Revocado",
+    "statusExpired": "Expirado",
+    "errors": {
+      "CALLER_NOT_QUINIELA_ADMIN": "No tienes permiso.",
+      "CANNOT_REMOVE_ADMIN": "No puedes eliminar a un administrador.",
+      "MEMBERSHIP_NOT_FOUND": "Membresía no encontrada.",
+      "LAST_ADMIN_CANNOT_LEAVE": "Eres el único administrador. Promueve a otro miembro antes de salir.",
+      "ALREADY_A_MEMBER": "Esta persona ya es miembro.",
+      "DB_ERROR": "No se pudo completar la acción. Inténtalo de nuevo.",
+      "UNKNOWN_ERROR": "Ocurrió un error inesperado."
+    }
+  },
+  "invite": {
+    "loading": "Validando invitación...",
+    "invalidHeading": "Invitación inválida",
+    "expiredMessage": "Esta invitación ha expirado. Pide al administrador que genere un nuevo enlace.",
+    "revokedMessage": "Esta invitación fue cancelada.",
+    "alreadyAcceptedMessage": "Esta invitación ya fue utilizada.",
+    "notFoundMessage": "Este enlace de invitación no es válido.",
+    "joinHeading": "Has sido invitado a unirte a",
+    "asRole": "como",
+    "emailMismatchHeading": "Cuenta incorrecta",
+    "emailMismatchMessage": "Esta invitación fue enviada a un correo diferente. Por favor cierra sesión y usa la cuenta correcta.",
+    "logoutLink": "Cerrar sesión",
+    "loginHeading": "Inicia sesión para continuar",
+    "loginSubtitle": "Inicia sesión con el correo invitado para aceptar.",
+    "signupHeading": "Crea tu cuenta",
+    "signupSubtitle": "Establece una contraseña para unirte",
+    "passwordLabel": "Contraseña",
+    "confirmPasswordLabel": "Confirmar contraseña",
+    "joinButton": "Unirse a la quiniela",
+    "joining": "Uniéndose...",
+    "successHeading": "¡Bienvenido!",
+    "successMessage": "Te has unido a la quiniela.",
+    "goToQuiniela": "Ir a la quiniela",
+    "errors": {
+      "TOKEN_NOT_FOUND": "Enlace de invitación inválido o expirado.",
+      "TOKEN_EXPIRED": "Este enlace de invitación ha expirado.",
+      "TOKEN_REVOKED": "Este enlace de invitación fue cancelado.",
+      "TOKEN_ALREADY_ACCEPTED": "Este enlace de invitación ya fue utilizado.",
+      "EMAIL_MISMATCH": "Esta invitación es para una dirección de correo diferente.",
+      "PASSWORD_REQUIRED": "Por favor establece una contraseña.",
+      "WEAK_PASSWORD": "La contraseña debe tener al menos 8 caracteres.",
+      "DB_ERROR": "Algo salió mal. Inténtalo de nuevo.",
+      "UNKNOWN_ERROR": "Ocurrió un error inesperado."
+    }
   }
 }
