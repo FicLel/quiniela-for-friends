@@ -43,7 +43,6 @@ export class QuinielasRepository implements IQuinielasRepository {
     return {
       id: row.id as string,
       name: row.name as string,
-      createdBy: row.created_by as string,
       createdAt: new Date(row.created_at as string),
       updatedAt: new Date(row.updated_at as string),
     }

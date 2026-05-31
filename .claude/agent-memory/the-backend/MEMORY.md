@@ -2,3 +2,4 @@
 - [Quinielas / Memberships / Invitations Module](project-quinielas-memberships-invitations.md) — Invitation+membership system: migration, 3 modules, cross-service deps, token security, 58 tests
 - [ShortCode and Approval Gate Feature](project-shortcode-approval-gate.md) — short_code on invitations, approved_at on memberships, users admin list, approveMember, acceptInviteByShortCode
 - [Open Invite Links Feature](project-open-invite-links.md) — email=null open invites, isMember, reusable links, no markAccepted on open invites
+- [Expected Results Feature](project-expected-results.md) — user match score predictions: expectedResults/ module, countByUser, saveExpectedResult action, cleanup on member removal

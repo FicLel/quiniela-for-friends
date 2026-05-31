@@ -55,13 +55,13 @@ const matchC: MatchCardData = {
 
 describe('DateGroupedView', () => {
   it('renders nothing when matches is empty', () => {
-    const { container } = render(<DateGroupedView matches={[]} dict={dict} lang="en" />)
+    const { container } = render(<DateGroupedView matches={[]} dict={dict} lang="en" isApproved={true} />)
     expect(container.firstChild).toBeNull()
   })
 
   it('groups two matches on the same local date under one heading', () => {
     // matchA and matchB both fall on 2026-06-15 UTC (UTC midnight and UTC+3h)
-    render(<DateGroupedView matches={[matchA, matchB]} dict={dict} lang="en" />)
+    render(<DateGroupedView matches={[matchA, matchB]} dict={dict} lang="en" isApproved={true} />)
 
     // Both teams from both matches should be visible
     expect(screen.getByText('Germany')).toBeInTheDocument()
@@ -75,14 +75,14 @@ describe('DateGroupedView', () => {
   })
 
   it('renders matches across two different dates under separate headings', () => {
-    render(<DateGroupedView matches={[matchA, matchC]} dict={dict} lang="en" />)
+    render(<DateGroupedView matches={[matchA, matchC]} dict={dict} lang="en" isApproved={true} />)
 
     const headings = screen.getAllByRole('heading', { level: 2 })
     expect(headings).toHaveLength(2)
   })
 
   it('renders matches in their input order within a date group', () => {
-    render(<DateGroupedView matches={[matchA, matchB]} dict={dict} lang="en" />)
+    render(<DateGroupedView matches={[matchA, matchB]} dict={dict} lang="en" isApproved={true} />)
 
     // Both matches render team names as text in order
     const germany = screen.getByText('Germany')
@@ -128,7 +128,7 @@ describe('DateGroupedView', () => {
       stage: 'GROUP_STAGE',
     }
 
-    render(<DateGroupedView matches={[june15Match, june16Match]} dict={dict} lang="en" />)
+    render(<DateGroupedView matches={[june15Match, june16Match]} dict={dict} lang="en" isApproved={true} />)
 
     // These two matches are 24 hours apart — any local timezone produces 2 separate date groups
     const headings = screen.getAllByRole('heading', { level: 2 })
@@ -138,7 +138,7 @@ describe('DateGroupedView', () => {
   // I4 — sort within a date group: input order reversed, DOM order must be ascending
   it('renders matches within a date group sorted ascending by scheduledAt even when input is reversed', () => {
     // matchB (03:00) before matchA (00:00) — reversed input order
-    render(<DateGroupedView matches={[matchB, matchA]} dict={dict} lang="en" />)
+    render(<DateGroupedView matches={[matchB, matchA]} dict={dict} lang="en" isApproved={true} />)
 
     const germany = screen.getByText('Germany')
     const france = screen.getByText('France')

@@ -47,7 +47,6 @@ export class InvitationsRepository implements IInvitationsRepository {
       expiresAt: new Date(row.expires_at as string),
       acceptedAt: row.accepted_at ? new Date(row.accepted_at as string) : null,
       revokedAt: row.revoked_at ? new Date(row.revoked_at as string) : null,
-      invitedByUserId: row.invited_by_user_id as string,
       createdAt: new Date(row.created_at as string),
     }
   }
@@ -59,7 +58,6 @@ export class InvitationsRepository implements IInvitationsRepository {
     tokenHash: string
     shortCode: string
     expiresAt: Date
-    invitedByUserId: string
   }): Promise<Invitation> {
     await this.verifySchema()
     const { data, error } = await this.supabase
@@ -71,7 +69,6 @@ export class InvitationsRepository implements IInvitationsRepository {
         token_hash: input.tokenHash,
         short_code: input.shortCode,
         expires_at: input.expiresAt.toISOString(),
-        invited_by_user_id: input.invitedByUserId,
       })
       .select('*')
       .single()

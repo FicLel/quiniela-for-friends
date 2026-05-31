@@ -11,6 +11,8 @@ export type GroupAccordionProps = {
   defaultOpen?: boolean
   dict: Dictionary['welcome']
   lang: Locale
+  isApproved: boolean
+  onSaveScore?: (matchId: string, home: number, away: number) => Promise<unknown>
 }
 
 function formatGroupLabel(group: string, groupWord: string): string {
@@ -26,6 +28,8 @@ export default function GroupAccordion({
   defaultOpen = false,
   dict,
   lang,
+  isApproved,
+  onSaveScore,
 }: GroupAccordionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
 
@@ -70,7 +74,14 @@ export default function GroupAccordion({
         className="flex flex-col gap-2 px-5 pb-4"
       >
         {matches.map((match) => (
-          <MatchCard key={match.id} {...match} dict={dict} lang={lang} />
+          <MatchCard
+            key={match.id}
+            {...match}
+            dict={dict}
+            lang={lang}
+            isApproved={isApproved}
+            onSaveScore={onSaveScore}
+          />
         ))}
       </div>
     </div>

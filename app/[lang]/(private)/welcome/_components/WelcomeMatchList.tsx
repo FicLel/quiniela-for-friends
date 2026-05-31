@@ -13,6 +13,8 @@ type WelcomeMatchListProps = {
   sortedGroups: [string, MatchCardData[]][]
   dict: Dictionary['welcome']
   lang: Locale
+  isApproved: boolean
+  onSaveScore?: (matchId: string, home: number, away: number) => Promise<unknown>
 }
 
 export default function WelcomeMatchList({
@@ -22,6 +24,8 @@ export default function WelcomeMatchList({
   sortedGroups,
   dict,
   lang,
+  isApproved,
+  onSaveScore,
 }: WelcomeMatchListProps) {
   return (
     <div className="flex flex-col gap-4">
@@ -32,7 +36,13 @@ export default function WelcomeMatchList({
 
       {/* Group-stage content — either date view or group accordion view */}
       {viewMode === 'date' ? (
-        <DateGroupedView matches={groupStageMatches} dict={dict} lang={lang} />
+        <DateGroupedView
+          matches={groupStageMatches}
+          dict={dict}
+          lang={lang}
+          isApproved={isApproved}
+          onSaveScore={onSaveScore}
+        />
       ) : (
         <div className="flex flex-col gap-4">
           {sortedGroups.map(([group, groupMatches]) => (
@@ -42,13 +52,21 @@ export default function WelcomeMatchList({
               matches={groupMatches}
               dict={dict}
               lang={lang}
+              isApproved={isApproved}
+              onSaveScore={onSaveScore}
             />
           ))}
         </div>
       )}
 
       {/* Knockout rounds — always shown below */}
-      <KnockoutSection knockoutMatches={knockoutMatches} dict={dict} lang={lang} />
+      <KnockoutSection
+        knockoutMatches={knockoutMatches}
+        dict={dict}
+        lang={lang}
+        isApproved={isApproved}
+        onSaveScore={onSaveScore}
+      />
     </div>
   )
 }

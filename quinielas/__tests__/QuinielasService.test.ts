@@ -16,7 +16,6 @@ function makeQuiniela(overrides: Partial<Quiniela> = {}): Quiniela {
   return {
     id: 'quiniela-uuid',
     name: 'World Cup 2026',
-    createdBy: 'user-uuid',
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides,
@@ -50,7 +49,7 @@ describe('QuinielasService.createQuiniela', () => {
     })
     const service = new QuinielasService(repo)
 
-    const result = await service.createQuiniela({ name: 'World Cup 2026', createdBy: 'user-uuid' })
+    const result = await service.createQuiniela({ name: 'World Cup 2026', userId: 'user-uuid' })
 
     expect(result).toEqual({ success: true, quiniela })
     expect(repo.createWithAdmin).toHaveBeenCalledWith('World Cup 2026', 'user-uuid')
@@ -60,7 +59,7 @@ describe('QuinielasService.createQuiniela', () => {
     const repo = makeRepository()
     const service = new QuinielasService(repo)
 
-    await service.createQuiniela({ name: '  My Quiniela  ', createdBy: 'user-uuid' })
+    await service.createQuiniela({ name: '  My Quiniela  ', userId: 'user-uuid' })
 
     expect(repo.createWithAdmin).toHaveBeenCalledWith('My Quiniela', 'user-uuid')
   })
@@ -69,7 +68,7 @@ describe('QuinielasService.createQuiniela', () => {
     const repo = makeRepository()
     const service = new QuinielasService(repo)
 
-    const result = await service.createQuiniela({ name: '', createdBy: 'user-uuid' })
+    const result = await service.createQuiniela({ name: '', userId: 'user-uuid' })
 
     expect(result).toEqual({ success: false, error: 'NAME_EMPTY' })
     expect(repo.createWithAdmin).not.toHaveBeenCalled()
@@ -79,7 +78,7 @@ describe('QuinielasService.createQuiniela', () => {
     const repo = makeRepository()
     const service = new QuinielasService(repo)
 
-    const result = await service.createQuiniela({ name: '   ', createdBy: 'user-uuid' })
+    const result = await service.createQuiniela({ name: '   ', userId: 'user-uuid' })
 
     expect(result).toEqual({ success: false, error: 'NAME_EMPTY' })
     expect(repo.createWithAdmin).not.toHaveBeenCalled()
@@ -91,7 +90,7 @@ describe('QuinielasService.createQuiniela', () => {
     })
     const service = new QuinielasService(repo)
 
-    const result = await service.createQuiniela({ name: 'Test', createdBy: 'user-uuid' })
+    const result = await service.createQuiniela({ name: 'Test', userId: 'user-uuid' })
 
     expect(result).toEqual({ success: false, error: 'DB_ERROR' })
   })
@@ -102,7 +101,7 @@ describe('QuinielasService.createQuiniela', () => {
     })
     const service = new QuinielasService(repo)
 
-    const result = await service.createQuiniela({ name: 'Test', createdBy: 'user-uuid' })
+    const result = await service.createQuiniela({ name: 'Test', userId: 'user-uuid' })
 
     expect(result).toEqual({ success: false, error: 'DB_ERROR' })
   })

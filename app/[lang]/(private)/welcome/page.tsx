@@ -4,12 +4,16 @@ import { getDictionary, hasLocale } from '@/i18n/getDictionary'
 import { CompetitionsClient } from '@/competitions/CompetitionsClient'
 import { CompetitionsRepository } from '@/competitions/CompetitionsRepository'
 import { CompetitionsService } from '@/competitions/CompetitionsService'
+import { ExpectedResultsService } from '@/expectedResults/ExpectedResultsService'
+import { ExpectedResultsRepository } from '@/expectedResults/ExpectedResultsRepository'
+import { MembershipsRepository } from '@/memberships/MembershipsRepository'
 import { AuthClient } from '@/auth/AuthClient'
 import ImportMatchesButton from './_components/ImportMatchesButton'
 import WelcomeMatchList from './_components/WelcomeMatchList'
 import EmptyState from './_components/EmptyState'
 import type { MatchCardData } from './_components/MatchCard'
 import type { Locale } from '@/i18n/i18n.types'
+import { saveExpectedResult } from './actions'
 
 type PageProps = {
   params: Promise<{ lang: string }>
@@ -40,8 +44,27 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
   const viewMode: 'date' | 'group' =
     viewParam === 'group' ? 'group' : 'date'
 
-  const service = new CompetitionsService(new CompetitionsClient(), new CompetitionsRepository())
-  const allMatches = await service.getAllMatches()
+  const userId = session?.sub ?? null
+
+  const competitionsService = new CompetitionsService(
+    new CompetitionsClient(),
+    new CompetitionsRepository(),
+  )
+  const expectedResultsService = new ExpectedResultsService(
+    new ExpectedResultsRepository(),
+    new MembershipsRepository(),
+  )
+
+  const [allMatches, isApproved, expectedResults] = await Promise.all([
+    competitionsService.getAllMatches(),
+    userId ? expectedResultsService.isUserApproved(userId) : Promise.resolve(false),
+    userId ? expectedResultsService.getExpectedResultsForUser(userId) : Promise.resolve([]),
+  ])
+
+  // Build O(1) lookup map: matchId → { homeScore, awayScore }
+  const expectedResultsMap = new Map(
+    expectedResults.map((r) => [r.matchId, { homeScore: r.homeScore, awayScore: r.awayScore }]),
+  )
 
   const knockoutStages = new Set(['ROUND_OF_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'FINAL'])
 
@@ -50,6 +73,7 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
   const groupMap = new Map<string, MatchCardData[]>()
 
   for (const match of allMatches) {
+    const savedScore = expectedResultsMap.get(match.id)
     const cardData: MatchCardData = {
       id: match.id,
       homeTeamName: match.homeTeamName,
@@ -63,6 +87,8 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
       scheduledAt: match.scheduledAt.toISOString(),
       status: match.status,
       stage: match.stage,
+      initialHomeScore: savedScore?.homeScore,
+      initialAwayScore: savedScore?.awayScore,
     }
 
     if (knockoutStages.has(match.stage)) {
@@ -104,6 +130,8 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
             sortedGroups={sortedGroups}
             dict={dict.welcome}
             lang={locale}
+            isApproved={isApproved}
+            onSaveScore={saveExpectedResult}
           />
         )}
       </div>

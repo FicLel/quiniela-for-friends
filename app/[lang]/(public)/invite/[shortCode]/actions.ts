@@ -96,7 +96,7 @@ export async function acceptInviteAsExistingUser(
     return result
   }
 
-  redirect(`/${lang}/quinielas/${result.quinielaId}`)
+  redirect(`/${lang}/welcome`)
 }
 
 /**

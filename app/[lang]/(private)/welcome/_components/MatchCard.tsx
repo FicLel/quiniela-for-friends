@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import type { Dictionary } from '@/i18n/getDictionary'
 import type { Locale } from '@/i18n/i18n.types'
 
@@ -17,11 +17,15 @@ export type MatchCardData = {
   scheduledAt: string   // ISO 8601 UTC — formatted client-side
   status: string
   stage: string
+  initialHomeScore?: number
+  initialAwayScore?: number
 }
 
 type MatchCardProps = MatchCardData & {
   dict: Dictionary['welcome']
   lang: Locale
+  isApproved: boolean
+  onSaveScore?: (matchId: string, home: number, away: number) => Promise<unknown>
 }
 
 // ---------------------------------------------------------------------------
@@ -106,19 +110,72 @@ function StatusBadge({ status, dict }: { status: string; dict: Dictionary['welco
 type ScoreCounterProps = {
   incrementLabel: string
   decrementLabel: string
+  initialValue?: number
+  disabled?: boolean
+  onSave?: (value: number) => void
 }
 
-function ScoreCounter({ incrementLabel, decrementLabel }: ScoreCounterProps) {
-  const [count, setCount] = useState(0)
+function ScoreCounter({
+  incrementLabel,
+  decrementLabel,
+  initialValue,
+  disabled = false,
+  onSave,
+}: ScoreCounterProps) {
+  const [count, setCount] = useState(initialValue ?? 0)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function fireOnSave(value: number) {
+    if (disabled) return
+    onSave?.(value)
+  }
+
+  function scheduleDebounce(value: number) {
+    if (debounceRef.current !== null) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      debounceRef.current = null
+      fireOnSave(value)
+    }, 500)
+  }
+
+  function handleIncrement() {
+    if (disabled) return
+    const next = count + 1
+    setCount(next)
+    scheduleDebounce(next)
+  }
+
+  function handleDecrement() {
+    if (disabled || count === 0) return
+    const next = Math.max(0, count - 1)
+    setCount(next)
+    scheduleDebounce(next)
+  }
+
+  function handleBlur(e: React.FocusEvent<HTMLDivElement>) {
+    // Ignore if focus is moving to another element inside this same counter widget
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+    if (debounceRef.current !== null) {
+      clearTimeout(debounceRef.current)
+      debounceRef.current = null
+    }
+    fireOnSave(count)
+  }
+
+  const disabledButtonClasses = disabled ? 'opacity-50 cursor-not-allowed' : ''
 
   return (
-    <div className="flex w-10 flex-col overflow-hidden rounded-lg border border-gray-200 sm:w-12 lg:w-14">
+    <div
+      className="flex w-10 flex-col overflow-hidden rounded-lg border border-gray-200 sm:w-12 lg:w-14"
+      onBlur={handleBlur}
+    >
       {/* Up button */}
       <button
         type="button"
         aria-label={incrementLabel}
-        onClick={() => setCount((c) => c + 1)}
-        className="flex h-7 w-full items-center justify-center bg-gray-50 text-gray-500 transition hover:bg-green-50 hover:text-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-400 sm:h-8"
+        onClick={handleIncrement}
+        disabled={disabled}
+        className={`flex h-7 w-full items-center justify-center bg-gray-50 text-gray-500 transition hover:bg-green-50 hover:text-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-400 sm:h-8 ${disabledButtonClasses}`}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -146,9 +203,9 @@ function ScoreCounter({ incrementLabel, decrementLabel }: ScoreCounterProps) {
       <button
         type="button"
         aria-label={decrementLabel}
-        onClick={() => setCount((c) => Math.max(0, c - 1))}
-        disabled={count === 0}
-        className="flex h-7 w-full items-center justify-center bg-gray-50 text-gray-500 transition hover:bg-green-50 hover:text-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-400 disabled:cursor-not-allowed disabled:opacity-40 sm:h-8"
+        onClick={handleDecrement}
+        disabled={disabled || count === 0}
+        className={`flex h-7 w-full items-center justify-center bg-gray-50 text-gray-500 transition hover:bg-green-50 hover:text-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-400 disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 ${disabledButtonClasses}`}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -191,6 +248,7 @@ function WinBadge({ label }: { label: string }) {
 // ---------------------------------------------------------------------------
 
 export default function MatchCard({
+  id,
   homeTeamName,
   homeTeamTla,
   homeTeamCrest,
@@ -199,9 +257,28 @@ export default function MatchCard({
   awayTeamCrest,
   scheduledAt,
   status,
+  initialHomeScore,
+  initialAwayScore,
   dict,
   lang,
+  isApproved,
+  onSaveScore,
 }: MatchCardProps) {
+  // Keep latest score values in refs so the onSave callbacks always capture
+  // the current value of the other side when both are needed together.
+  const homeScoreRef = useRef(initialHomeScore ?? 0)
+  const awayScoreRef = useRef(initialAwayScore ?? 0)
+
+  function handleSaveHome(value: number) {
+    homeScoreRef.current = value
+    onSaveScore?.(id, value, awayScoreRef.current)
+  }
+
+  function handleSaveAway(value: number) {
+    awayScoreRef.current = value
+    onSaveScore?.(id, homeScoreRef.current, value)
+  }
+
   return (
     <div className="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm sm:px-5 sm:py-4 lg:px-6 lg:py-4">
 
@@ -229,11 +306,17 @@ export default function MatchCard({
           <ScoreCounter
             incrementLabel={`Increase ${homeTeamName} score`}
             decrementLabel={`Decrease ${homeTeamName} score`}
+            initialValue={initialHomeScore}
+            disabled={!isApproved}
+            onSave={handleSaveHome}
           />
           <span className="text-sm font-bold text-gray-400">:</span>
           <ScoreCounter
             incrementLabel={`Increase ${awayTeamName} score`}
             decrementLabel={`Decrease ${awayTeamName} score`}
+            initialValue={initialAwayScore}
+            disabled={!isApproved}
+            onSave={handleSaveAway}
           />
         </div>
 

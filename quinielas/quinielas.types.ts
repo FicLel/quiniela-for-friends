@@ -1,7 +1,6 @@
 export type Quiniela = {
   id: string
   name: string
-  createdBy: string
   createdAt: Date
   updatedAt: Date
 }
@@ -25,7 +24,7 @@ export interface IQuinielasRepository {
 }
 
 export interface IQuinielasService {
-  createQuiniela(input: { name: string; createdBy: string }): Promise<CreateQuinielaResult>
+  createQuiniela(input: { name: string; userId: string }): Promise<CreateQuinielaResult>
   getQuiniela(quinielaId: string): Promise<GetQuinielaResult>
   listQuinielasForUser(userId: string): Promise<ListQuinielasForUserResult>
 }

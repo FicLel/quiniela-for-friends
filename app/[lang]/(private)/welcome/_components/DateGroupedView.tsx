@@ -8,6 +8,8 @@ type DateGroupedViewProps = {
   matches: MatchCardData[]
   dict: Dictionary['welcome']
   lang: Locale
+  isApproved: boolean
+  onSaveScore?: (matchId: string, home: number, away: number) => Promise<unknown>
 }
 
 function toLocalDateKey(scheduledAt: string): string {
@@ -15,7 +17,13 @@ function toLocalDateKey(scheduledAt: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-export default function DateGroupedView({ matches, dict, lang }: DateGroupedViewProps) {
+export default function DateGroupedView({
+  matches,
+  dict,
+  lang,
+  isApproved,
+  onSaveScore,
+}: DateGroupedViewProps) {
   if (matches.length === 0) return null
 
   // Group matches by local calendar date, preserving insertion order
@@ -50,7 +58,14 @@ export default function DateGroupedView({ matches, dict, lang }: DateGroupedView
               {[...dayMatches]
                 .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))
                 .map((match) => (
-                  <MatchCard key={match.id} {...match} dict={dict} lang={lang} />
+                  <MatchCard
+                    key={match.id}
+                    {...match}
+                    dict={dict}
+                    lang={lang}
+                    isApproved={isApproved}
+                    onSaveScore={onSaveScore}
+                  />
                 ))}
             </div>
           </div>

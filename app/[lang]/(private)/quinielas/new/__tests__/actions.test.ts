@@ -59,21 +59,21 @@ describe('createQuiniela action', () => {
   it('calls service with trimmed name and callerUserId on success', async () => {
     mockCreateQuiniela.mockResolvedValue({
       success: true,
-      quiniela: { id: 'qid-1', name: 'World Cup 2026', createdBy: 'user-123', createdAt: new Date(), updatedAt: new Date() },
+      quiniela: { id: 'qid-1', name: 'World Cup 2026', createdAt: new Date(), updatedAt: new Date() },
     })
 
     await createQuiniela('en', '  World Cup 2026  ')
 
     expect(mockCreateQuiniela).toHaveBeenCalledWith({
       name: 'World Cup 2026',
-      createdBy: 'user-123',
+      userId: 'user-123',
     })
   })
 
   it('redirects to members page on success', async () => {
     mockCreateQuiniela.mockResolvedValue({
       success: true,
-      quiniela: { id: 'qid-1', name: 'My Quiniela', createdBy: 'user-123', createdAt: new Date(), updatedAt: new Date() },
+      quiniela: { id: 'qid-1', name: 'My Quiniela', createdAt: new Date(), updatedAt: new Date() },
     })
 
     await createQuiniela('en', 'My Quiniela')
@@ -99,11 +99,11 @@ describe('createQuiniela action', () => {
     const longName = 'a'.repeat(100)
     mockCreateQuiniela.mockResolvedValue({
       success: true,
-      quiniela: { id: 'qid-1', name: longName, createdBy: 'user-123', createdAt: new Date(), updatedAt: new Date() },
+      quiniela: { id: 'qid-1', name: longName, createdAt: new Date(), updatedAt: new Date() },
     })
 
     await createQuiniela('en', longName)
-    expect(mockCreateQuiniela).toHaveBeenCalledWith({ name: longName, createdBy: 'user-123' })
+    expect(mockCreateQuiniela).toHaveBeenCalledWith({ name: longName, userId: 'user-123' })
   })
 
   it('returns NAME_EMPTY for name exceeding 100 characters', async () => {

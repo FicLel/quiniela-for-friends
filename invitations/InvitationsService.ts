@@ -109,7 +109,6 @@ export class InvitationsService implements IInvitationsService {
             tokenHash,
             shortCode,
             expiresAt,
-            invitedByUserId: input.callerUserId,
           })
           break
         } catch (err) {

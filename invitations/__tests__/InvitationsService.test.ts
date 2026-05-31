@@ -63,7 +63,6 @@ function makeInvitation(overrides: Partial<Invitation> = {}): Invitation {
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
     acceptedAt: null,
     revokedAt: null,
-    invitedByUserId: 'admin-uuid',
     createdAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides,
   }

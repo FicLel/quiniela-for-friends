@@ -25,25 +25,25 @@ const dict = enDict.welcome
 
 describe('GroupAccordion', () => {
   it('renders collapsed by default (panel hidden)', () => {
-    render(<GroupAccordion group="GROUP_A" matches={sampleMatches} dict={dict} lang="en" />)
+    render(<GroupAccordion group="GROUP_A" matches={sampleMatches} dict={dict} lang="en" isApproved={true} />)
     const panel = document.getElementById('group-panel-GROUP_A')
     expect(panel).not.toBeNull()
     expect(panel).toHaveAttribute('hidden')
   })
 
   it('renders the group label transformed from GROUP_A to "Group A"', () => {
-    render(<GroupAccordion group="GROUP_A" matches={sampleMatches} dict={dict} lang="en" />)
+    render(<GroupAccordion group="GROUP_A" matches={sampleMatches} dict={dict} lang="en" isApproved={true} />)
     expect(screen.getByText('Group A')).toBeInTheDocument()
   })
 
   it('has aria-expanded="false" when collapsed', () => {
-    render(<GroupAccordion group="GROUP_A" matches={sampleMatches} dict={dict} lang="en" />)
+    render(<GroupAccordion group="GROUP_A" matches={sampleMatches} dict={dict} lang="en" isApproved={true} />)
     const button = screen.getByRole('button', { name: /group a/i })
     expect(button).toHaveAttribute('aria-expanded', 'false')
   })
 
   it('clicking the header expands the panel', () => {
-    render(<GroupAccordion group="GROUP_A" matches={sampleMatches} dict={dict} lang="en" />)
+    render(<GroupAccordion group="GROUP_A" matches={sampleMatches} dict={dict} lang="en" isApproved={true} />)
     const button = screen.getByRole('button', { name: /group a/i })
 
     fireEvent.click(button)
@@ -54,7 +54,7 @@ describe('GroupAccordion', () => {
   })
 
   it('clicking again collapses the panel', () => {
-    render(<GroupAccordion group="GROUP_A" matches={sampleMatches} dict={dict} lang="en" />)
+    render(<GroupAccordion group="GROUP_A" matches={sampleMatches} dict={dict} lang="en" isApproved={true} />)
     const button = screen.getByRole('button', { name: /group a/i })
 
     fireEvent.click(button)
@@ -73,6 +73,7 @@ describe('GroupAccordion', () => {
         defaultOpen={true}
         dict={dict}
         lang="en"
+        isApproved={true}
       />,
     )
     const panel = document.getElementById('group-panel-GROUP_B')

@@ -98,8 +98,12 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // Pass through.
-  return NextResponse.next()
+  // Pass through — forward x-locale so app/layout.tsx can read it via headers().
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-locale', locale)
+  return NextResponse.next({
+    request: { headers: requestHeaders },
+  })
 }
 
 export const config = {

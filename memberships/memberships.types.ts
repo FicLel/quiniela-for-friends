@@ -44,6 +44,8 @@ export interface IMembershipsRepository {
   countAdmins(quinielaId: string): Promise<number>
   approve(membershipId: string): Promise<void>
   isMember(quinielaId: string, userId: string): Promise<boolean>
+  /** Count approved memberships for a user (approved_at IS NOT NULL). */
+  countByUser(userId: string): Promise<number>
 }
 
 export interface IMembershipsService {

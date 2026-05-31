@@ -39,7 +39,7 @@ export async function createQuiniela(
   const service = new QuinielasService(new QuinielasRepository())
   const result = await service.createQuiniela({
     name: parsed.data.name,
-    createdBy: session.sub,
+    userId: session.sub,
   })
 
   if (!result.success) {

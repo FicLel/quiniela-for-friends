@@ -23,7 +23,7 @@ const makeMatch = (id: string, stage: string): MatchCardData => ({
 
 describe('KnockoutSection', () => {
   it('renders 4 placeholder cards when knockoutMatches is empty', () => {
-    render(<KnockoutSection knockoutMatches={[]} dict={dict} lang="en" />)
+    render(<KnockoutSection knockoutMatches={[]} dict={dict} lang="en" isApproved={true} />)
 
     // Each round label appears in both the section heading and the placeholder card
     expect(screen.getAllByText(dict.knockoutRoundOf16).length).toBeGreaterThanOrEqual(1)
@@ -38,7 +38,7 @@ describe('KnockoutSection', () => {
 
   it('renders a MatchCard for a SEMI_FINALS match and placeholders for other 3 rounds', () => {
     const semiMatch = makeMatch('semi-1', 'SEMI_FINALS')
-    render(<KnockoutSection knockoutMatches={[semiMatch]} dict={dict} lang="en" />)
+    render(<KnockoutSection knockoutMatches={[semiMatch]} dict={dict} lang="en" isApproved={true} />)
 
     // Semi-finals: renders a real match card — team names visible
     expect(screen.getAllByText('Team A').length).toBeGreaterThanOrEqual(1)
@@ -51,7 +51,7 @@ describe('KnockoutSection', () => {
   })
 
   it('renders rounds in fixed order: ROUND_OF_16 → QUARTER_FINALS → SEMI_FINALS → FINAL', () => {
-    render(<KnockoutSection knockoutMatches={[]} dict={dict} lang="en" />)
+    render(<KnockoutSection knockoutMatches={[]} dict={dict} lang="en" isApproved={true} />)
 
     const headings = screen.getAllByRole('heading', { level: 2 })
     const labels = headings.map((h) => h.textContent)
@@ -64,7 +64,7 @@ describe('KnockoutSection', () => {
 
   it('renders section headings for all rounds regardless of data', () => {
     const finalMatch = makeMatch('final-1', 'FINAL')
-    render(<KnockoutSection knockoutMatches={[finalMatch]} dict={dict} lang="en" />)
+    render(<KnockoutSection knockoutMatches={[finalMatch]} dict={dict} lang="en" isApproved={true} />)
 
     expect(screen.getByRole('heading', { name: dict.knockoutRoundOf16 })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: dict.knockoutQuarterFinals })).toBeInTheDocument()
@@ -76,7 +76,7 @@ describe('KnockoutSection', () => {
   it('renders correctly when groupStageMatches is empty and knockoutMatches has data', () => {
     const semiMatch = makeMatch('semi-edge', 'SEMI_FINALS')
     // KnockoutSection only receives knockoutMatches — groupStageMatches context is irrelevant
-    render(<KnockoutSection knockoutMatches={[semiMatch]} dict={dict} lang="en" />)
+    render(<KnockoutSection knockoutMatches={[semiMatch]} dict={dict} lang="en" isApproved={true} />)
 
     // Should not crash; real MatchCard for SEMI_FINALS renders team names
     expect(screen.getAllByText('Team A').length).toBeGreaterThanOrEqual(1)
@@ -91,7 +91,7 @@ describe('KnockoutSection', () => {
   // I6 — ROUND_OF_16 real match path
   it('renders a MatchCard for a ROUND_OF_16 match and placeholders for other 3 rounds', () => {
     const r16Match = makeMatch('r16-1', 'ROUND_OF_16')
-    render(<KnockoutSection knockoutMatches={[r16Match]} dict={dict} lang="en" />)
+    render(<KnockoutSection knockoutMatches={[r16Match]} dict={dict} lang="en" isApproved={true} />)
 
     // ROUND_OF_16 renders real team names
     expect(screen.getAllByText('Team A').length).toBeGreaterThanOrEqual(1)
@@ -105,7 +105,7 @@ describe('KnockoutSection', () => {
   // I6 — QUARTER_FINALS real match path
   it('renders a MatchCard for a QUARTER_FINALS match and placeholders for other 3 rounds', () => {
     const qfMatch = makeMatch('qf-1', 'QUARTER_FINALS')
-    render(<KnockoutSection knockoutMatches={[qfMatch]} dict={dict} lang="en" />)
+    render(<KnockoutSection knockoutMatches={[qfMatch]} dict={dict} lang="en" isApproved={true} />)
 
     // QUARTER_FINALS renders real team names
     expect(screen.getAllByText('Team A').length).toBeGreaterThanOrEqual(1)

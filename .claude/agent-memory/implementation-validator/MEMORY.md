@@ -4,3 +4,4 @@
 - [Welcome View Toggle Patterns & Gap Types](project-welcome-view-toggle-patterns.md) — Recurring patterns from Welcome page view-toggle + knockout validation: brief-approved arch bypass, timezone grouping, missing edge-case tests
 - [Invitations & Memberships Patterns](project-invitations-memberships-patterns.md) — Redirect to dead route, duplicate hashToken, missing NOT_A_MEMBER i18n key, missing interaction error-path tests, wrong error key for password mismatch
 - [Users Dashboard & Approval Gate Patterns](project-users-dashboard-approval-patterns.md) — quinielaId passed instead of membershipId, repository bypass in actions, stale [token] route, missing MembersClient approve tests, double DB read
+- [Expected Results & Score Input Patterns](project-expected-results-patterns.md) — Repository bypass in cascade delete, leaveQuiniela missing cascade, non-serializable function prop at server-client boundary, missing Repository test

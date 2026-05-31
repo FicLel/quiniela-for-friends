@@ -7,6 +7,8 @@ type KnockoutSectionProps = {
   knockoutMatches: MatchCardData[]
   dict: Dictionary['welcome']
   lang: Locale
+  isApproved: boolean
+  onSaveScore?: (matchId: string, home: number, away: number) => Promise<unknown>
 }
 
 const KNOCKOUT_ROUNDS = [
@@ -16,7 +18,13 @@ const KNOCKOUT_ROUNDS = [
   { stage: 'FINAL',          labelKey: 'knockoutFinal'         },
 ] as const
 
-export default function KnockoutSection({ knockoutMatches, dict, lang }: KnockoutSectionProps) {
+export default function KnockoutSection({
+  knockoutMatches,
+  dict,
+  lang,
+  isApproved,
+  onSaveScore,
+}: KnockoutSectionProps) {
   return (
     <div className="mt-8 border-t border-gray-200 pt-8">
       <div className="flex flex-col gap-6">
@@ -30,7 +38,14 @@ export default function KnockoutSection({ knockoutMatches, dict, lang }: Knockou
               <div className="flex flex-col gap-3">
                 {roundMatches.length > 0 ? (
                   roundMatches.map((m) => (
-                    <MatchCard key={m.id} {...m} dict={dict} lang={lang} />
+                    <MatchCard
+                      key={m.id}
+                      {...m}
+                      dict={dict}
+                      lang={lang}
+                      isApproved={isApproved}
+                      onSaveScore={onSaveScore}
+                    />
                   ))
                 ) : (
                   <KnockoutPlaceholderCard roundLabel={roundLabel} />

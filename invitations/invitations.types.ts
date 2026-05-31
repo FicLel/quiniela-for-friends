@@ -10,7 +10,6 @@ export type Invitation = {
   expiresAt: Date
   acceptedAt: Date | null
   revokedAt: Date | null
-  invitedByUserId: string
   createdAt: Date
 }
 
@@ -40,7 +39,6 @@ export interface IInvitationsRepository {
     tokenHash: string
     shortCode: string
     expiresAt: Date
-    invitedByUserId: string
   }): Promise<Invitation>
   findByTokenHash(tokenHash: string): Promise<Invitation | null>
   findByShortCode(shortCode: string): Promise<Invitation | null>

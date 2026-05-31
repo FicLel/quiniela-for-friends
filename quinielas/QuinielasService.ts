@@ -33,7 +33,7 @@ export class QuinielasService implements IQuinielasService {
    */
   async createQuiniela(input: {
     name: string
-    createdBy: string
+    userId: string
   }): Promise<CreateQuinielaResult> {
     const name = input.name.trim()
     if (name === '') {
@@ -41,7 +41,7 @@ export class QuinielasService implements IQuinielasService {
     }
 
     try {
-      const quiniela = await this.repository.createWithAdmin(name, input.createdBy)
+      const quiniela = await this.repository.createWithAdmin(name, input.userId)
       return { success: true, quiniela }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)

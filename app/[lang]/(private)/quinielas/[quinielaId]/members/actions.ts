@@ -8,6 +8,8 @@ import { InvitationsRepository } from '@/invitations/InvitationsRepository'
 import { MembershipsService } from '@/memberships/MembershipsService'
 import { MembershipsRepository } from '@/memberships/MembershipsRepository'
 import { UsersRepository } from '@/users/UsersRepository'
+import { ExpectedResultsService } from '@/expectedResults/ExpectedResultsService'
+import { ExpectedResultsRepository } from '@/expectedResults/ExpectedResultsRepository'
 import type { SendInviteResult } from '@/invitations/invitations.types'
 import type { RemoveMemberResult, LeaveQuinielaResult, ApproveMemberResult } from '@/memberships/memberships.types'
 import type { RevokeInviteResult } from '@/invitations/invitations.types'
@@ -20,6 +22,14 @@ async function getCallerUserId(): Promise<string | null> {
   const token = await authClient.getTokenFromServerAction()
   const session = token ? await authClient.verifyToken(token) : null
   return session?.sub ?? null
+}
+
+/**
+ * Build an ExpectedResultsService wired to the real infrastructure adapters.
+ * Centralised here so both removeMember and leaveQuiniela share the same factory.
+ */
+function makeExpectedResultsService(membershipsRepository: MembershipsRepository): ExpectedResultsService {
+  return new ExpectedResultsService(new ExpectedResultsRepository(), membershipsRepository)
 }
 
 /**
@@ -59,6 +69,9 @@ export async function inviteMember(
 
 /**
  * Remove a member from a quiniela.
+ *
+ * After successful removal, if the removed user has no remaining memberships,
+ * their expected results are deleted via ExpectedResultsService.
  */
 export async function removeMember(
   _lang: Locale,
@@ -70,8 +83,24 @@ export async function removeMember(
     return { success: false, error: 'CALLER_NOT_QUINIELA_ADMIN' }
   }
 
-  const service = new MembershipsService(new MembershipsRepository())
-  return service.removeMember(quinielaId, targetMembershipId, callerUserId)
+  const membershipsRepository = new MembershipsRepository()
+
+  // Look up the target membership before removal so we have the userId
+  const targetMembership = await membershipsRepository.findById(targetMembershipId)
+
+  const membershipsService = new MembershipsService(membershipsRepository)
+  const result = await membershipsService.removeMember(quinielaId, targetMembershipId, callerUserId)
+
+  if (result.success && targetMembership) {
+    const remainingCount = await membershipsRepository.countByUser(targetMembership.userId)
+    if (remainingCount === 0) {
+      await makeExpectedResultsService(membershipsRepository).deleteExpectedResultsForUser(
+        targetMembership.userId,
+      )
+    }
+  }
+
+  return result
 }
 
 /**
@@ -118,6 +147,9 @@ export async function approveMember(
 /**
  * Leave a quiniela. On success, redirects to /quinielas.
  *
+ * After successful leave, if the caller has no remaining memberships,
+ * their expected results are deleted via ExpectedResultsService.
+ *
  * IMPORTANT: redirect() throws internally — must NOT be inside a try/catch.
  */
 export async function leaveQuiniela(
@@ -129,11 +161,17 @@ export async function leaveQuiniela(
     return { success: false, error: 'UNKNOWN_ERROR' }
   }
 
-  const service = new MembershipsService(new MembershipsRepository())
-  const result = await service.leaveQuiniela(quinielaId, callerUserId)
+  const membershipsRepository = new MembershipsRepository()
+  const membershipsService = new MembershipsService(membershipsRepository)
+  const result = await membershipsService.leaveQuiniela(quinielaId, callerUserId)
 
   if (!result.success) {
     return result
+  }
+
+  const remainingCount = await membershipsRepository.countByUser(callerUserId)
+  if (remainingCount === 0) {
+    await makeExpectedResultsService(membershipsRepository).deleteExpectedResultsForUser(callerUserId)
   }
 
   redirect(`/${lang}/quinielas`)

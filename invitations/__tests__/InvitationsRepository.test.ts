@@ -111,7 +111,6 @@ const ROW = {
   expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
   accepted_at: null,
   revoked_at: null,
-  invited_by_user_id: 'admin-uuid',
   created_at: '2026-01-01T00:00:00Z',
 }
 
@@ -203,7 +202,6 @@ describe('InvitationsRepository – create stores shortCode', () => {
       tokenHash: 'abc123hash',
       shortCode: 'ab12cd34',
       expiresAt: new Date(ROW.expires_at),
-      invitedByUserId: 'admin-uuid',
     })
 
     expect(mockInsert).toHaveBeenCalledWith(
@@ -222,7 +220,6 @@ describe('InvitationsRepository – create stores shortCode', () => {
       tokenHash: 'abc123hash',
       shortCode: 'ab12cd34',
       expiresAt: new Date(ROW.expires_at),
-      invitedByUserId: 'admin-uuid',
     })
 
     expect(mockInsert).toHaveBeenCalledWith(
@@ -241,7 +238,6 @@ describe('InvitationsRepository – create stores shortCode', () => {
       tokenHash: 'abc123hash',
       shortCode: 'ab12cd34',
       expiresAt: new Date(ROW.expires_at),
-      invitedByUserId: 'admin-uuid',
     })
 
     expect(invitation.shortCode).toBe('ab12cd34')
@@ -258,7 +254,6 @@ describe('InvitationsRepository – create stores shortCode', () => {
       tokenHash: 'abc123hash',
       shortCode: 'ab12cd34',
       expiresAt: new Date(ROW.expires_at),
-      invitedByUserId: 'admin-uuid',
     })
 
     expect(invitation.email).toBeNull()
