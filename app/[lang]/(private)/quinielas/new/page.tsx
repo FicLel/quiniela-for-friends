@@ -1,5 +1,6 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { getDictionary, hasLocale } from '@/i18n/getDictionary'
+import { AuthClient } from '@/auth/AuthClient'
 import type { Locale } from '@/i18n/i18n.types'
 import { createQuiniela } from './actions'
 import CreateQuinielaForm from './_components/CreateQuinielaForm'
@@ -14,6 +15,12 @@ export default async function NewQuinielaPage({ params }: PageProps) {
 
   const dict = await getDictionary(lang)
   const locale = lang as Locale
+
+  const authClient = new AuthClient()
+  const token = await authClient.getTokenFromServerAction()
+  const session = token ? await authClient.verifyToken(token) : null
+  if (!session) redirect(`/${locale}/login`)
+  if (session.role !== 'admin') redirect(`/${locale}/welcome`)
 
   const boundCreateQuiniela = createQuiniela.bind(null, locale)
 

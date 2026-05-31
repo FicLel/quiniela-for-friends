@@ -44,7 +44,8 @@ export async function proxy(request: NextRequest) {
   const isPublicAsset =
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
-    pathname === '/favicon.ico'
+    pathname === '/favicon.ico' ||
+    /\.(png|jpe?g|gif|svg|ico|webp|avif|woff2?|ttf|eot|mp4|pdf)$/i.test(pathname)
 
   if (isPublicAsset) {
     return NextResponse.next()

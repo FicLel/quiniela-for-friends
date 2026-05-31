@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { getDictionary, hasLocale } from '@/i18n/getDictionary'
 import { AuthClient } from '@/auth/AuthClient'
 import { Navbar } from '@/app/_components/Navbar'
@@ -18,7 +18,10 @@ export default async function PrivateLayout({ children, params }: LayoutProps) {
   const authClient = new AuthClient()
   const token = await authClient.getTokenFromServerAction()
   const session = token ? await authClient.verifyToken(token) : null
-  const isAdmin = session?.role === 'admin'
+
+  if (!session) redirect(`/${lang}/login`)
+
+  const isAdmin = session.role === 'admin'
 
   return (
     <>

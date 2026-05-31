@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Quiniela for Friends",
+    "title": "Your Quiniela",
     "description": "Soccer predictions with your friends"
   },
   "login": {
@@ -42,7 +42,7 @@
     }
   },
   "welcome": {
-    "heading": "Welcome to Quiniela for Friends",
+    "heading": "Welcome to Your Quiniela",
     "subtitle": "World Cup 2026 — Group Stage Schedule",
     "group": "Group",
     "importButton": "Import World Cup Matches",
@@ -91,7 +91,7 @@
     }
   },
   "navbar": {
-    "appName": "Quiniela for Friends",
+    "appName": "Your Quiniela",
     "switchLanguage": "Switch language",
     "quinielas": "Quinielas",
     "users": "Users"

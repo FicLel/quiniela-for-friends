@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getDictionary, hasLocale } from '@/i18n/getDictionary'
 import { AuthClient } from '@/auth/AuthClient'
@@ -22,7 +22,11 @@ export default async function QuinielasPage({ params }: PageProps) {
   const session = token ? await authClient.verifyToken(token) : null
 
   if (!session) {
-    notFound()
+    redirect(`/${locale}/login`)
+  }
+
+  if (session.role !== 'admin') {
+    redirect(`/${locale}/welcome`)
   }
 
   const service = new QuinielasService(new QuinielasRepository())

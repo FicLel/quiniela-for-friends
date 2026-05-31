@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Quiniela para Amigos",
+    "title": "Tu quiniela",
     "description": "Predicciones de fútbol con tus amigos"
   },
   "login": {
@@ -42,7 +42,7 @@
     }
   },
   "welcome": {
-    "heading": "Bienvenido a Quiniela para Amigos",
+    "heading": "Tu quiniela",
     "subtitle": "Copa del Mundo 2026 — Fase de Grupos",
     "group": "Grupo",
     "importButton": "Importar partidos del Mundial",

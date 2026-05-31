@@ -41,11 +41,6 @@ jest.mock('../_components/SetupAdminForm', () => ({
   default: () => <div data-testid="setup-admin-form" />,
 }))
 
-jest.mock('../_components/SoccerAnimation', () => ({
-  __esModule: true,
-  default: () => null,
-}))
-
 jest.mock('../actions', () => ({
   login: jest.fn(),
   createFirstAdmin: jest.fn(),

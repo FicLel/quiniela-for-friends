@@ -15,12 +15,14 @@ export function Navbar({ lang, dict, isAdmin = false }: NavbarProps) {
       <div className="flex items-center gap-6">
         <span className="text-sm font-bold tracking-wide text-white">{dict.appName}</span>
         <nav className="flex items-center gap-4">
-          <Link
-            href={`/${lang}/quinielas`}
-            className="text-sm font-medium text-green-200 transition hover:text-white"
-          >
-            {dict.quinielas}
-          </Link>
+          {isAdmin && (
+            <Link
+              href={`/${lang}/quinielas`}
+              className="text-sm font-medium text-green-200 transition hover:text-white"
+            >
+              {dict.quinielas}
+            </Link>
+          )}
           {isAdmin && (
             <Link
               href={`/${lang}/dashboard`}

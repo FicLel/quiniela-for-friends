@@ -45,7 +45,15 @@ export default async function InvitePage({ params }: PageProps) {
   const boundAcceptAsNew = acceptInviteAsNewUser.bind(null, locale, shortCode)
 
   return (
-    <main className="flex min-h-screen w-full items-center justify-center bg-gradient-to-b from-green-900 to-green-700 px-4 py-12">
+    <main
+      style={{
+        backgroundImage: "url('/imagen-fondo-quiniela.png')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+      className="flex min-h-screen w-full items-center justify-center px-4 py-12"
+    >
       <div className="w-full max-w-sm">
         <InviteAcceptanceFlow
           pageData={pageData}
