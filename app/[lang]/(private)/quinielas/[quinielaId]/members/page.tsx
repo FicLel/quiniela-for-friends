@@ -50,7 +50,7 @@ export default async function MembersPage({ params }: PageProps) {
   const isAdmin = callerMembership.role === 'admin'
 
   // AC-13: Gate pending members — show pending approval screen if not yet approved
-  if (callerMembership.approvedAt === null) {
+  if (callerMembership.approvedAt === null && !isAdmin) {
     return <PendingApprovalScreen lang={locale} dict={dict.pendingApproval} />
   }
 
