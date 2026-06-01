@@ -102,7 +102,9 @@
     "appName": "Your Quiniela",
     "switchLanguage": "Switch language",
     "quinielas": "Quinielas",
-    "users": "Users"
+    "users": "Users",
+    "leaderboard": "Leaderboard",
+    "selectQuiniela": "Select quiniela"
   },
   "quinielas": {
     "heading": "My Quinielas",
@@ -180,6 +182,31 @@
     "heading": "Approval pending",
     "message": "Your membership is awaiting admin approval. You will be notified when access is granted.",
     "backLink": "Back to quinielas"
+  },
+  "leaderboard": {
+    "title": "Leaderboard",
+    "backToMembers": "Back to members",
+    "noMembers": "This quiniela has no members yet.",
+    "noScoresBanner": "Scores will appear here once matches are synced. Players are shown alphabetically for now.",
+    "youBadge": "YOU",
+    "pts": "pts",
+    "youAre": "You are",
+    "colPlayer": "Player",
+    "colExact": "Exact",
+    "colOutcome": "Out.",
+    "colPts": "Pts",
+    "colExactTitle": "Exact score hits",
+    "colOutcomeTitle": "Correct outcome hits",
+    "colPtsTitle": "Total points",
+    "pointsSystemTitle": "How points work",
+    "pointsSystemClose": "Close",
+    "rule1Label": "⭐ Correct outcome — 1 pt",
+    "rule1Desc": "You predicted the right result: home win, draw, or away win.",
+    "rule2Label": "⚽ Correct home goals — 1 pt",
+    "rule2Desc": "You predicted the exact number of goals for the home team.",
+    "rule3Label": "⚽ Correct away goals — 1 pt",
+    "rule3Desc": "You predicted the exact number of goals for the away team.",
+    "maxPoints": "Maximum 3 points per match when you nail the exact score."
   },
   "invite": {
     "loading": "Validating invite...",

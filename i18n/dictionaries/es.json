@@ -102,7 +102,9 @@
     "appName": "Quiniela para Amigos",
     "switchLanguage": "Cambiar idioma",
     "quinielas": "Quinielas",
-    "users": "Usuarios"
+    "users": "Usuarios",
+    "leaderboard": "Marcador",
+    "selectQuiniela": "Seleccionar quiniela"
   },
   "quinielas": {
     "heading": "Mis Quinielas",
@@ -180,6 +182,31 @@
     "heading": "Aprobación pendiente",
     "message": "Tu membresía está esperando la aprobación del administrador. Serás notificado cuando se te conceda acceso.",
     "backLink": "Volver a quinielas"
+  },
+  "leaderboard": {
+    "title": "Marcador",
+    "backToMembers": "Volver a miembros",
+    "noMembers": "Esta quiniela aún no tiene miembros.",
+    "noScoresBanner": "Las puntuaciones aparecerán aquí cuando se sincronicen los partidos. Los jugadores se muestran en orden alfabético por ahora.",
+    "youBadge": "TÚ",
+    "pts": "pts",
+    "youAre": "Posición",
+    "colPlayer": "Jugador",
+    "colExact": "Exacto",
+    "colOutcome": "Result.",
+    "colPts": "Pts",
+    "colExactTitle": "Aciertos exactos",
+    "colOutcomeTitle": "Resultados correctos",
+    "colPtsTitle": "Puntos totales",
+    "pointsSystemTitle": "Cómo funcionan los puntos",
+    "pointsSystemClose": "Cerrar",
+    "rule1Label": "⭐ Resultado correcto — 1 pt",
+    "rule1Desc": "Predijiste el resultado correcto: victoria local, empate o victoria visitante.",
+    "rule2Label": "⚽ Goles locales correctos — 1 pt",
+    "rule2Desc": "Predijiste el número exacto de goles del equipo local.",
+    "rule3Label": "⚽ Goles visitantes correctos — 1 pt",
+    "rule3Desc": "Predijiste el número exacto de goles del equipo visitante.",
+    "maxPoints": "Máximo 3 puntos por partido cuando aciertas el marcador exacto."
   },
   "invite": {
     "loading": "Validando invitación...",

@@ -2,19 +2,27 @@ import Link from 'next/link'
 import type { Locale } from '@/i18n/i18n.types'
 import type { Dictionary } from '@/i18n/getDictionary'
 import { LanguageSwitcher } from './LanguageSwitcher'
+import { QuinielaLeaderboardNav } from './QuinielaLeaderboardNav'
+import { MobileMenuClient } from './MobileMenuClient'
 
 type NavbarProps = {
   lang: Locale
   dict: Dictionary['navbar']
   isAdmin?: boolean
+  quinielas?: { id: string; name: string }[]
 }
 
-export function Navbar({ lang, dict, isAdmin = false }: NavbarProps) {
+export function Navbar({ lang, dict, isAdmin = false, quinielas = [] }: NavbarProps) {
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between border-b border-green-800 bg-green-900 px-6 py-3">
       <div className="flex items-center gap-6">
-        <span className="text-sm font-bold tracking-wide text-white">{dict.appName}</span>
-        <nav className="flex items-center gap-4">
+        <Link
+          href={`/${lang}/welcome`}
+          className="text-sm font-bold tracking-wide text-white transition hover:text-green-200"
+        >
+          {dict.appName}
+        </Link>
+        <nav className="hidden md:flex items-center gap-4">
           {isAdmin && (
             <Link
               href={`/${lang}/quinielas`}
@@ -31,9 +39,22 @@ export function Navbar({ lang, dict, isAdmin = false }: NavbarProps) {
               {dict.users}
             </Link>
           )}
+          <QuinielaLeaderboardNav
+            lang={lang}
+            quinielas={quinielas}
+            dict={{ leaderboard: dict.leaderboard, selectQuiniela: dict.selectQuiniela }}
+          />
         </nav>
       </div>
-      <LanguageSwitcher currentLocale={lang} label={dict.switchLanguage} />
+      <div className="hidden md:block">
+        <LanguageSwitcher currentLocale={lang} label={dict.switchLanguage} />
+      </div>
+      <MobileMenuClient
+        lang={lang}
+        dict={dict}
+        isAdmin={isAdmin}
+        quinielas={quinielas}
+      />
     </header>
   )
 }

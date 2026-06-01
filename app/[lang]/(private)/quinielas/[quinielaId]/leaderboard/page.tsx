@@ -16,8 +16,8 @@ export default async function LeaderboardPage({ params }: PageProps) {
   const { lang, quinielaId } = await params
   if (!hasLocale(lang)) notFound()
 
-  const dict = await getDictionary(lang)
   const locale = lang as Locale
+  const dict = await getDictionary(locale)
 
   const authClient = new AuthClient()
   const token = await authClient.getTokenFromServerAction()
@@ -37,17 +37,21 @@ export default async function LeaderboardPage({ params }: PageProps) {
   const leaderboardService = new LeaderboardService(
     new PredictionScoreRepository(),
     new UsersRepository(),
+    membershipsRepository,
   )
 
   const rows = await leaderboardService.getLeaderboard(quinielaId)
 
-  // dict is available for future i18n use
-  void dict
-
   return (
     <main className="min-h-screen bg-green-50 px-4 py-8">
       <div className="mx-auto w-full max-w-3xl">
-        <LeaderboardClient rows={rows} callerUserId={session.sub} />
+        <LeaderboardClient
+          rows={rows}
+          callerUserId={session.sub}
+          lang={locale}
+          quinielaId={quinielaId}
+          dict={dict.leaderboard}
+        />
       </div>
     </main>
   )

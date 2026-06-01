@@ -56,6 +56,7 @@ export async function GET(
     const leaderboardService = new LeaderboardService(
       new PredictionScoreRepository(),
       new UsersRepository(),
+      membershipsRepo,
     )
     const leaderboard = await leaderboardService.getLeaderboard(poolId)
 
