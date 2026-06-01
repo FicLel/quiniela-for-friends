@@ -1,14 +1,19 @@
 type KnockoutPlaceholderCardProps = {
   roundLabel: string
+  matchupDescription?: string | null
 }
 
-export default function KnockoutPlaceholderCard({ roundLabel }: KnockoutPlaceholderCardProps) {
+export default function KnockoutPlaceholderCard({ roundLabel, matchupDescription }: KnockoutPlaceholderCardProps) {
   return (
     <div className="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm sm:px-5 sm:py-4 lg:px-6 lg:py-4">
       {/* Row 1: round label */}
       <div className="mb-3 flex items-center justify-between sm:mb-4">
         <p className="text-xs font-medium text-gray-500">{roundLabel}</p>
       </div>
+
+      {matchupDescription && (
+        <p className="mb-2 text-center text-xs italic text-gray-400">{matchupDescription}</p>
+      )}
 
       {/* Row 2: home TBD | separator | away TBD */}
       <div className="flex items-center justify-between gap-2 sm:gap-4">

@@ -60,6 +60,15 @@ type RawApiResponse = {
 // Client
 // ---------------------------------------------------------------------------
 
+const KNOCKOUT_STAGES = [
+  'ROUND_OF_32',
+  'ROUND_OF_16',
+  'QUARTER_FINALS',
+  'SEMI_FINALS',
+  'THIRD_PLACE',
+  'FINAL',
+]
+
 export class CompetitionsClient implements ICompetitionsClient {
   /**
    * Fetch all GROUP_STAGE matches for the 2026 World Cup.
@@ -95,6 +104,45 @@ export class CompetitionsClient implements ICompetitionsClient {
 
     return body.matches
       .filter((m) => m.stage === 'GROUP_STAGE')
+      .map((m) => mapToImportRecord(m))
+  }
+
+  /**
+   * Fetch all knockout-stage matches for the 2026 World Cup.
+   * Filters for ROUND_OF_32, ROUND_OF_16, QUARTER_FINALS, SEMI_FINALS,
+   * THIRD_PLACE, and FINAL stages.
+   *
+   * Throws:
+   *   Error — on non-2xx HTTP response (message includes status code)
+   *   Error — on network failure (message from underlying fetch error)
+   *   Error — when FOOTBALL_DATA_ORG_API_KEY env var is missing
+   */
+  async fetchAllKnockoutMatches(): Promise<MatchImportRecord[]> {
+    const apiKey = requireEnv('FOOTBALL_DATA_ORG_API_KEY')
+
+    let response: Response
+    try {
+      response = await fetch(WC_MATCHES_URL, {
+        headers: {
+          'X-Auth-Token': apiKey,
+        },
+      })
+    } catch (err) {
+      throw new Error(
+        `[CompetitionsClient] Network failure fetching matches: ${err instanceof Error ? err.message : String(err)}`,
+      )
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        `[CompetitionsClient] Unexpected response from football-data.org: HTTP ${response.status}`,
+      )
+    }
+
+    const body = (await response.json()) as RawApiResponse
+
+    return body.matches
+      .filter((m) => KNOCKOUT_STAGES.includes(m.stage))
       .map((m) => mapToImportRecord(m))
   }
 }

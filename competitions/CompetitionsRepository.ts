@@ -11,6 +11,7 @@
 import { createClient } from '@supabase/supabase-js'
 import type {
   ICompetitionsRepository,
+  KnockoutPlaceholderRecord,
   Match,
   MatchImportRecord,
 } from '@/competitions/competitions.types'
@@ -60,22 +61,24 @@ export class CompetitionsRepository implements ICompetitionsRepository {
   private toMatch(row: Record<string, unknown>): Match {
     return {
       id: row.id as string,
-      externalId: row.external_id as number,
+      externalId: row.external_id as number | null,
       stage: row.stage as string,
       group: row.group as string,
       matchday: row.matchday as number,
       status: row.status as string,
       scheduledAt: new Date(row.scheduled_at as string),
-      homeTeamExternalId: row.home_team_external_id as number,
+      homeTeamExternalId: row.home_team_external_id as number | null,
       homeTeamName: row.home_team_name as string,
       homeTeamShortName: row.home_team_short_name as string,
       homeTeamTla: row.home_team_tla as string,
       homeTeamCrest: (row.home_team_crest as string | null) ?? null,
-      awayTeamExternalId: row.away_team_external_id as number,
+      awayTeamExternalId: row.away_team_external_id as number | null,
       awayTeamName: row.away_team_name as string,
       awayTeamShortName: row.away_team_short_name as string,
       awayTeamTla: row.away_team_tla as string,
       awayTeamCrest: (row.away_team_crest as string | null) ?? null,
+      bracketSlot: (row.bracket_slot as string | null) ?? null,
+      matchupDescription: (row.matchup_description as string | null) ?? null,
       createdAt: new Date(row.created_at as string),
       updatedAt: new Date(row.updated_at as string),
     }
@@ -86,22 +89,24 @@ export class CompetitionsRepository implements ICompetitionsRepository {
    */
   private toDbRow(record: MatchImportRecord): Record<string, unknown> {
     return {
-      external_id: record.externalId,
+      external_id: record.externalId ?? null,
       stage: record.stage,
       group: record.group,
       matchday: record.matchday,
       status: record.status,
       scheduled_at: record.scheduledAt,
-      home_team_external_id: record.homeTeamExternalId,
+      home_team_external_id: record.homeTeamExternalId ?? null,
       home_team_name: record.homeTeamName,
       home_team_short_name: record.homeTeamShortName,
       home_team_tla: record.homeTeamTla,
       home_team_crest: record.homeTeamCrest,
-      away_team_external_id: record.awayTeamExternalId,
+      away_team_external_id: record.awayTeamExternalId ?? null,
       away_team_name: record.awayTeamName,
       away_team_short_name: record.awayTeamShortName,
       away_team_tla: record.awayTeamTla,
       away_team_crest: record.awayTeamCrest,
+      bracket_slot: record.bracketSlot ?? null,
+      matchup_description: record.matchupDescription ?? null,
     }
   }
 
@@ -170,5 +175,121 @@ export class CompetitionsRepository implements ICompetitionsRepository {
     if (!data || data.length === 0) return []
 
     return data.map((row) => this.toMatch(row as Record<string, unknown>))
+  }
+
+  /**
+   * Upsert knockout placeholder rows keyed on bracket_slot.
+   * Returns the number of records submitted for upsert.
+   * Throws on Supabase error.
+   */
+  async upsertKnockoutPlaceholders(records: KnockoutPlaceholderRecord[]): Promise<number> {
+    await this.verifySchema()
+
+    const rows = records.map((r) => ({
+      bracket_slot: r.bracketSlot,
+      matchup_description: r.matchupDescription,
+      stage: r.stage,
+      group: '',
+      matchday: r.matchday,
+      status: 'SCHEDULED',
+      scheduled_at: r.scheduledAt,
+      home_team_name: r.homeTeamName,
+      home_team_short_name: r.homeTeamShortName,
+      home_team_tla: r.homeTeamTla,
+      away_team_name: r.awayTeamName,
+      away_team_short_name: r.awayTeamShortName,
+      away_team_tla: r.awayTeamTla,
+      home_team_crest: null,
+      away_team_crest: null,
+      external_id: null,
+      home_team_external_id: null,
+      away_team_external_id: null,
+    }))
+
+    const { error } = await this.supabase
+      .from('matches')
+      .upsert(rows, { onConflict: 'bracket_slot', ignoreDuplicates: false })
+
+    if (error) {
+      throw new Error(`upsertKnockoutPlaceholders failed: ${error.message}`)
+    }
+
+    return rows.length
+  }
+
+  /**
+   * Update team details on knockout placeholder matches, matched positionally
+   * within each stage by scheduled_at order.
+   *
+   * The football-data.org API may use matchday values that differ from our
+   * seeded values, so we avoid matching on matchday entirely. Instead:
+   * 1. Group API records by stage, sort each group by scheduledAt.
+   * 2. For each stage, fetch our placeholder bracket_slots ordered by scheduled_at.
+   * 3. Pair them positionally and update each by bracket_slot.
+   *
+   * Returns the count of records updated.
+   * Throws on Supabase error.
+   */
+  async updateKnockoutTeams(records: MatchImportRecord[]): Promise<number> {
+    await this.verifySchema()
+
+    // Group API records by stage, sorted by scheduledAt within each stage
+    const byStage = new Map<string, MatchImportRecord[]>()
+    for (const record of records) {
+      const stageRecords = byStage.get(record.stage) ?? []
+      stageRecords.push(record)
+      byStage.set(record.stage, stageRecords)
+    }
+    for (const stageRecords of byStage.values()) {
+      stageRecords.sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
+    }
+
+    let updated = 0
+
+    for (const [stage, stageRecords] of byStage.entries()) {
+      // Fetch placeholder bracket_slots for this stage ordered by scheduled_at
+      const { data, error: fetchError } = await this.supabase
+        .from('matches')
+        .select('bracket_slot')
+        .eq('stage', stage)
+        .not('bracket_slot', 'is', null)
+        .order('scheduled_at')
+
+      if (fetchError) {
+        throw new Error(`updateKnockoutTeams failed: ${fetchError.message}`)
+      }
+
+      const placeholders = (data ?? []) as { bracket_slot: string }[]
+
+      for (let i = 0; i < Math.min(stageRecords.length, placeholders.length); i++) {
+        const record = stageRecords[i]
+        const { bracket_slot } = placeholders[i]
+
+        const { error } = await this.supabase
+          .from('matches')
+          .update({
+            external_id: record.externalId ?? null,
+            home_team_external_id: record.homeTeamExternalId ?? null,
+            home_team_name: record.homeTeamName,
+            home_team_short_name: record.homeTeamShortName,
+            home_team_tla: record.homeTeamTla,
+            home_team_crest: record.homeTeamCrest,
+            away_team_external_id: record.awayTeamExternalId ?? null,
+            away_team_name: record.awayTeamName,
+            away_team_short_name: record.awayTeamShortName,
+            away_team_tla: record.awayTeamTla,
+            away_team_crest: record.awayTeamCrest,
+            status: record.status,
+          })
+          .eq('bracket_slot', bracket_slot)
+
+        if (error) {
+          throw new Error(`updateKnockoutTeams failed: ${error.message}`)
+        }
+        updated++
+      }
+    }
+
+    return updated
   }
 }

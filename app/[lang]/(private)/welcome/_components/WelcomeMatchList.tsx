@@ -34,39 +34,40 @@ export default function WelcomeMatchList({
         <ViewToggle activeView={viewMode} dict={dict} />
       </div>
 
-      {/* Group-stage content — either date view or group accordion view */}
       {viewMode === 'date' ? (
+        // Date view: ALL matches (group stage + knockout) in one chronological flow
         <DateGroupedView
-          matches={groupStageMatches}
+          matches={[...groupStageMatches, ...knockoutMatches]}
           dict={dict}
           lang={lang}
           isApproved={isApproved}
           onSaveScore={onSaveScore}
         />
       ) : (
-        <div className="flex flex-col gap-4">
-          {sortedGroups.map(([group, groupMatches]) => (
-            <GroupAccordion
-              key={group}
-              group={group}
-              matches={groupMatches}
-              dict={dict}
-              lang={lang}
-              isApproved={isApproved}
-              onSaveScore={onSaveScore}
-            />
-          ))}
-        </div>
+        // Group view: group stage in accordions + knockout rounds by bracket stage
+        <>
+          <div className="flex flex-col gap-4">
+            {sortedGroups.map(([group, groupMatches]) => (
+              <GroupAccordion
+                key={group}
+                group={group}
+                matches={groupMatches}
+                dict={dict}
+                lang={lang}
+                isApproved={isApproved}
+                onSaveScore={onSaveScore}
+              />
+            ))}
+          </div>
+          <KnockoutSection
+            knockoutMatches={knockoutMatches}
+            dict={dict}
+            lang={lang}
+            isApproved={isApproved}
+            onSaveScore={onSaveScore}
+          />
+        </>
       )}
-
-      {/* Knockout rounds — always shown below */}
-      <KnockoutSection
-        knockoutMatches={knockoutMatches}
-        dict={dict}
-        lang={lang}
-        isApproved={isApproved}
-        onSaveScore={onSaveScore}
-      />
     </div>
   )
 }

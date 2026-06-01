@@ -22,18 +22,20 @@ const makeMatch = (id: string, stage: string): MatchCardData => ({
 })
 
 describe('KnockoutSection', () => {
-  it('renders 4 placeholder cards when knockoutMatches is empty', () => {
+  it('renders 6 placeholder cards when knockoutMatches is empty', () => {
     render(<KnockoutSection knockoutMatches={[]} dict={dict} lang="en" isApproved={true} />)
 
     // Each round label appears in both the section heading and the placeholder card
+    expect(screen.getAllByText(dict.knockoutRoundOf32).length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText(dict.knockoutRoundOf16).length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText(dict.knockoutQuarterFinals).length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText(dict.knockoutSemiFinals).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(dict.knockoutThirdPlace).length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText(dict.knockoutFinal).length).toBeGreaterThanOrEqual(1)
 
-    // All 4 rounds show TBD (each placeholder has 2 TBDs = 8 total)
+    // All 6 rounds show TBD (each placeholder has 2 TBDs = 12 total)
     const tbdElements = screen.getAllByText('TBD')
-    expect(tbdElements.length).toBeGreaterThanOrEqual(4)
+    expect(tbdElements.length).toBeGreaterThanOrEqual(6)
   })
 
   it('renders a MatchCard for a SEMI_FINALS match and placeholders for other 3 rounds', () => {
@@ -50,25 +52,29 @@ describe('KnockoutSection', () => {
     expect(tbdElements.length).toBeGreaterThanOrEqual(3)
   })
 
-  it('renders rounds in fixed order: ROUND_OF_16 → QUARTER_FINALS → SEMI_FINALS → FINAL', () => {
+  it('renders rounds in fixed order: ROUND_OF_32 → ROUND_OF_16 → QUARTER_FINALS → SEMI_FINALS → THIRD_PLACE → FINAL', () => {
     render(<KnockoutSection knockoutMatches={[]} dict={dict} lang="en" isApproved={true} />)
 
     const headings = screen.getAllByRole('heading', { level: 2 })
     const labels = headings.map((h) => h.textContent)
 
-    expect(labels[0]).toBe(dict.knockoutRoundOf16)
-    expect(labels[1]).toBe(dict.knockoutQuarterFinals)
-    expect(labels[2]).toBe(dict.knockoutSemiFinals)
-    expect(labels[3]).toBe(dict.knockoutFinal)
+    expect(labels[0]).toBe(dict.knockoutRoundOf32)
+    expect(labels[1]).toBe(dict.knockoutRoundOf16)
+    expect(labels[2]).toBe(dict.knockoutQuarterFinals)
+    expect(labels[3]).toBe(dict.knockoutSemiFinals)
+    expect(labels[4]).toBe(dict.knockoutThirdPlace)
+    expect(labels[5]).toBe(dict.knockoutFinal)
   })
 
   it('renders section headings for all rounds regardless of data', () => {
     const finalMatch = makeMatch('final-1', 'FINAL')
     render(<KnockoutSection knockoutMatches={[finalMatch]} dict={dict} lang="en" isApproved={true} />)
 
+    expect(screen.getByRole('heading', { name: dict.knockoutRoundOf32 })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: dict.knockoutRoundOf16 })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: dict.knockoutQuarterFinals })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: dict.knockoutSemiFinals })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: dict.knockoutThirdPlace })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: dict.knockoutFinal })).toBeInTheDocument()
   })
 
@@ -81,10 +87,12 @@ describe('KnockoutSection', () => {
     // Should not crash; real MatchCard for SEMI_FINALS renders team names
     expect(screen.getAllByText('Team A').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('Team B').length).toBeGreaterThanOrEqual(1)
-    // All four round headings still present
+    // All six round headings still present
+    expect(screen.getByRole('heading', { name: dict.knockoutRoundOf32 })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: dict.knockoutRoundOf16 })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: dict.knockoutQuarterFinals })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: dict.knockoutSemiFinals })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: dict.knockoutThirdPlace })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: dict.knockoutFinal })).toBeInTheDocument()
   })
 
@@ -114,5 +122,14 @@ describe('KnockoutSection', () => {
     // Other 3 rounds still show TBD placeholders
     const tbdElements = screen.getAllByText('TBD')
     expect(tbdElements.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('renders both time and date <time> elements for each MatchCard (showDate=true)', () => {
+    const sfMatch = makeMatch('sf-date', 'SEMI_FINALS')
+    render(<KnockoutSection knockoutMatches={[sfMatch]} dict={dict} lang="en" isApproved={true} />)
+
+    // showDate=true injects a second <time> element (date) alongside the HH:MM one
+    const timeElements = screen.getAllByRole('time')
+    expect(timeElements.length).toBeGreaterThanOrEqual(2)
   })
 })

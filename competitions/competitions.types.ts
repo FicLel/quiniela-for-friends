@@ -10,22 +10,24 @@
 /** Domain object returned by the repository — fully mapped from snake_case DB rows. */
 export type Match = {
   id: string
-  externalId: number
+  externalId: number | null
   stage: string
   group: string
   matchday: number
   status: string
   scheduledAt: Date
-  homeTeamExternalId: number
+  homeTeamExternalId: number | null
   homeTeamName: string
   homeTeamShortName: string
   homeTeamTla: string
   homeTeamCrest: string | null
-  awayTeamExternalId: number
+  awayTeamExternalId: number | null
   awayTeamName: string
   awayTeamShortName: string
   awayTeamTla: string
   awayTeamCrest: string | null
+  bracketSlot: string | null
+  matchupDescription: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -36,22 +38,42 @@ export type Match = {
  * Produced by CompetitionsClient; consumed by CompetitionsRepository.
  */
 export type MatchImportRecord = {
-  externalId: number
+  externalId: number | null
   stage: string
   group: string
   matchday: number
   status: string
   scheduledAt: string        // ISO 8601 UTC string from API
-  homeTeamExternalId: number
+  homeTeamExternalId: number | null
   homeTeamName: string
   homeTeamShortName: string
   homeTeamTla: string
   homeTeamCrest: string | null
-  awayTeamExternalId: number
+  awayTeamExternalId: number | null
   awayTeamName: string
   awayTeamShortName: string
   awayTeamTla: string
   awayTeamCrest: string | null
+  bracketSlot?: string | null
+  matchupDescription?: string | null
+}
+
+/**
+ * Record used when seeding knockout placeholder matches.
+ * All team fields are 'TBD' until the real teams are known.
+ */
+export type KnockoutPlaceholderRecord = {
+  bracketSlot: string
+  matchupDescription: string
+  stage: string
+  matchday: number
+  scheduledAt: string  // ISO 8601
+  homeTeamName: string
+  homeTeamShortName: string
+  homeTeamTla: string
+  awayTeamName: string
+  awayTeamShortName: string
+  awayTeamTla: string
 }
 
 // ---------------------------------------------------------------------------
@@ -62,6 +84,10 @@ export type ImportMatchesResult =
   | { success: true; count: number }
   | { success: false; error: 'FETCH_FAILED' | 'DB_ERROR' | 'UNKNOWN_ERROR' }
 
+export type SeedPlaceholdersResult =
+  | { success: true; count: number }
+  | { success: false; error: 'DB_ERROR' | 'UNKNOWN_ERROR' }
+
 // ---------------------------------------------------------------------------
 // Port interfaces
 // ---------------------------------------------------------------------------
@@ -69,6 +95,8 @@ export type ImportMatchesResult =
 export interface ICompetitionsClient {
   /** Fetch all GROUP_STAGE matches for the 2026 World Cup from football-data.org. */
   fetchGroupStageMatches(): Promise<MatchImportRecord[]>
+  /** Fetch all knockout-stage matches for the 2026 World Cup from football-data.org. */
+  fetchAllKnockoutMatches(): Promise<MatchImportRecord[]>
 }
 
 export interface ICompetitionsRepository {
@@ -83,9 +111,24 @@ export interface ICompetitionsRepository {
 
   /** Return all matches (all stages) ordered by scheduled_at. */
   findAllMatches(): Promise<Match[]>
+
+  /**
+   * Upsert knockout placeholder rows, keyed on bracket_slot.
+   * Returns the number of records submitted.
+   */
+  upsertKnockoutPlaceholders(records: KnockoutPlaceholderRecord[]): Promise<number>
+
+  /**
+   * Update team details on knockout matches that have a bracket_slot,
+   * matched by stage + matchday.
+   * Returns the count of records processed.
+   */
+  updateKnockoutTeams(records: MatchImportRecord[]): Promise<number>
 }
 
 export interface ICompetitionsService {
   importGroupStageMatches(): Promise<ImportMatchesResult>
   getAllMatches(): Promise<Match[]>
+  seedKnockoutPlaceholders(): Promise<SeedPlaceholdersResult>
+  syncKnockoutMatches(): Promise<ImportMatchesResult>
 }

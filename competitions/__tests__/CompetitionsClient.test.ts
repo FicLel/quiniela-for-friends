@@ -57,6 +57,29 @@ const KNOCKOUT_MATCH = {
   },
 }
 
+const FINAL_MATCH = {
+  id: 888888,
+  utcDate: '2026-07-19T23:00:00Z',
+  status: 'SCHEDULED',
+  stage: 'FINAL',
+  group: null,
+  matchday: 1,
+  homeTeam: {
+    id: 759,
+    name: 'Germany',
+    shortName: 'Germany',
+    tla: 'GER',
+    crest: 'https://crests.football-data.org/759.svg',
+  },
+  awayTeam: {
+    id: 762,
+    name: 'Scotland',
+    shortName: 'Scotland',
+    tla: 'SCO',
+    crest: 'https://crests.football-data.org/762.svg',
+  },
+}
+
 function makeOkResponse(matches: unknown[]) {
   return Promise.resolve({
     ok: true,
@@ -195,6 +218,105 @@ describe('CompetitionsClient – fetchGroupStageMatches', () => {
     )
 
     // fetch should NOT have been called — we fail fast before the network call
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// fetchAllKnockoutMatches
+// ---------------------------------------------------------------------------
+
+describe('CompetitionsClient – fetchAllKnockoutMatches', () => {
+  it('filters out GROUP_STAGE matches and returns only knockout stages', async () => {
+    mockFetch.mockReturnValueOnce(
+      makeOkResponse([GROUP_STAGE_MATCH, KNOCKOUT_MATCH, FINAL_MATCH]),
+    )
+
+    const client = new CompetitionsClient()
+    const result = await client.fetchAllKnockoutMatches()
+
+    expect(result).toHaveLength(2)
+    expect(result.map((r) => r.externalId)).toEqual([999999, 888888])
+  })
+
+  it('maps a ROUND_OF_16 match to a MatchImportRecord correctly', async () => {
+    mockFetch.mockReturnValueOnce(makeOkResponse([KNOCKOUT_MATCH]))
+
+    const client = new CompetitionsClient()
+    const result = await client.fetchAllKnockoutMatches()
+
+    expect(result).toHaveLength(1)
+    expect(result[0]).toEqual({
+      externalId: 999999,
+      stage: 'ROUND_OF_16',
+      group: null,
+      matchday: 1,
+      status: 'SCHEDULED',
+      scheduledAt: '2026-07-14T20:00:00Z',
+      homeTeamExternalId: 759,
+      homeTeamName: 'Germany',
+      homeTeamShortName: 'Germany',
+      homeTeamTla: 'GER',
+      homeTeamCrest: 'https://crests.football-data.org/759.svg',
+      awayTeamExternalId: 762,
+      awayTeamName: 'Scotland',
+      awayTeamShortName: 'Scotland',
+      awayTeamTla: 'SCO',
+      awayTeamCrest: 'https://crests.football-data.org/762.svg',
+    })
+  })
+
+  it('returns an empty array when no knockout matches are present', async () => {
+    mockFetch.mockReturnValueOnce(makeOkResponse([GROUP_STAGE_MATCH]))
+
+    const client = new CompetitionsClient()
+    const result = await client.fetchAllKnockoutMatches()
+
+    expect(result).toEqual([])
+  })
+
+  it('includes all six knockout stage types: ROUND_OF_32, ROUND_OF_16, QUARTER_FINALS, SEMI_FINALS, THIRD_PLACE, FINAL', async () => {
+    const stages = ['ROUND_OF_32', 'ROUND_OF_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'THIRD_PLACE', 'FINAL']
+    const rawMatches = stages.map((stage, i) => ({
+      ...KNOCKOUT_MATCH,
+      id: 1000 + i,
+      stage,
+    }))
+    mockFetch.mockReturnValueOnce(makeOkResponse(rawMatches))
+
+    const client = new CompetitionsClient()
+    const result = await client.fetchAllKnockoutMatches()
+
+    expect(result).toHaveLength(6)
+    expect(result.map((r) => r.stage)).toEqual(stages)
+  })
+
+  it('throws when the API returns a non-2xx response', async () => {
+    mockFetch.mockReturnValueOnce(makeErrorResponse(403))
+
+    const client = new CompetitionsClient()
+    await expect(client.fetchAllKnockoutMatches()).rejects.toThrow(
+      '[CompetitionsClient] Unexpected response from football-data.org: HTTP 403',
+    )
+  })
+
+  it('throws on network failure', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('Connection refused'))
+
+    const client = new CompetitionsClient()
+    await expect(client.fetchAllKnockoutMatches()).rejects.toThrow(
+      '[CompetitionsClient] Network failure fetching matches: Connection refused',
+    )
+  })
+
+  it('throws when FOOTBALL_DATA_ORG_API_KEY env var is missing', async () => {
+    delete process.env.FOOTBALL_DATA_ORG_API_KEY
+
+    const client = new CompetitionsClient()
+    await expect(client.fetchAllKnockoutMatches()).rejects.toThrow(
+      '[CompetitionsClient] Missing required environment variable: FOOTBALL_DATA_ORG_API_KEY',
+    )
+
     expect(mockFetch).not.toHaveBeenCalled()
   })
 })

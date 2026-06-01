@@ -19,12 +19,14 @@ export type MatchCardData = {
   stage: string
   initialHomeScore?: number
   initialAwayScore?: number
+  matchupDescription?: string | null
 }
 
 type MatchCardProps = MatchCardData & {
   dict: Dictionary['welcome']
   lang: Locale
   isApproved: boolean
+  showDate?: boolean
   onSaveScore?: (matchId: string, home: number, away: number) => Promise<unknown>
 }
 
@@ -75,6 +77,19 @@ function FormattedTime({ scheduledAt, lang }: { scheduledAt: string; lang: Local
   }).format(new Date(scheduledAt))
 
   return <time suppressHydrationWarning>{formatted}</time>
+}
+
+// ---------------------------------------------------------------------------
+// FormattedDate — "Jun 28" style, used for knockout matches
+// ---------------------------------------------------------------------------
+
+function FormattedDate({ scheduledAt, lang }: { scheduledAt: string; lang: Locale }) {
+  const formatted = new Intl.DateTimeFormat(lang, {
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date(scheduledAt))
+
+  return <time suppressHydrationWarning className="text-xs text-gray-400">{formatted}</time>
 }
 
 // ---------------------------------------------------------------------------
@@ -259,9 +274,11 @@ export default function MatchCard({
   status,
   initialHomeScore,
   initialAwayScore,
+  matchupDescription,
   dict,
   lang,
   isApproved,
+  showDate = false,
   onSaveScore,
 }: MatchCardProps) {
   // Keep latest score values in refs so the onSave callbacks always capture
@@ -282,13 +299,21 @@ export default function MatchCard({
   return (
     <div className="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm sm:px-5 sm:py-4 lg:px-6 lg:py-4">
 
-      {/* Row 1: match time (left) + status badge (right) */}
+      {/* Row 1: match time + optional date (left) + status badge (right) */}
       <div className="mb-3 flex items-center justify-between sm:mb-4">
-        <p className="text-xs font-medium text-gray-500">
-          <FormattedTime scheduledAt={scheduledAt} lang={lang} />
-        </p>
+        <div className="flex flex-col items-start">
+          <p className="text-xs font-medium text-gray-500">
+            <FormattedTime scheduledAt={scheduledAt} lang={lang} />
+          </p>
+          {showDate && <FormattedDate scheduledAt={scheduledAt} lang={lang} />}
+        </div>
         <StatusBadge status={status} dict={dict} />
       </div>
+
+      {/* Matchup description — shown for TBD knockout bracket slots */}
+      {homeTeamTla === 'TBD' && matchupDescription && (
+        <p className="mb-2 text-center text-xs italic text-gray-400">{matchupDescription}</p>
+      )}
 
       {/* Row 2: home team | score counters | away team */}
       <div className="flex items-center justify-between gap-2 sm:gap-4">
@@ -330,11 +355,13 @@ export default function MatchCard({
 
       </div>
 
-      {/* Row 3: win probability — extra top margin for breathing room */}
-      <div className="mt-3 flex items-center justify-between px-2 sm:mt-4 sm:px-4 lg:px-6">
-        <WinBadge label={dict.winLabel} />
-        <WinBadge label={dict.winLabel} />
-      </div>
+      {/* Row 3: win probability — suppressed when both teams are TBD (bracket placeholders) */}
+      {!(homeTeamTla === 'TBD' && awayTeamTla === 'TBD') && (
+        <div className="mt-3 flex items-center justify-between px-2 sm:mt-4 sm:px-4 lg:px-6">
+          <WinBadge label={dict.winLabel} />
+          <WinBadge label={dict.winLabel} />
+        </div>
+      )}
 
     </div>
   )

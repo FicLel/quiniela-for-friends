@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { importWorldCupMatches } from '../actions'
-import type { ImportMatchesResult } from '@/competitions/competitions.types'
+import { useRouter } from 'next/navigation'
+import { importWorldCupMatches, seedKnockoutPlaceholders, syncKnockoutMatches } from '../actions'
+import type { ImportMatchesResult, SeedPlaceholdersResult } from '@/competitions/competitions.types'
 import type { Dictionary } from '@/i18n/getDictionary'
 
 type ImportMatchesButtonProps = {
@@ -33,10 +34,17 @@ function LoadingSpinner() {
 
 export default function ImportMatchesButton({ userRole, dict }: ImportMatchesButtonProps) {
   if (userRole !== 'admin') return null
-  return <ImportMatchesButtonInner dict={dict} />
+  return (
+    <div className="flex flex-col gap-4">
+      <ImportMatchesButtonInner dict={dict} />
+      <SeedPlaceholdersButtonInner dict={dict} />
+      <SyncKnockoutButtonInner dict={dict} />
+    </div>
+  )
 }
 
 function ImportMatchesButtonInner({ dict }: { dict: Dictionary['welcome'] }) {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [result, setResult] = useState<ImportMatchesResult | null>(null)
 
@@ -45,6 +53,7 @@ function ImportMatchesButtonInner({ dict }: { dict: Dictionary['welcome'] }) {
     startTransition(async () => {
       const res = await importWorldCupMatches()
       setResult(res)
+      if (res.success) router.refresh()
     })
   }
 
@@ -68,6 +77,100 @@ function ImportMatchesButtonInner({ dict }: { dict: Dictionary['welcome'] }) {
       {result !== null && result.success && (
         <p role="status" className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
           {dict.importSuccess.replace('{count}', String(result.count))}
+        </p>
+      )}
+
+      {result !== null && !result.success && (
+        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          {dict.importErrors[result.error as ImportErrorCode] ?? dict.importErrors.UNKNOWN_ERROR}
+        </p>
+      )}
+    </div>
+  )
+}
+
+type SeedErrorCode = 'DB_ERROR' | 'UNKNOWN_ERROR'
+
+function SeedPlaceholdersButtonInner({ dict }: { dict: Dictionary['welcome'] }) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [result, setResult] = useState<SeedPlaceholdersResult | null>(null)
+
+  function handleClick() {
+    setResult(null)
+    startTransition(async () => {
+      const res = await seedKnockoutPlaceholders()
+      setResult(res)
+      if (res.success) router.refresh()
+    })
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        onClick={handleClick}
+        disabled={isPending}
+        className="flex w-full items-center justify-center rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-blue-400 sm:w-auto"
+      >
+        {isPending ? (
+          <span className="flex items-center gap-2">
+            <LoadingSpinner />
+            {dict.seedingPlaceholders}
+          </span>
+        ) : (
+          dict.seedPlaceholdersButton
+        )}
+      </button>
+
+      {result !== null && result.success && (
+        <p role="status" className="rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-700">
+          {dict.seedPlaceholdersSuccess.replace('{count}', String(result.count))}
+        </p>
+      )}
+
+      {result !== null && !result.success && (
+        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          {dict.importErrors[result.error as SeedErrorCode] ?? dict.importErrors.UNKNOWN_ERROR}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function SyncKnockoutButtonInner({ dict }: { dict: Dictionary['welcome'] }) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [result, setResult] = useState<ImportMatchesResult | null>(null)
+
+  function handleClick() {
+    setResult(null)
+    startTransition(async () => {
+      const res = await syncKnockoutMatches()
+      setResult(res)
+      if (res.success) router.refresh()
+    })
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        onClick={handleClick}
+        disabled={isPending}
+        className="flex w-full items-center justify-center rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-amber-400 sm:w-auto"
+      >
+        {isPending ? (
+          <span className="flex items-center gap-2">
+            <LoadingSpinner />
+            {dict.syncingKnockout}
+          </span>
+        ) : (
+          dict.syncKnockoutButton
+        )}
+      </button>
+
+      {result !== null && result.success && (
+        <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
+          {dict.syncKnockoutSuccess.replace('{count}', String(result.count))}
         </p>
       )}
 

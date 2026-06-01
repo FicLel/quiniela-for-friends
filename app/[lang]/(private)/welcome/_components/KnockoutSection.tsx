@@ -12,9 +12,11 @@ type KnockoutSectionProps = {
 }
 
 const KNOCKOUT_ROUNDS = [
+  { stage: 'ROUND_OF_32',    labelKey: 'knockoutRoundOf32'     },
   { stage: 'ROUND_OF_16',    labelKey: 'knockoutRoundOf16'     },
   { stage: 'QUARTER_FINALS', labelKey: 'knockoutQuarterFinals' },
   { stage: 'SEMI_FINALS',    labelKey: 'knockoutSemiFinals'    },
+  { stage: 'THIRD_PLACE',    labelKey: 'knockoutThirdPlace'    },
   { stage: 'FINAL',          labelKey: 'knockoutFinal'         },
 ] as const
 
@@ -44,6 +46,7 @@ export default function KnockoutSection({
                       dict={dict}
                       lang={lang}
                       isApproved={isApproved}
+                      showDate={true}
                       onSaveScore={onSaveScore}
                     />
                   ))

@@ -66,7 +66,7 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
     expectedResults.map((r) => [r.matchId, { homeScore: r.homeScore, awayScore: r.awayScore }]),
   )
 
-  const knockoutStages = new Set(['ROUND_OF_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'FINAL'])
+  const knockoutStages = new Set(['ROUND_OF_32', 'ROUND_OF_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'THIRD_PLACE', 'FINAL'])
 
   const groupStageMatches: MatchCardData[] = []
   const knockoutMatches: MatchCardData[] = []
@@ -89,6 +89,7 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
       stage: match.stage,
       initialHomeScore: savedScore?.homeScore,
       initialAwayScore: savedScore?.awayScore,
+      matchupDescription: match.matchupDescription ?? null,
     }
 
     if (knockoutStages.has(match.stage)) {

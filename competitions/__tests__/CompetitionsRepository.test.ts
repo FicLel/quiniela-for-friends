@@ -41,6 +41,15 @@ let useFindAllChain = false
 // upsertMatches: .upsert(rows, opts)
 const mockUpsert = jest.fn()
 
+// updateKnockoutTeams select: .select('bracket_slot').eq('stage', s).not('bracket_slot', 'is', null).order(...)
+const mockBracketSlotOrder = jest.fn()
+const mockBracketSlotNot = jest.fn(() => ({ order: mockBracketSlotOrder }))
+const mockBracketSlotEq = jest.fn(() => ({ not: mockBracketSlotNot }))
+
+// updateKnockoutTeams update: .update(data).eq('bracket_slot', slot)
+const mockUpdateEq = jest.fn()
+const mockUpdate = jest.fn(() => ({ eq: mockUpdateEq }))
+
 // Schema check: .select('id').limit(0) — limit routes on value
 const mockSchemaSelectLimit = jest.fn((n: number) => {
   if (n === 0) return mockSchemaLimit()
@@ -50,13 +59,10 @@ const mockSchemaSelectLimit = jest.fn((n: number) => {
 
 // Combined select: routes on argument
 const mockSelect = jest.fn((arg: string) => {
-  if (arg === 'id') {
-    return { limit: mockSchemaSelectLimit }
-  }
+  if (arg === 'id') return { limit: mockSchemaSelectLimit }
+  if (arg === 'bracket_slot') return { eq: mockBracketSlotEq }
   // arg === '*' — route based on which method is under test
-  if (useFindAllChain) {
-    return { order: mockFindAllOrder }
-  }
+  if (useFindAllChain) return { order: mockFindAllOrder }
   return { order: mockFindOrder1 }
 })
 
@@ -64,6 +70,7 @@ const mockSelect = jest.fn((arg: string) => {
 const mockFrom = jest.fn(() => ({
   select: mockSelect,
   upsert: mockUpsert,
+  update: mockUpdate,
 }))
 
 jest.mock('@supabase/supabase-js', () => ({
@@ -111,6 +118,8 @@ const DB_ROW = {
   away_team_short_name: 'Scotland',
   away_team_tla: 'SCO',
   away_team_crest: 'https://crests.football-data.org/762.svg',
+  bracket_slot: null,
+  matchup_description: null,
   created_at: '2026-05-28T00:00:00Z',
   updated_at: '2026-05-28T00:00:00Z',
 }
@@ -133,6 +142,8 @@ const DB_ROW_KNOCKOUT = {
   away_team_short_name: 'Scotland',
   away_team_tla: 'SCO',
   away_team_crest: 'https://crests.football-data.org/762.svg',
+  bracket_slot: null,
+  matchup_description: null,
   created_at: '2026-05-28T00:00:00Z',
   updated_at: '2026-05-28T00:00:00Z',
 }
@@ -277,6 +288,8 @@ describe('CompetitionsRepository – upsertMatches', () => {
           away_team_short_name: 'Scotland',
           away_team_tla: 'SCO',
           away_team_crest: 'https://crests.football-data.org/762.svg',
+          bracket_slot: null,
+          matchup_description: null,
         },
       ],
       { onConflict: 'external_id', ignoreDuplicates: false },
@@ -350,6 +363,8 @@ describe('CompetitionsRepository – findAllGroupStageMatches', () => {
       awayTeamShortName: 'Scotland',
       awayTeamTla: 'SCO',
       awayTeamCrest: 'https://crests.football-data.org/762.svg',
+      bracketSlot: null,
+      matchupDescription: null,
       createdAt: new Date('2026-05-28T00:00:00Z'),
       updatedAt: new Date('2026-05-28T00:00:00Z'),
     })
@@ -440,6 +455,8 @@ describe('CompetitionsRepository – findAllMatches', () => {
       awayTeamShortName: 'Scotland',
       awayTeamTla: 'SCO',
       awayTeamCrest: 'https://crests.football-data.org/762.svg',
+      bracketSlot: null,
+      matchupDescription: null,
       createdAt: new Date('2026-05-28T00:00:00Z'),
       updatedAt: new Date('2026-05-28T00:00:00Z'),
     })
@@ -461,6 +478,8 @@ describe('CompetitionsRepository – findAllMatches', () => {
       awayTeamShortName: 'Scotland',
       awayTeamTla: 'SCO',
       awayTeamCrest: 'https://crests.football-data.org/762.svg',
+      bracketSlot: null,
+      matchupDescription: null,
       createdAt: new Date('2026-05-28T00:00:00Z'),
       updatedAt: new Date('2026-05-28T00:00:00Z'),
     })
@@ -513,5 +532,215 @@ describe('CompetitionsRepository – findAllMatches', () => {
     await expect(repo.findAllMatches()).rejects.toThrow(
       'Supabase table "public.matches" does not exist — run pending migrations before starting the application.',
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// upsertKnockoutPlaceholders
+// ---------------------------------------------------------------------------
+
+describe('CompetitionsRepository – upsertKnockoutPlaceholders', () => {
+  it('calls upsert with correct snake_case row shape and returns records length', async () => {
+    const repo = makeRepo()
+    mockUpsert.mockResolvedValueOnce({ error: null })
+
+    const placeholderRecord = {
+      bracketSlot: 'R32_01',
+      matchupDescription: 'Group A Winner vs Group B Runner-up',
+      stage: 'ROUND_OF_32',
+      matchday: 1,
+      scheduledAt: '2026-06-28T20:00:00Z',
+      homeTeamName: 'TBD',
+      homeTeamShortName: 'TBD',
+      homeTeamTla: 'TBD',
+      awayTeamName: 'TBD',
+      awayTeamShortName: 'TBD',
+      awayTeamTla: 'TBD',
+    }
+
+    const count = await repo.upsertKnockoutPlaceholders([placeholderRecord])
+
+    expect(count).toBe(1)
+    expect(mockUpsert).toHaveBeenCalledWith(
+      [
+        {
+          bracket_slot: 'R32_01',
+          matchup_description: 'Group A Winner vs Group B Runner-up',
+          stage: 'ROUND_OF_32',
+          group: '',
+          matchday: 1,
+          status: 'SCHEDULED',
+          scheduled_at: '2026-06-28T20:00:00Z',
+          home_team_name: 'TBD',
+          home_team_short_name: 'TBD',
+          home_team_tla: 'TBD',
+          away_team_name: 'TBD',
+          away_team_short_name: 'TBD',
+          away_team_tla: 'TBD',
+          home_team_crest: null,
+          away_team_crest: null,
+          external_id: null,
+          home_team_external_id: null,
+          away_team_external_id: null,
+        },
+      ],
+      { onConflict: 'bracket_slot', ignoreDuplicates: false },
+    )
+  })
+
+  it('returns 0 when called with an empty array', async () => {
+    const repo = makeRepo()
+    mockUpsert.mockResolvedValueOnce({ error: null })
+
+    const count = await repo.upsertKnockoutPlaceholders([])
+
+    expect(count).toBe(0)
+    expect(mockUpsert).toHaveBeenCalledWith([], {
+      onConflict: 'bracket_slot',
+      ignoreDuplicates: false,
+    })
+  })
+
+  it('throws when Supabase returns an error', async () => {
+    const repo = makeRepo()
+    mockUpsert.mockResolvedValueOnce({ error: { message: 'unique constraint violation' } })
+
+    await expect(
+      repo.upsertKnockoutPlaceholders([
+        {
+          bracketSlot: 'R32_01',
+          matchupDescription: 'Group A Winner vs Group B Runner-up',
+          stage: 'ROUND_OF_32',
+          matchday: 1,
+          scheduledAt: '2026-06-28T20:00:00Z',
+          homeTeamName: 'TBD',
+          homeTeamShortName: 'TBD',
+          homeTeamTla: 'TBD',
+          awayTeamName: 'TBD',
+          awayTeamShortName: 'TBD',
+          awayTeamTla: 'TBD',
+        },
+      ]),
+    ).rejects.toThrow('upsertKnockoutPlaceholders failed: unique constraint violation')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// updateKnockoutTeams
+// ---------------------------------------------------------------------------
+
+describe('CompetitionsRepository – updateKnockoutTeams', () => {
+  const KNOCKOUT_RECORD: import('../competitions.types').MatchImportRecord = {
+    externalId: 999,
+    stage: 'ROUND_OF_16',
+    group: '',
+    matchday: 1,
+    status: 'IN_PLAY',
+    scheduledAt: '2026-07-04T20:00:00Z',
+    homeTeamExternalId: 759,
+    homeTeamName: 'Germany',
+    homeTeamShortName: 'Germany',
+    homeTeamTla: 'GER',
+    homeTeamCrest: 'https://crests.football-data.org/759.svg',
+    awayTeamExternalId: 762,
+    awayTeamName: 'Scotland',
+    awayTeamShortName: 'Scotland',
+    awayTeamTla: 'SCO',
+    awayTeamCrest: 'https://crests.football-data.org/762.svg',
+  }
+
+  it('fetches bracket_slots for the stage then updates each by bracket_slot, returns count', async () => {
+    const repo = makeRepo()
+    // First call: select('bracket_slot').eq().not().order() → placeholder list
+    mockBracketSlotOrder.mockResolvedValueOnce({ data: [{ bracket_slot: 'R16_01' }], error: null })
+    // Second call: update().eq('bracket_slot', 'R16_01')
+    mockUpdateEq.mockResolvedValueOnce({ error: null })
+
+    const count = await repo.updateKnockoutTeams([KNOCKOUT_RECORD])
+
+    expect(count).toBe(1)
+    expect(mockBracketSlotEq).toHaveBeenCalledWith('stage', 'ROUND_OF_16')
+    expect(mockBracketSlotNot).toHaveBeenCalledWith('bracket_slot', 'is', null)
+    expect(mockBracketSlotOrder).toHaveBeenCalledWith('scheduled_at')
+    expect(mockUpdate).toHaveBeenCalledWith({
+      external_id: 999,
+      home_team_external_id: 759,
+      home_team_name: 'Germany',
+      home_team_short_name: 'Germany',
+      home_team_tla: 'GER',
+      home_team_crest: 'https://crests.football-data.org/759.svg',
+      away_team_external_id: 762,
+      away_team_name: 'Scotland',
+      away_team_short_name: 'Scotland',
+      away_team_tla: 'SCO',
+      away_team_crest: 'https://crests.football-data.org/762.svg',
+      status: 'IN_PLAY',
+    })
+    expect(mockUpdateEq).toHaveBeenCalledWith('bracket_slot', 'R16_01')
+  })
+
+  it('returns 0 when called with an empty array', async () => {
+    const repo = makeRepo()
+
+    const count = await repo.updateKnockoutTeams([])
+
+    expect(count).toBe(0)
+    expect(mockUpdate).not.toHaveBeenCalled()
+    expect(mockBracketSlotOrder).not.toHaveBeenCalled()
+  })
+
+  it('throws when the select (fetch) returns an error', async () => {
+    const repo = makeRepo()
+    mockBracketSlotOrder.mockResolvedValueOnce({ error: { message: 'permission denied' } })
+
+    await expect(repo.updateKnockoutTeams([KNOCKOUT_RECORD])).rejects.toThrow(
+      'updateKnockoutTeams failed: permission denied',
+    )
+  })
+
+  it('throws when the update returns an error', async () => {
+    const repo = makeRepo()
+    mockBracketSlotOrder.mockResolvedValueOnce({ data: [{ bracket_slot: 'R16_01' }], error: null })
+    mockUpdateEq.mockResolvedValueOnce({ error: { message: 'update failed' } })
+
+    await expect(repo.updateKnockoutTeams([KNOCKOUT_RECORD])).rejects.toThrow(
+      'updateKnockoutTeams failed: update failed',
+    )
+  })
+
+  it('processes two records in the same stage and returns total count', async () => {
+    const repo = makeRepo()
+    // Both records are ROUND_OF_16 — one select call returns two placeholders
+    mockBracketSlotOrder.mockResolvedValueOnce({
+      data: [{ bracket_slot: 'R16_01' }, { bracket_slot: 'R16_02' }],
+      error: null,
+    })
+    mockUpdateEq
+      .mockResolvedValueOnce({ error: null })
+      .mockResolvedValueOnce({ error: null })
+
+    const record2 = { ...KNOCKOUT_RECORD, scheduledAt: '2026-07-05T00:00:00Z' }
+    const count = await repo.updateKnockoutTeams([KNOCKOUT_RECORD, record2])
+
+    expect(count).toBe(2)
+    expect(mockUpdate).toHaveBeenCalledTimes(2)
+    expect(mockUpdateEq).toHaveBeenNthCalledWith(1, 'bracket_slot', 'R16_01')
+    expect(mockUpdateEq).toHaveBeenNthCalledWith(2, 'bracket_slot', 'R16_02')
+  })
+
+  it('skips extra API records when the stage has fewer placeholders than API records', async () => {
+    const repo = makeRepo()
+    // Only 1 placeholder for ROUND_OF_16, but 2 API records
+    mockBracketSlotOrder.mockResolvedValueOnce({
+      data: [{ bracket_slot: 'R16_01' }],
+      error: null,
+    })
+    mockUpdateEq.mockResolvedValueOnce({ error: null })
+
+    const record2 = { ...KNOCKOUT_RECORD, scheduledAt: '2026-07-05T00:00:00Z' }
+    const count = await repo.updateKnockoutTeams([KNOCKOUT_RECORD, record2])
+
+    expect(count).toBe(1)
+    expect(mockUpdate).toHaveBeenCalledTimes(1)
   })
 })
