@@ -1,0 +1,54 @@
+import { notFound, redirect } from 'next/navigation'
+import { getDictionary, hasLocale } from '@/i18n/getDictionary'
+import { AuthClient } from '@/auth/AuthClient'
+import { MembershipsRepository } from '@/memberships/MembershipsRepository'
+import { LeaderboardService } from '@/scoring/LeaderboardService'
+import { PredictionScoreRepository } from '@/scoring/PredictionScoreRepository'
+import { UsersRepository } from '@/users/UsersRepository'
+import type { Locale } from '@/i18n/i18n.types'
+import LeaderboardClient from './_components/LeaderboardClient'
+
+type PageProps = {
+  params: Promise<{ lang: string; quinielaId: string }>
+}
+
+export default async function LeaderboardPage({ params }: PageProps) {
+  const { lang, quinielaId } = await params
+  if (!hasLocale(lang)) notFound()
+
+  const dict = await getDictionary(lang)
+  const locale = lang as Locale
+
+  const authClient = new AuthClient()
+  const token = await authClient.getTokenFromServerAction()
+  const session = token ? await authClient.verifyToken(token) : null
+
+  if (!session) {
+    redirect(`/${locale}/login`)
+  }
+
+  const membershipsRepository = new MembershipsRepository()
+  const isMember = await membershipsRepository.isApprovedMember(quinielaId, session.sub)
+
+  if (!isMember) {
+    redirect(`/${locale}/quinielas`)
+  }
+
+  const leaderboardService = new LeaderboardService(
+    new PredictionScoreRepository(),
+    new UsersRepository(),
+  )
+
+  const rows = await leaderboardService.getLeaderboard(quinielaId)
+
+  // dict is available for future i18n use
+  void dict
+
+  return (
+    <main className="min-h-screen bg-green-50 px-4 py-8">
+      <div className="mx-auto w-full max-w-3xl">
+        <LeaderboardClient rows={rows} callerUserId={session.sub} />
+      </div>
+    </main>
+  )
+}

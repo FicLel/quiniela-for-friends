@@ -1,6 +1,7 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { z } from 'zod'
 import { AuthClient } from '@/auth/AuthClient'
 import { InvitationsService } from '@/invitations/InvitationsService'
@@ -16,6 +17,16 @@ import type { RevokeInviteResult } from '@/invitations/invitations.types'
 import type { Locale } from '@/i18n/i18n.types'
 
 const roleSchema = z.enum(['admin', 'member'])
+
+async function getBaseUrl(): Promise<string> {
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL
+  }
+  const headersList = await headers()
+  const host = headersList.get('host') ?? 'localhost:3000'
+  const proto = headersList.get('x-forwarded-proto') ?? 'http'
+  return `${proto}://${host}`
+}
 
 async function getCallerUserId(): Promise<string | null> {
   const authClient = new AuthClient()
@@ -51,7 +62,7 @@ export async function inviteMember(
     return { success: false, error: 'CALLER_NOT_QUINIELA_ADMIN' }
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const baseUrl = await getBaseUrl()
 
   const service = new InvitationsService(
     new InvitationsRepository(),

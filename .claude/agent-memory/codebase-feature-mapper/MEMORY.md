@@ -1,0 +1,2 @@
+- [Codebase Overview](codebase-overview.md) — Next.js 16 App Router, Supabase, hexagonal architecture, module organization, patterns
+- [Scoring & Leaderboard Status](scoring-leaderboard-status.md) — current state vs. feature request gaps, data model additions, service architecture needed

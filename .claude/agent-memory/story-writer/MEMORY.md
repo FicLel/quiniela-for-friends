@@ -1,1 +1,2 @@
 - [User Role](user_role.md) — product owner / lead dev, quiniela SaaS, provides rough features + mapper findings, wants tight one-page stories
+- [Scoring Feature](project_scoring_feature.md) — three-point scoring engine + sync + match cards + leaderboard; story written 2026-06-01; 5 open questions unresolved

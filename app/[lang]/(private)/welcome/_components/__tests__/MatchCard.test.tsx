@@ -134,19 +134,50 @@ describe('MatchCard', () => {
   // Win badge — language-aware, positioned below each team
   // -------------------------------------------------------------------------
 
-  it('shows "W" win label twice in English', () => {
-    render(<MatchCard {...baseMatch} dict={enWelcome} lang="en" isApproved={true} />)
+  it('shows "W" win label twice in English when crowd data is provided', () => {
+    render(
+      <MatchCard
+        {...baseMatch}
+        dict={enWelcome}
+        lang="en"
+        isApproved={true}
+        crowdHomeWinPct={50}
+        crowdDrawPct={25}
+        crowdAwayWinPct={25}
+      />,
+    )
     expect(screen.getAllByText(enWelcome.winLabel)).toHaveLength(2)
   })
 
-  it('shows "V" win label twice in Spanish', () => {
-    render(<MatchCard {...baseMatch} dict={esWelcome} lang="es" isApproved={true} />)
+  it('shows "V" win label twice in Spanish when crowd data is provided', () => {
+    render(
+      <MatchCard
+        {...baseMatch}
+        dict={esWelcome}
+        lang="es"
+        isApproved={true}
+        crowdHomeWinPct={50}
+        crowdDrawPct={25}
+        crowdAwayWinPct={25}
+      />,
+    )
     expect(screen.getAllByText(esWelcome.winLabel)).toHaveLength(2)
   })
 
-  it('shows 50% probability for both teams', () => {
-    render(<MatchCard {...baseMatch} dict={enWelcome} lang="en" isApproved={true} />)
-    expect(screen.getAllByText('50%')).toHaveLength(2)
+  it('shows crowd percentages when provided', () => {
+    render(
+      <MatchCard
+        {...baseMatch}
+        dict={enWelcome}
+        lang="en"
+        isApproved={true}
+        crowdHomeWinPct={60}
+        crowdDrawPct={10}
+        crowdAwayWinPct={30}
+      />,
+    )
+    expect(screen.getByText('60%')).toBeInTheDocument()
+    expect(screen.getByText('30%')).toBeInTheDocument()
   })
 
   // -------------------------------------------------------------------------
@@ -367,5 +398,125 @@ describe('MatchCard', () => {
 
     // The last call to onSaveScore must include both correct values
     expect(onSaveScore).toHaveBeenCalledWith('match-1', 2, 1)
+  })
+
+  // -------------------------------------------------------------------------
+  // Final state (official result synced)
+  // -------------------------------------------------------------------------
+
+  it('when regulationHomeGoals is set, shows official score instead of counters', () => {
+    render(
+      <MatchCard
+        {...baseMatch}
+        dict={enWelcome}
+        lang="en"
+        isApproved={true}
+        regulationHomeGoals={3}
+        regulationAwayGoals={1}
+      />,
+    )
+    expect(screen.getByText('3')).toBeInTheDocument()
+    expect(screen.getByText('1')).toBeInTheDocument()
+    // Score counter increment buttons should NOT be present
+    expect(screen.queryByLabelText('Increase Germany score')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Increase Brazil score')).not.toBeInTheDocument()
+  })
+
+  it('when regulationHomeGoals is set, shows predicted score as secondary label', () => {
+    render(
+      <MatchCard
+        {...baseMatch}
+        dict={enWelcome}
+        lang="en"
+        isApproved={true}
+        regulationHomeGoals={2}
+        regulationAwayGoals={0}
+        initialHomeScore={1}
+        initialAwayScore={0}
+      />,
+    )
+    // Official score values
+    expect(screen.getByText('2')).toBeInTheDocument()
+    // Predicted score label
+    const prediction = screen.getByLabelText('Your prediction')
+    expect(prediction).toBeInTheDocument()
+    expect(prediction.textContent).toContain('1')
+    expect(prediction.textContent).toContain('0')
+  })
+
+  it('shows earnedPoints badge with correct value (3 points)', () => {
+    render(
+      <MatchCard
+        {...baseMatch}
+        dict={enWelcome}
+        lang="en"
+        isApproved={true}
+        regulationHomeGoals={2}
+        regulationAwayGoals={1}
+        earnedPoints={3}
+      />,
+    )
+    expect(screen.getByText('+3 pts')).toBeInTheDocument()
+  })
+
+  it('shows earnedPoints badge with 0 points', () => {
+    render(
+      <MatchCard
+        {...baseMatch}
+        dict={enWelcome}
+        lang="en"
+        isApproved={true}
+        regulationHomeGoals={2}
+        regulationAwayGoals={1}
+        earnedPoints={0}
+      />,
+    )
+    expect(screen.getByText('+0 pts')).toBeInTheDocument()
+  })
+
+  // -------------------------------------------------------------------------
+  // Locked state
+  // -------------------------------------------------------------------------
+
+  it('when isLocked=true, counter buttons are disabled', () => {
+    render(
+      <MatchCard
+        {...baseMatch}
+        dict={enWelcome}
+        lang="en"
+        isApproved={true}
+        isLocked={true}
+      />,
+    )
+    expect(screen.getByLabelText('Increase Germany score')).toBeDisabled()
+    expect(screen.getByLabelText('Increase Brazil score')).toBeDisabled()
+  })
+
+  it('when isLocked=true, shows "Predictions closed" label', () => {
+    render(
+      <MatchCard
+        {...baseMatch}
+        dict={enWelcome}
+        lang="en"
+        isApproved={true}
+        isLocked={true}
+      />,
+    )
+    expect(screen.getByText('Predictions closed')).toBeInTheDocument()
+  })
+
+  it('shows "No predictions yet" when all crowd percentages are null', () => {
+    render(
+      <MatchCard
+        {...baseMatch}
+        dict={enWelcome}
+        lang="en"
+        isApproved={true}
+        crowdHomeWinPct={null}
+        crowdDrawPct={null}
+        crowdAwayWinPct={null}
+      />,
+    )
+    expect(screen.getByText('No predictions yet')).toBeInTheDocument()
   })
 })

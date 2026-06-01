@@ -45,6 +45,7 @@ export async function saveExpectedResult(
   const service = new ExpectedResultsService(
     new ExpectedResultsRepository(),
     new MembershipsRepository(),
+    new CompetitionsRepository(),
   )
 
   return service.upsertExpectedResult(session.sub, matchId, homeScore, awayScore)

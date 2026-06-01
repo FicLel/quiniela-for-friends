@@ -14,6 +14,8 @@ export type ExpectedResult = {
   matchId: string
   homeScore: number
   awayScore: number
+  lockedAt: Date | null
+  submittedAt: Date | null
   createdAt: Date
   updatedAt: Date
 }
@@ -31,7 +33,7 @@ export type UpsertExpectedResultInput = {
 
 export type SaveExpectedResultResult =
   | { success: true }
-  | { success: false; error: 'NOT_APPROVED' | 'INVALID_SCORE' | 'UNKNOWN_ERROR' }
+  | { success: false; error: 'NOT_APPROVED' | 'INVALID_SCORE' | 'LOCKED' | 'UNKNOWN_ERROR' }
 
 // ---------------------------------------------------------------------------
 // Port interfaces
@@ -44,6 +46,18 @@ export interface IExpectedResultsRepository {
   findByUserId(userId: string): Promise<ExpectedResult[]>
   /** Delete all prediction rows for a given user. */
   deleteByUserId(userId: string): Promise<void>
+  /** Return all predictions for a given match. */
+  findByMatchId(matchId: string): Promise<ExpectedResult[]>
+}
+
+/**
+ * Port for reading a match kickoff timestamp.
+ * Implemented by CompetitionsRepository; injected into ExpectedResultsService
+ * so the service never imports infrastructure directly.
+ */
+export interface IMatchKickoffReader {
+  /** Return the scheduled_at timestamp for the given match, or null if not found. */
+  findKickoffAt(matchId: string): Promise<Date | null>
 }
 
 export interface IExpectedResultsService {

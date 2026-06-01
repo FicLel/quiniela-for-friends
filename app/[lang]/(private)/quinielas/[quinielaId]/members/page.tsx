@@ -1,4 +1,5 @@
 import { notFound, redirect } from 'next/navigation'
+import Link from 'next/link'
 import { getDictionary, hasLocale } from '@/i18n/getDictionary'
 import { AuthClient } from '@/auth/AuthClient'
 import { MembershipsService } from '@/memberships/MembershipsService'
@@ -79,6 +80,16 @@ export default async function MembersPage({ params }: PageProps) {
   return (
     <main className="min-h-screen bg-green-50 px-4 py-8">
       <div className="mx-auto w-full max-w-3xl">
+        {/* Leaderboard navigation link */}
+        <div className="mb-4 flex justify-end">
+          <Link
+            href={`/${locale}/quinielas/${quinielaId}/leaderboard`}
+            className="rounded-lg border border-green-200 bg-white px-4 py-2 text-sm font-medium text-green-700 shadow-sm transition hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-1"
+          >
+            Leaderboard
+          </Link>
+        </div>
+
         <MembersClient
           members={members}
           invitations={invitations}

@@ -19,7 +19,10 @@ import type {
   KnockoutPlaceholderRecord,
   Match,
   SeedPlaceholdersResult,
+  SyncResultPayload,
+  SyncRegulationResultsResult,
 } from '@/competitions/competitions.types'
+import type { IScoringService } from '@/scoring/scoring.types'
 
 // ---------------------------------------------------------------------------
 // Knockout bracket seed data — 32 records (16 R32 + 8 R16 + 4 QF + 2 SF + 1 3P + 1 F)
@@ -70,6 +73,7 @@ export class CompetitionsService implements ICompetitionsService {
   constructor(
     private readonly client: ICompetitionsClient,
     private readonly repository: ICompetitionsRepository,
+    private readonly scoringService?: IScoringService,
   ) {}
 
   /**
@@ -163,6 +167,42 @@ export class CompetitionsService implements ICompetitionsService {
       return { success: true, count }
     } catch {
       return { success: false, error: 'UNKNOWN_ERROR' }
+    }
+  }
+
+  /**
+   * Update regulation-time results for a batch of matches and recalculate
+   * prediction scores for each one.
+   *
+   * Flow:
+   * For each entry in the payload:
+   *   1. Call repository.updateRegulationResults(matchId, homeGoals, awayGoals).
+   *   2. If scoringService is provided, call scoringService.recalculateMatchScores(matchId).
+   * Any DB-level throw → { success: false, error: 'DB_ERROR' }.
+   * On success → { success: true, matchesUpdated, scoresUpdated }.
+   */
+  async syncRegulationResults(payload: SyncResultPayload[]): Promise<SyncRegulationResultsResult> {
+    let scoresUpdated = 0
+    try {
+      for (const entry of payload) {
+        await this.repository.updateRegulationResults(
+          entry.matchId,
+          entry.regulationHomeGoals,
+          entry.regulationAwayGoals,
+        )
+        if (this.scoringService) {
+          await this.scoringService.recalculateMatchScores(entry.matchId)
+          scoresUpdated++
+        }
+      }
+    } catch {
+      return { success: false, error: 'DB_ERROR' }
+    }
+
+    return {
+      success: true,
+      matchesUpdated: payload.length,
+      scoresUpdated,
     }
   }
 }

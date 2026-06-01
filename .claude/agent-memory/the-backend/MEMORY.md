@@ -3,3 +3,5 @@
 - [ShortCode and Approval Gate Feature](project-shortcode-approval-gate.md) — short_code on invitations, approved_at on memberships, users admin list, approveMember, acceptInviteByShortCode
 - [Open Invite Links Feature](project-open-invite-links.md) — email=null open invites, isMember, reusable links, no markAccepted on open invites
 - [Expected Results Feature](project-expected-results.md) — user match score predictions: expectedResults/ module, countByUser, saveExpectedResult action, cleanup on member removal
+- [Scoring and Leaderboard Feature](project-scoring-leaderboard.md) — 3-pt scoring, regulation results sync, crowd percentages, pool leaderboard, prediction lock gate
+- [isMember vs isApprovedMember](feedback-ismember-vs-isapprovedmember.md) — isMember = any row (duplicate prevention); isApprovedMember = approved_at IS NOT NULL (access control gate)

@@ -5,3 +5,4 @@
 - [Invitations & Memberships Patterns](project-invitations-memberships-patterns.md) — Redirect to dead route, duplicate hashToken, missing NOT_A_MEMBER i18n key, missing interaction error-path tests, wrong error key for password mismatch
 - [Users Dashboard & Approval Gate Patterns](project-users-dashboard-approval-patterns.md) — quinielaId passed instead of membershipId, repository bypass in actions, stale [token] route, missing MembersClient approve tests, double DB read
 - [Expected Results & Score Input Patterns](project-expected-results-patterns.md) — Repository bypass in cascade delete, leaveQuiniela missing cascade, non-serializable function prop at server-client boundary, missing Repository test
+- [Scoring & Leaderboard Patterns](project-scoring-leaderboard-patterns.md) — earnedPoints never wired in page, isMember missing approved_at filter, crowd pct false-null edge, no syncRegulationResults tests, hardcoded "Predictions closed" string

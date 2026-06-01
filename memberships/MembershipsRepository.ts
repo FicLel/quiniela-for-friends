@@ -167,6 +167,19 @@ export class MembershipsRepository implements IMembershipsRepository {
     return (count ?? 0) > 0
   }
 
+  async isApprovedMember(quinielaId: string, userId: string): Promise<boolean> {
+    await this.verifySchema()
+    const { count, error } = await this.supabase
+      .from('quiniela_memberships')
+      .select('id', { count: 'exact' })
+      .eq('quiniela_id', quinielaId)
+      .eq('user_id', userId)
+      .not('approved_at', 'is', null)
+
+    if (error) throw new Error(`isApprovedMember failed: ${error.message}`)
+    return (count ?? 0) > 0
+  }
+
   async countByUser(userId: string): Promise<number> {
     await this.verifySchema()
     const { count, error } = await this.supabase

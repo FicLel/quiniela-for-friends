@@ -28,6 +28,9 @@ export type Match = {
   awayTeamCrest: string | null
   bracketSlot: string | null
   matchupDescription: string | null
+  regulationHomeGoals: number | null
+  regulationAwayGoals: number | null
+  lastSyncedAt: Date | null
   createdAt: Date
   updatedAt: Date
 }
@@ -88,6 +91,16 @@ export type SeedPlaceholdersResult =
   | { success: true; count: number }
   | { success: false; error: 'DB_ERROR' | 'UNKNOWN_ERROR' }
 
+export type SyncResultPayload = {
+  matchId: string
+  regulationHomeGoals: number
+  regulationAwayGoals: number
+}
+
+export type SyncRegulationResultsResult =
+  | { success: true; matchesUpdated: number; scoresUpdated: number }
+  | { success: false; error: 'UNAUTHORIZED' | 'INVALID_PAYLOAD' | 'DB_ERROR' }
+
 // ---------------------------------------------------------------------------
 // Port interfaces
 // ---------------------------------------------------------------------------
@@ -124,6 +137,18 @@ export interface ICompetitionsRepository {
    * Returns the count of records processed.
    */
   updateKnockoutTeams(records: MatchImportRecord[]): Promise<number>
+
+  /** Return a single match by its primary key UUID, or null if not found. */
+  findById(matchId: string): Promise<Match | null>
+
+  /**
+   * Set regulation_home_goals, regulation_away_goals, and last_synced_at = NOW()
+   * for the given match.
+   */
+  updateRegulationResults(matchId: string, homeGoals: number, awayGoals: number): Promise<void>
+
+  /** Return the scheduled_at timestamp for the given match, or null if not found. */
+  findKickoffAt(matchId: string): Promise<Date | null>
 }
 
 export interface ICompetitionsService {
@@ -131,4 +156,5 @@ export interface ICompetitionsService {
   getAllMatches(): Promise<Match[]>
   seedKnockoutPlaceholders(): Promise<SeedPlaceholdersResult>
   syncKnockoutMatches(): Promise<ImportMatchesResult>
+  syncRegulationResults(payload: SyncResultPayload[]): Promise<SyncRegulationResultsResult>
 }

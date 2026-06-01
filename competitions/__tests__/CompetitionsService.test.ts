@@ -31,6 +31,9 @@ const MATCH: Match = {
   awayTeamCrest: 'https://crests.football-data.org/762.svg',
   bracketSlot: null,
   matchupDescription: null,
+  regulationHomeGoals: null,
+  regulationAwayGoals: null,
+  lastSyncedAt: null,
   createdAt: new Date('2026-01-01T00:00:00Z'),
   updatedAt: new Date('2026-01-01T00:00:00Z'),
 }
@@ -77,6 +80,9 @@ function makeRepository(
     findAllMatches: jest.fn().mockResolvedValue([]),
     upsertKnockoutPlaceholders: jest.fn().mockResolvedValue(32),
     updateKnockoutTeams: jest.fn().mockResolvedValue(1),
+    findById: jest.fn().mockResolvedValue(null),
+    updateRegulationResults: jest.fn().mockResolvedValue(undefined),
+    findKickoffAt: jest.fn().mockResolvedValue(null),
     ...override,
   }
 }

@@ -7,7 +7,7 @@
  */
 
 import { ExpectedResultsService } from '../ExpectedResultsService'
-import type { IExpectedResultsRepository, ExpectedResult } from '../expectedResults.types'
+import type { IExpectedResultsRepository, IMatchKickoffReader, ExpectedResult } from '../expectedResults.types'
 import type { IMembershipsRepository, Membership } from '@/memberships/memberships.types'
 
 // ---------------------------------------------------------------------------
@@ -21,6 +21,8 @@ function makeExpectedResult(overrides: Partial<ExpectedResult> = {}): ExpectedRe
     matchId: 'match-uuid',
     homeScore: 2,
     awayScore: 1,
+    lockedAt: null,
+    submittedAt: null,
     createdAt: new Date('2026-06-01T00:00:00Z'),
     updatedAt: new Date('2026-06-01T00:00:00Z'),
     ...overrides,
@@ -46,8 +48,15 @@ function makeExpectedResultsRepository(
     upsert: jest.fn().mockResolvedValue(undefined),
     findByUserId: jest.fn().mockResolvedValue([]),
     deleteByUserId: jest.fn().mockResolvedValue(undefined),
+    findByMatchId: jest.fn().mockResolvedValue([]),
     ...overrides,
   } as unknown as IExpectedResultsRepository
+}
+
+function makeKickoffReader(kickoffAt: Date | null = null): IMatchKickoffReader {
+  return {
+    findKickoffAt: jest.fn().mockResolvedValue(kickoffAt),
+  }
 }
 
 function makeMembershipsRepository(
@@ -247,6 +256,80 @@ describe('ExpectedResultsService.upsertExpectedResult', () => {
     const result = await service.upsertExpectedResult(USER_ID, MATCH_ID, 2, 1)
 
     expect(result).toEqual({ success: false, error: 'UNKNOWN_ERROR' })
+  })
+
+  it('returns LOCKED when kickoffAt is in the past', async () => {
+    const membershipsRepo = makeMembershipsRepository({
+      countByUser: jest.fn().mockResolvedValue(1),
+    })
+    const repo = makeExpectedResultsRepository()
+    const kickoffReader = makeKickoffReader(new Date('2020-01-01T00:00:00Z')) // past
+    const service = new ExpectedResultsService(repo, membershipsRepo, kickoffReader)
+
+    const result = await service.upsertExpectedResult(USER_ID, MATCH_ID, 2, 1)
+
+    expect(result).toEqual({ success: false, error: 'LOCKED' })
+    expect(repo.upsert).not.toHaveBeenCalled()
+  })
+
+  it('returns LOCKED when kickoffAt equals now (boundary: kickoffAt <= now)', async () => {
+    const membershipsRepo = makeMembershipsRepository({
+      countByUser: jest.fn().mockResolvedValue(1),
+    })
+    const repo = makeExpectedResultsRepository()
+    // Use a Date in the past to reliably trigger <= now
+    const kickoffReader = makeKickoffReader(new Date(Date.now() - 1))
+    const service = new ExpectedResultsService(repo, membershipsRepo, kickoffReader)
+
+    const result = await service.upsertExpectedResult(USER_ID, MATCH_ID, 2, 1)
+
+    expect(result).toEqual({ success: false, error: 'LOCKED' })
+    expect(repo.upsert).not.toHaveBeenCalled()
+  })
+
+  it('returns { success: true } when kickoffAt is in the future', async () => {
+    const membershipsRepo = makeMembershipsRepository({
+      countByUser: jest.fn().mockResolvedValue(1),
+    })
+    const repo = makeExpectedResultsRepository({
+      upsert: jest.fn().mockResolvedValue(undefined),
+    })
+    const kickoffReader = makeKickoffReader(new Date('2099-01-01T00:00:00Z')) // future
+    const service = new ExpectedResultsService(repo, membershipsRepo, kickoffReader)
+
+    const result = await service.upsertExpectedResult(USER_ID, MATCH_ID, 2, 1)
+
+    expect(result).toEqual({ success: true })
+    expect(repo.upsert).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns { success: true } when no kickoffReader is provided (backwards-compatible)', async () => {
+    const membershipsRepo = makeMembershipsRepository({
+      countByUser: jest.fn().mockResolvedValue(1),
+    })
+    const repo = makeExpectedResultsRepository({
+      upsert: jest.fn().mockResolvedValue(undefined),
+    })
+    // No kickoffReader injected — lock gate is bypassed
+    const service = new ExpectedResultsService(repo, membershipsRepo)
+
+    const result = await service.upsertExpectedResult(USER_ID, MATCH_ID, 2, 1)
+
+    expect(result).toEqual({ success: true })
+    expect(repo.upsert).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not call repository.upsert when LOCKED', async () => {
+    const membershipsRepo = makeMembershipsRepository({
+      countByUser: jest.fn().mockResolvedValue(1),
+    })
+    const repo = makeExpectedResultsRepository()
+    const kickoffReader = makeKickoffReader(new Date('2020-06-01T00:00:00Z'))
+    const service = new ExpectedResultsService(repo, membershipsRepo, kickoffReader)
+
+    await service.upsertExpectedResult(USER_ID, MATCH_ID, 2, 1)
+
+    expect(repo.upsert).not.toHaveBeenCalled()
   })
 })
 

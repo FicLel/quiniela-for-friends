@@ -7,6 +7,8 @@ import { CompetitionsService } from '@/competitions/CompetitionsService'
 import { ExpectedResultsService } from '@/expectedResults/ExpectedResultsService'
 import { ExpectedResultsRepository } from '@/expectedResults/ExpectedResultsRepository'
 import { MembershipsRepository } from '@/memberships/MembershipsRepository'
+import { ScoringService, calculateScore } from '@/scoring/ScoringService'
+import { PredictionScoreRepository } from '@/scoring/PredictionScoreRepository'
 import { AuthClient } from '@/auth/AuthClient'
 import ImportMatchesButton from './_components/ImportMatchesButton'
 import WelcomeMatchList from './_components/WelcomeMatchList'
@@ -46,13 +48,21 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
 
   const userId = session?.sub ?? null
 
+  const competitionsRepository = new CompetitionsRepository()
   const competitionsService = new CompetitionsService(
     new CompetitionsClient(),
-    new CompetitionsRepository(),
+    competitionsRepository,
   )
+  // Pass CompetitionsRepository as the kickoff reader (3rd arg) so the lock
+  // gate in ExpectedResultsService prevents predictions after kickoff.
   const expectedResultsService = new ExpectedResultsService(
     new ExpectedResultsRepository(),
     new MembershipsRepository(),
+    competitionsRepository,
+  )
+  const scoringService = new ScoringService(
+    new PredictionScoreRepository(),
+    competitionsRepository,
   )
 
   const [allMatches, isApproved, expectedResults] = await Promise.all([
@@ -66,6 +76,22 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
     expectedResults.map((r) => [r.matchId, { homeScore: r.homeScore, awayScore: r.awayScore }]),
   )
 
+  // Fetch crowd percentages for all matches in parallel
+  const crowdPercentagesMap = new Map<string, { homeWinPct: number; drawPct: number; awayWinPct: number } | null>()
+  await Promise.all(
+    allMatches.map(async (match) => {
+      try {
+        const pct = await scoringService.getCrowdPercentages(match.id)
+        // Treat all-zero (no predictions) as null
+        const hasPredictions = pct.homeWinPct > 0 || pct.drawPct > 0 || pct.awayWinPct > 0
+        crowdPercentagesMap.set(match.id, hasPredictions ? pct : null)
+      } catch {
+        crowdPercentagesMap.set(match.id, null)
+      }
+    }),
+  )
+
+  const now = new Date()
   const knockoutStages = new Set(['ROUND_OF_32', 'ROUND_OF_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'THIRD_PLACE', 'FINAL'])
 
   const groupStageMatches: MatchCardData[] = []
@@ -74,6 +100,9 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
 
   for (const match of allMatches) {
     const savedScore = expectedResultsMap.get(match.id)
+    const crowd = crowdPercentagesMap.get(match.id) ?? null
+    const isLocked = match.scheduledAt <= now
+
     const cardData: MatchCardData = {
       id: match.id,
       homeTeamName: match.homeTeamName,
@@ -90,6 +119,22 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
       initialHomeScore: savedScore?.homeScore,
       initialAwayScore: savedScore?.awayScore,
       matchupDescription: match.matchupDescription ?? null,
+      regulationHomeGoals: match.regulationHomeGoals ?? null,
+      regulationAwayGoals: match.regulationAwayGoals ?? null,
+      lastSyncedAt: match.lastSyncedAt ? match.lastSyncedAt.toISOString() : null,
+      earnedPoints: (() => {
+        if (match.regulationHomeGoals == null || match.regulationAwayGoals == null) return null
+        const prediction = expectedResultsMap.get(match.id)
+        if (!prediction) return null
+        return calculateScore(
+          { homeScore: prediction.homeScore, awayScore: prediction.awayScore },
+          { regulationHomeGoals: match.regulationHomeGoals, regulationAwayGoals: match.regulationAwayGoals },
+        ).totalPoints
+      })(),
+      isLocked,
+      crowdHomeWinPct: crowd?.homeWinPct ?? null,
+      crowdDrawPct: crowd?.drawPct ?? null,
+      crowdAwayWinPct: crowd?.awayWinPct ?? null,
     }
 
     if (knockoutStages.has(match.stage)) {

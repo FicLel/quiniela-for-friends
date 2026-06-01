@@ -14,6 +14,7 @@
 import type {
   IExpectedResultsRepository,
   IExpectedResultsService,
+  IMatchKickoffReader,
   ExpectedResult,
   SaveExpectedResultResult,
 } from '@/expectedResults/expectedResults.types'
@@ -23,6 +24,7 @@ export class ExpectedResultsService implements IExpectedResultsService {
   constructor(
     private readonly repository: IExpectedResultsRepository,
     private readonly membershipsRepository: IMembershipsRepository,
+    private readonly kickoffReader?: IMatchKickoffReader,
   ) {}
 
   /**
@@ -56,8 +58,10 @@ export class ExpectedResultsService implements IExpectedResultsService {
    * Business rules:
    * 1. User must have at least one approved membership → NOT_APPROVED.
    * 2. homeScore and awayScore must be non-negative integers → INVALID_SCORE.
-   * 3. Call repository.upsert; if it throws → UNKNOWN_ERROR.
-   * 4. Return { success: true } on success.
+   * 3. If kickoffReader is provided, check that the match has not yet kicked off
+   *    (kickoffAt > now). If kickoffAt <= now → LOCKED.
+   * 4. Call repository.upsert; if it throws → UNKNOWN_ERROR.
+   * 5. Return { success: true } on success.
    */
   async upsertExpectedResult(
     userId: string,
@@ -80,10 +84,18 @@ export class ExpectedResultsService implements IExpectedResultsService {
         return { success: false, error: 'INVALID_SCORE' }
       }
 
-      // 3. Persist
+      // 3. Check kickoff lock
+      if (this.kickoffReader) {
+        const kickoffAt = await this.kickoffReader.findKickoffAt(matchId)
+        if (kickoffAt !== null && kickoffAt <= new Date()) {
+          return { success: false, error: 'LOCKED' }
+        }
+      }
+
+      // 4. Persist
       await this.repository.upsert({ userId, matchId, homeScore, awayScore })
 
-      // 4. Success
+      // 5. Success
       return { success: true }
     } catch {
       return { success: false, error: 'UNKNOWN_ERROR' }

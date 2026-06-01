@@ -365,6 +365,9 @@ describe('CompetitionsRepository – findAllGroupStageMatches', () => {
       awayTeamCrest: 'https://crests.football-data.org/762.svg',
       bracketSlot: null,
       matchupDescription: null,
+      regulationHomeGoals: null,
+      regulationAwayGoals: null,
+      lastSyncedAt: null,
       createdAt: new Date('2026-05-28T00:00:00Z'),
       updatedAt: new Date('2026-05-28T00:00:00Z'),
     })
@@ -457,6 +460,9 @@ describe('CompetitionsRepository – findAllMatches', () => {
       awayTeamCrest: 'https://crests.football-data.org/762.svg',
       bracketSlot: null,
       matchupDescription: null,
+      regulationHomeGoals: null,
+      regulationAwayGoals: null,
+      lastSyncedAt: null,
       createdAt: new Date('2026-05-28T00:00:00Z'),
       updatedAt: new Date('2026-05-28T00:00:00Z'),
     })
@@ -480,6 +486,9 @@ describe('CompetitionsRepository – findAllMatches', () => {
       awayTeamCrest: 'https://crests.football-data.org/762.svg',
       bracketSlot: null,
       matchupDescription: null,
+      regulationHomeGoals: null,
+      regulationAwayGoals: null,
+      lastSyncedAt: null,
       createdAt: new Date('2026-05-28T00:00:00Z'),
       updatedAt: new Date('2026-05-28T00:00:00Z'),
     })

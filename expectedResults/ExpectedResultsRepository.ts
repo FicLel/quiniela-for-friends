@@ -58,6 +58,8 @@ export class ExpectedResultsRepository implements IExpectedResultsRepository {
       matchId: row.match_id as string,
       homeScore: row.home_score as number,
       awayScore: row.away_score as number,
+      lockedAt: row.locked_at ? new Date(row.locked_at as string) : null,
+      submittedAt: row.submitted_at ? new Date(row.submitted_at as string) : null,
       createdAt: new Date(row.created_at as string),
       updatedAt: new Date(row.updated_at as string),
     }
@@ -65,22 +67,40 @@ export class ExpectedResultsRepository implements IExpectedResultsRepository {
 
   /**
    * Insert or update a prediction row keyed on (user_id, match_id).
+   *
+   * On first insert, sets submitted_at = NOW().
+   * On subsequent updates, submitted_at is preserved (not overwritten).
+   * locked_at is never set here — it is managed by external admin processes.
+   *
    * Throws on Supabase error.
    */
   async upsert(input: UpsertExpectedResultInput): Promise<void> {
     await this.verifySchema()
 
+    // Check whether this is an INSERT or UPDATE so we can set submitted_at on first insert only.
+    const { data: existing } = await this.supabase
+      .from('user_expected_results')
+      .select('id, submitted_at')
+      .eq('user_id', input.userId)
+      .eq('match_id', input.matchId)
+      .maybeSingle()
+
+    const isFirstInsert = !existing
+
+    const row: Record<string, unknown> = {
+      user_id: input.userId,
+      match_id: input.matchId,
+      home_score: input.homeScore,
+      away_score: input.awayScore,
+    }
+
+    if (isFirstInsert) {
+      row.submitted_at = new Date().toISOString()
+    }
+
     const { error } = await this.supabase
       .from('user_expected_results')
-      .upsert(
-        {
-          user_id: input.userId,
-          match_id: input.matchId,
-          home_score: input.homeScore,
-          away_score: input.awayScore,
-        },
-        { onConflict: 'user_id,match_id' },
-      )
+      .upsert(row, { onConflict: 'user_id,match_id' })
 
     if (error) {
       throw new Error(`upsert expected result failed: ${error.message}`)
@@ -125,5 +145,27 @@ export class ExpectedResultsRepository implements IExpectedResultsRepository {
     if (error) {
       throw new Error(`deleteByUserId failed: ${error.message}`)
     }
+  }
+
+  /**
+   * Return all predictions for a given match.
+   * Returns [] if no rows exist.
+   * Throws on Supabase error.
+   */
+  async findByMatchId(matchId: string): Promise<ExpectedResult[]> {
+    await this.verifySchema()
+
+    const { data, error } = await this.supabase
+      .from('user_expected_results')
+      .select('*')
+      .eq('match_id', matchId)
+
+    if (error) {
+      throw new Error(`findByMatchId failed: ${error.message}`)
+    }
+
+    if (!data || data.length === 0) return []
+
+    return (data as Record<string, unknown>[]).map((row) => this.toExpectedResult(row))
   }
 }

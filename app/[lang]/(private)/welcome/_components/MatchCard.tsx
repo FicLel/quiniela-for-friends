@@ -20,6 +20,14 @@ export type MatchCardData = {
   initialHomeScore?: number
   initialAwayScore?: number
   matchupDescription?: string | null
+  regulationHomeGoals?: number | null   // official result, null until synced
+  regulationAwayGoals?: number | null
+  lastSyncedAt?: string | null          // ISO 8601
+  earnedPoints?: number | null          // 0–3, null if not yet scored
+  crowdHomeWinPct?: number | null       // 0–100, null = no predictions yet
+  crowdDrawPct?: number | null
+  crowdAwayWinPct?: number | null
+  isLocked?: boolean                    // computed from kickoff_at server-side
 }
 
 type MatchCardProps = MatchCardData & {
@@ -28,6 +36,25 @@ type MatchCardProps = MatchCardData & {
   isApproved: boolean
   showDate?: boolean
   onSaveScore?: (matchId: string, home: number, away: number) => Promise<unknown>
+}
+
+// ---------------------------------------------------------------------------
+// EarnedPointsBadge — color-coded points badge shown on final matches
+// ---------------------------------------------------------------------------
+
+function EarnedPointsBadge({ points }: { points: number }) {
+  const colorClass =
+    points === 3
+      ? 'bg-green-100 text-green-800'
+      : points === 0
+        ? 'bg-gray-100 text-gray-500'
+        : 'bg-amber-100 text-amber-800'
+
+  return (
+    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums ${colorClass}`}>
+      +{points} pts
+    </span>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -241,10 +268,10 @@ function ScoreCounter({
 }
 
 // ---------------------------------------------------------------------------
-// WinBadge — circle letter (W/V) + 50%
+// WinBadge — circle letter (W/V) + percentage
 // ---------------------------------------------------------------------------
 
-function WinBadge({ label }: { label: string }) {
+function WinBadge({ label, pct }: { label: string; pct: number }) {
   return (
     <div className="flex items-center gap-1">
       <span
@@ -253,7 +280,7 @@ function WinBadge({ label }: { label: string }) {
       >
         {label}
       </span>
-      <span className="text-xs text-gray-400">50%</span>
+      <span className="text-xs text-gray-400">{pct}%</span>
     </div>
   )
 }
@@ -275,6 +302,13 @@ export default function MatchCard({
   initialHomeScore,
   initialAwayScore,
   matchupDescription,
+  regulationHomeGoals,
+  regulationAwayGoals,
+  earnedPoints,
+  crowdHomeWinPct,
+  crowdDrawPct,
+  crowdAwayWinPct,
+  isLocked = false,
   dict,
   lang,
   isApproved,
@@ -296,6 +330,15 @@ export default function MatchCard({
     onSaveScore?.(id, homeScoreRef.current, value)
   }
 
+  // A match is "final" when the official regulation result has been synced
+  const isFinal = regulationHomeGoals != null && regulationAwayGoals != null
+
+  // Counters are disabled when not approved, or when the match is locked/final
+  const countersDisabled = !isApproved || isLocked || isFinal
+
+  // Crowd percentages: null when all three are null (no predictions yet)
+  const hasCrowdData = crowdHomeWinPct != null || crowdDrawPct != null || crowdAwayWinPct != null
+
   return (
     <div className="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm sm:px-5 sm:py-4 lg:px-6 lg:py-4">
 
@@ -307,7 +350,12 @@ export default function MatchCard({
           </p>
           {showDate && <FormattedDate scheduledAt={scheduledAt} lang={lang} />}
         </div>
-        <StatusBadge status={status} dict={dict} />
+        <div className="flex items-center gap-2">
+          {isFinal && earnedPoints != null && (
+            <EarnedPointsBadge points={earnedPoints} />
+          )}
+          <StatusBadge status={status} dict={dict} />
+        </div>
       </div>
 
       {/* Matchup description — shown for TBD knockout bracket slots */}
@@ -315,7 +363,7 @@ export default function MatchCard({
         <p className="mb-2 text-center text-xs italic text-gray-400">{matchupDescription}</p>
       )}
 
-      {/* Row 2: home team | score counters | away team */}
+      {/* Row 2: home team | score area | away team */}
       <div className="flex items-center justify-between gap-2 sm:gap-4">
 
         {/* Home team column */}
@@ -326,23 +374,54 @@ export default function MatchCard({
           </span>
         </div>
 
-        {/* Score counters */}
-        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-          <ScoreCounter
-            incrementLabel={`Increase ${homeTeamName} score`}
-            decrementLabel={`Decrease ${homeTeamName} score`}
-            initialValue={initialHomeScore}
-            disabled={!isApproved}
-            onSave={handleSaveHome}
-          />
-          <span className="text-sm font-bold text-gray-400">:</span>
-          <ScoreCounter
-            incrementLabel={`Increase ${awayTeamName} score`}
-            decrementLabel={`Decrease ${awayTeamName} score`}
-            initialValue={initialAwayScore}
-            disabled={!isApproved}
-            onSave={handleSaveAway}
-          />
+        {/* Score area: static display when final, counters otherwise */}
+        <div className="flex shrink-0 flex-col items-center gap-1">
+          {isFinal ? (
+            // Final state: static official score
+            <div className="flex flex-col items-center gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-bold tabular-nums text-gray-900 sm:text-3xl">
+                  {regulationHomeGoals}
+                </span>
+                <span className="text-lg font-bold text-gray-400">:</span>
+                <span className="text-2xl font-bold tabular-nums text-gray-900 sm:text-3xl">
+                  {regulationAwayGoals}
+                </span>
+              </div>
+              {/* User's predicted score shown below the official result */}
+              {(initialHomeScore != null || initialAwayScore != null) && (
+                <p className="text-xs text-gray-400" aria-label="Your prediction">
+                  {'Your pick:'} {initialHomeScore ?? 0}–{initialAwayScore ?? 0}
+                </p>
+              )}
+            </div>
+          ) : (
+            // Interactive counters (locked or open)
+            <div className="flex items-center gap-1 sm:gap-2">
+              <ScoreCounter
+                incrementLabel={`Increase ${homeTeamName} score`}
+                decrementLabel={`Decrease ${homeTeamName} score`}
+                initialValue={initialHomeScore}
+                disabled={countersDisabled}
+                onSave={handleSaveHome}
+              />
+              <span className="text-sm font-bold text-gray-400">:</span>
+              <ScoreCounter
+                incrementLabel={`Increase ${awayTeamName} score`}
+                decrementLabel={`Decrease ${awayTeamName} score`}
+                initialValue={initialAwayScore}
+                disabled={countersDisabled}
+                onSave={handleSaveAway}
+              />
+            </div>
+          )}
+
+          {/* Locked label — shown when locked but not yet final */}
+          {isLocked && !isFinal && (
+            <p className="mt-1 text-xs font-medium text-gray-400" role="status">
+              Predictions closed
+            </p>
+          )}
         </div>
 
         {/* Away team column */}
@@ -355,11 +434,18 @@ export default function MatchCard({
 
       </div>
 
-      {/* Row 3: win probability — suppressed when both teams are TBD (bracket placeholders) */}
+      {/* Row 3: crowd percentages — suppressed when both teams are TBD */}
       {!(homeTeamTla === 'TBD' && awayTeamTla === 'TBD') && (
         <div className="mt-3 flex items-center justify-between px-2 sm:mt-4 sm:px-4 lg:px-6">
-          <WinBadge label={dict.winLabel} />
-          <WinBadge label={dict.winLabel} />
+          {hasCrowdData ? (
+            <>
+              <WinBadge label={dict.winLabel} pct={crowdHomeWinPct ?? 0} />
+              <span className="text-xs text-gray-400">{crowdDrawPct ?? 0}%</span>
+              <WinBadge label={dict.winLabel} pct={crowdAwayWinPct ?? 0} />
+            </>
+          ) : (
+            <p className="w-full text-center text-xs text-gray-400">No predictions yet</p>
+          )}
         </div>
       )}
 

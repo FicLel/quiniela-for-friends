@@ -79,6 +79,9 @@ export class CompetitionsRepository implements ICompetitionsRepository {
       awayTeamCrest: (row.away_team_crest as string | null) ?? null,
       bracketSlot: (row.bracket_slot as string | null) ?? null,
       matchupDescription: (row.matchup_description as string | null) ?? null,
+      regulationHomeGoals: (row.regulation_home_goals as number | null) ?? null,
+      regulationAwayGoals: (row.regulation_away_goals as number | null) ?? null,
+      lastSyncedAt: row.last_synced_at ? new Date(row.last_synced_at as string) : null,
       createdAt: new Date(row.created_at as string),
       updatedAt: new Date(row.updated_at as string),
     }
@@ -215,6 +218,66 @@ export class CompetitionsRepository implements ICompetitionsRepository {
     }
 
     return rows.length
+  }
+
+  /**
+   * Return a single match by its primary key UUID.
+   * Returns null if not found or on Supabase error.
+   */
+  async findById(matchId: string): Promise<Match | null> {
+    await this.verifySchema()
+
+    const { data, error } = await this.supabase
+      .from('matches')
+      .select('*')
+      .eq('id', matchId)
+      .single()
+
+    if (error || !data) return null
+
+    return this.toMatch(data as Record<string, unknown>)
+  }
+
+  /**
+   * Set regulation_home_goals, regulation_away_goals, and last_synced_at = NOW()
+   * for the given match.
+   * Throws on Supabase error.
+   */
+  async updateRegulationResults(matchId: string, homeGoals: number, awayGoals: number): Promise<void> {
+    await this.verifySchema()
+
+    const { error } = await this.supabase
+      .from('matches')
+      .update({
+        regulation_home_goals: homeGoals,
+        regulation_away_goals: awayGoals,
+        last_synced_at: new Date().toISOString(),
+      })
+      .eq('id', matchId)
+
+    if (error) {
+      throw new Error(`updateRegulationResults failed: ${error.message}`)
+    }
+  }
+
+  /**
+   * Return the scheduled_at timestamp for a match (used as the kickoff time
+   * for the prediction lock gate).
+   * Returns null if the match does not exist.
+   */
+  async findKickoffAt(matchId: string): Promise<Date | null> {
+    await this.verifySchema()
+
+    const { data, error } = await this.supabase
+      .from('matches')
+      .select('scheduled_at')
+      .eq('id', matchId)
+      .single()
+
+    if (error || !data) return null
+
+    const row = data as { scheduled_at: string }
+    return new Date(row.scheduled_at)
   }
 
   /**

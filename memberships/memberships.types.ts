@@ -43,7 +43,10 @@ export interface IMembershipsRepository {
   deleteById(membershipId: string): Promise<void>
   countAdmins(quinielaId: string): Promise<number>
   approve(membershipId: string): Promise<void>
+  /** Returns true if the user has ANY membership row (approved or pending). Used for duplicate-prevention checks. */
   isMember(quinielaId: string, userId: string): Promise<boolean>
+  /** Returns true only if the user has an APPROVED membership (approved_at IS NOT NULL). Use this for access-control gates. */
+  isApprovedMember(quinielaId: string, userId: string): Promise<boolean>
   /** Count approved memberships for a user (approved_at IS NOT NULL). */
   countByUser(userId: string): Promise<number>
 }
