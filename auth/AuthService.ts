@@ -51,6 +51,7 @@ export class AuthService {
         email: userRow.email,
         role: userRow.role,
         mustChangePassword: userRow.mustChangePassword,
+        tokenVersion: userRow.tokenVersion,
       })
 
       return { success: true, token, mustChangePassword: userRow.mustChangePassword }
@@ -98,6 +99,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         mustChangePassword: true,
+        tokenVersion: user.tokenVersion,
       })
 
       return { success: true, token }
@@ -145,6 +147,7 @@ export class AuthService {
         email: userRow.email,
         role: userRow.role,
         mustChangePassword: false,
+        tokenVersion: userRow.tokenVersion,
       })
 
       return { success: true, token }

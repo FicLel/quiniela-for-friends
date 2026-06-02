@@ -23,6 +23,7 @@ export type SessionPayload = {
   email: string
   role: 'admin' | 'player'
   mustChangePassword: boolean
+  tokenVersion: number
 }
 
 const SESSION_COOKIE_NAME = 'session'
@@ -76,6 +77,7 @@ export class AuthClient {
         email: payload['email'] as string,
         role: payload['role'] as 'admin' | 'player',
         mustChangePassword: payload['mustChangePassword'] as boolean,
+        tokenVersion: (payload['tokenVersion'] as number) ?? 1,
       }
     } catch {
       return null

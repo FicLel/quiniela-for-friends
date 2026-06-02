@@ -5,6 +5,7 @@ import { Navbar } from '@/app/_components/Navbar'
 import type { Locale } from '@/i18n/i18n.types'
 import { QuinielasService } from '@/quinielas/QuinielasService'
 import { QuinielasRepository } from '@/quinielas/QuinielasRepository'
+import { UsersRepository } from '@/users/UsersRepository'
 
 type LayoutProps = {
   children: React.ReactNode
@@ -23,7 +24,14 @@ export default async function PrivateLayout({ children, params }: LayoutProps) {
 
   if (!session) redirect(`/${lang}/login`)
 
-  const isAdmin = session.role === 'admin'
+  // Verify the token version matches the DB — detects stale JWTs after a role change.
+  const usersRepo = new UsersRepository()
+  const freshUser = await usersRepo.findById(session.sub)
+  if (!freshUser || freshUser.tokenVersion !== session.tokenVersion) {
+    redirect(`/${lang}/login`)
+  }
+
+  const isAdmin = freshUser.role === 'admin'
 
   const quinielasService = new QuinielasService(new QuinielasRepository())
   const quinielasResult = await quinielasService.listQuinielasForUser(session.sub)

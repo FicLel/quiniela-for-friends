@@ -48,6 +48,7 @@ export class UsersRepository implements IUsersRepository {
       passwordHash: row.password_hash as string,
       role: row.role as 'admin' | 'player',
       mustChangePassword: row.must_change_password as boolean,
+      tokenVersion: (row.token_version as number) ?? 1,
       createdAt: new Date(row.created_at as string),
       updatedAt: new Date(row.updated_at as string),
     }
@@ -91,6 +92,12 @@ export class UsersRepository implements IUsersRepository {
       .update({ password_hash: passwordHash })
       .eq('id', userId)
     if (error) throw new Error(`setPasswordHash failed: ${error.message}`)
+  }
+
+  async incrementTokenVersion(userId: string): Promise<void> {
+    await this.verifySchema()
+    const { error } = await this.supabase.rpc('increment_token_version', { p_user_id: userId })
+    if (error) throw new Error(`incrementTokenVersion failed: ${error.message}`)
   }
 
   /**
