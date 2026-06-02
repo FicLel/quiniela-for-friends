@@ -142,6 +142,7 @@ export async function acceptInviteAsNewUser(
       email: newUser.email,
       role: 'player',
       mustChangePassword: false,
+      tokenVersion: newUser.tokenVersion,
     })
     await authClient.setSessionCookieOnServerAction(jwtToken)
   }
