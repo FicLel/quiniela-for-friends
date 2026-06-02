@@ -60,14 +60,18 @@ export class ExpectedResultsService implements IExpectedResultsService {
    * 2. homeScore and awayScore must be non-negative integers → INVALID_SCORE.
    * 3. If kickoffReader is provided, check that the match has not yet kicked off
    *    (kickoffAt > now). If kickoffAt <= now → LOCKED.
-   * 4. Call repository.upsert; if it throws → UNKNOWN_ERROR.
+   * 4. Call repository.upsert (with optional quinielaId); if it throws → UNKNOWN_ERROR.
    * 5. Return { success: true } on success.
+   *
+   * @param quinielaId - When provided, scopes the prediction to a specific quiniela
+   *   (per_quiniela mode). When null/undefined, the prediction is shared across all quinielas.
    */
   async upsertExpectedResult(
     userId: string,
     matchId: string,
     homeScore: number,
     awayScore: number,
+    quinielaId?: string | null,
   ): Promise<SaveExpectedResultResult> {
     try {
       // 1. Check approval
@@ -92,8 +96,8 @@ export class ExpectedResultsService implements IExpectedResultsService {
         }
       }
 
-      // 4. Persist
-      await this.repository.upsert({ userId, matchId, homeScore, awayScore })
+      // 4. Persist (pass quinielaId through — null means shared prediction)
+      await this.repository.upsert({ userId, matchId, homeScore, awayScore, quinielaId })
 
       // 5. Success
       return { success: true }

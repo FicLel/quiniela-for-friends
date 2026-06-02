@@ -56,6 +56,7 @@ export class ExpectedResultsRepository implements IExpectedResultsRepository {
       id: row.id as string,
       userId: row.user_id as string,
       matchId: row.match_id as string,
+      quinielaId: (row.quiniela_id as string | null | undefined) ?? null,
       homeScore: row.home_score as number,
       awayScore: row.away_score as number,
       lockedAt: row.locked_at ? new Date(row.locked_at as string) : null,
@@ -66,7 +67,9 @@ export class ExpectedResultsRepository implements IExpectedResultsRepository {
   }
 
   /**
-   * Insert or update a prediction row keyed on (user_id, match_id).
+   * Insert or update a prediction row keyed on:
+   *   - (user_id, match_id) when quinielaId is null/undefined (shared mode)
+   *   - (user_id, match_id, quiniela_id) when quinielaId is set (per-quiniela mode)
    *
    * On first insert, sets submitted_at = NOW().
    * On subsequent updates, submitted_at is preserved (not overwritten).
@@ -77,13 +80,22 @@ export class ExpectedResultsRepository implements IExpectedResultsRepository {
   async upsert(input: UpsertExpectedResultInput): Promise<void> {
     await this.verifySchema()
 
-    // Check whether this is an INSERT or UPDATE so we can set submitted_at on first insert only.
-    const { data: existing } = await this.supabase
+    const hasQuiniela = input.quinielaId != null
+
+    // Build the pre-check query to determine insert vs. update
+    let preCheckQuery = this.supabase
       .from('user_expected_results')
       .select('id, submitted_at')
       .eq('user_id', input.userId)
       .eq('match_id', input.matchId)
-      .maybeSingle()
+
+    if (hasQuiniela) {
+      preCheckQuery = preCheckQuery.eq('quiniela_id', input.quinielaId as string)
+    } else {
+      preCheckQuery = preCheckQuery.is('quiniela_id', null)
+    }
+
+    const { data: existing } = await preCheckQuery.maybeSingle()
 
     const isFirstInsert = !existing
 
@@ -92,15 +104,25 @@ export class ExpectedResultsRepository implements IExpectedResultsRepository {
       match_id: input.matchId,
       home_score: input.homeScore,
       away_score: input.awayScore,
+      quiniela_id: input.quinielaId ?? null,
     }
 
     if (isFirstInsert) {
       row.submitted_at = new Date().toISOString()
     }
 
+    // Use the appropriate conflict target based on whether quiniela_id is set.
+    // For shared rows (quiniela_id IS NULL), the partial unique index
+    // (user_id, match_id) WHERE quiniela_id IS NULL handles deduplication —
+    // Supabase upsert requires a named constraint, so we fall back to INSERT ... ON CONFLICT DO UPDATE
+    // via the composite constraint for per-quiniela rows.
+    const onConflict = hasQuiniela
+      ? 'user_id,match_id,quiniela_id'
+      : 'user_id,match_id'
+
     const { error } = await this.supabase
       .from('user_expected_results')
-      .upsert(row, { onConflict: 'user_id,match_id' })
+      .upsert(row, { onConflict })
 
     if (error) {
       throw new Error(`upsert expected result failed: ${error.message}`)
@@ -162,6 +184,37 @@ export class ExpectedResultsRepository implements IExpectedResultsRepository {
 
     if (error) {
       throw new Error(`findByMatchId failed: ${error.message}`)
+    }
+
+    if (!data || data.length === 0) return []
+
+    return (data as Record<string, unknown>[]).map((row) => this.toExpectedResult(row))
+  }
+
+  /**
+   * Return all predictions for a given user scoped to a quiniela.
+   * Pass quinielaId = null to retrieve shared (NULL quiniela_id) predictions.
+   * Returns [] if no rows exist.
+   * Throws on Supabase error.
+   */
+  async findByUserIdAndQuiniela(userId: string, quinielaId: string | null): Promise<ExpectedResult[]> {
+    await this.verifySchema()
+
+    let query = this.supabase
+      .from('user_expected_results')
+      .select('*')
+      .eq('user_id', userId)
+
+    if (quinielaId !== null) {
+      query = query.eq('quiniela_id', quinielaId)
+    } else {
+      query = query.is('quiniela_id', null)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      throw new Error(`findByUserIdAndQuiniela failed: ${error.message}`)
     }
 
     if (!data || data.length === 0) return []

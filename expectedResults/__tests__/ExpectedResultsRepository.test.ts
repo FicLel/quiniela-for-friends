@@ -44,9 +44,18 @@ const mockFindEq = jest.fn()
 const mockDeleteEq = jest.fn()
 const mockDelete = jest.fn(() => ({ eq: mockDeleteEq }))
 
-// Upsert pre-check chain: .select('id, submitted_at').eq().eq().maybeSingle() → Promise<{ data, error }>
+// Upsert pre-check chain:
+//   shared:   .select('id, submitted_at').eq(user_id).eq(match_id).is('quiniela_id', null).maybeSingle()
+//   per-quin: .select('id, submitted_at').eq(user_id).eq(match_id).eq('quiniela_id', id).maybeSingle()
 const mockPreCheckMaybeSingle = jest.fn()
-const mockPreCheckEq2 = jest.fn(() => ({ maybeSingle: mockPreCheckMaybeSingle }))
+// Last filter — either .is() or .eq() — both terminate in maybySingle
+const mockPreCheckLastFilter = jest.fn(() => ({ maybeSingle: mockPreCheckMaybeSingle }))
+// Second eq (match_id): exposes .eq() for per-quiniela AND .is() for shared
+const mockPreCheckEq2 = jest.fn(() => ({
+  eq: mockPreCheckLastFilter,
+  is: mockPreCheckLastFilter,
+  maybeSingle: mockPreCheckMaybeSingle,
+}))
 const mockPreCheckEq1 = jest.fn(() => ({ eq: mockPreCheckEq2 }))
 
 // Schema-check select: .select('id').limit(0)
@@ -91,6 +100,7 @@ const DB_ROW = {
   id: 'result-uuid',
   user_id: 'user-uuid',
   match_id: 'match-uuid',
+  quiniela_id: null,
   home_score: 2,
   away_score: 1,
   locked_at: null,
@@ -103,6 +113,7 @@ const DB_ROW_2 = {
   id: 'result-uuid-2',
   user_id: 'user-uuid',
   match_id: 'match-uuid-2',
+  quiniela_id: null,
   home_score: 0,
   away_score: 0,
   locked_at: null,
@@ -332,6 +343,7 @@ describe('ExpectedResultsRepository – findByUserId', () => {
       id: 'result-uuid',
       userId: 'user-uuid',
       matchId: 'match-uuid',
+      quinielaId: null,
       homeScore: 2,
       awayScore: 1,
       lockedAt: null,
@@ -343,6 +355,7 @@ describe('ExpectedResultsRepository – findByUserId', () => {
       id: 'result-uuid-2',
       userId: 'user-uuid',
       matchId: 'match-uuid-2',
+      quinielaId: null,
       homeScore: 0,
       awayScore: 0,
       lockedAt: null,

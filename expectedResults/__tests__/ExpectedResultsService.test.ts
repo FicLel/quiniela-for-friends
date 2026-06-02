@@ -19,6 +19,7 @@ function makeExpectedResult(overrides: Partial<ExpectedResult> = {}): ExpectedRe
     id: 'result-uuid',
     userId: 'user-uuid',
     matchId: 'match-uuid',
+    quinielaId: null,
     homeScore: 2,
     awayScore: 1,
     lockedAt: null,
@@ -49,6 +50,7 @@ function makeExpectedResultsRepository(
     findByUserId: jest.fn().mockResolvedValue([]),
     deleteByUserId: jest.fn().mockResolvedValue(undefined),
     findByMatchId: jest.fn().mockResolvedValue([]),
+    findByUserIdAndQuiniela: jest.fn().mockResolvedValue([]),
     ...overrides,
   } as unknown as IExpectedResultsRepository
 }
@@ -329,6 +331,92 @@ describe('ExpectedResultsService.upsertExpectedResult', () => {
 
     await service.upsertExpectedResult(USER_ID, MATCH_ID, 2, 1)
 
+    expect(repo.upsert).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// ExpectedResultsService.upsertExpectedResult — quinielaId (per-quiniela mode)
+// ---------------------------------------------------------------------------
+
+describe('ExpectedResultsService.upsertExpectedResult — with quinielaId', () => {
+  const USER_ID = 'user-uuid'
+  const MATCH_ID = 'match-uuid'
+  const QUINIELA_ID = 'quiniela-uuid'
+
+  it('passes quinielaId through to repository.upsert when provided', async () => {
+    const membershipsRepo = makeMembershipsRepository({
+      countByUser: jest.fn().mockResolvedValue(1),
+    })
+    const repo = makeExpectedResultsRepository({
+      upsert: jest.fn().mockResolvedValue(undefined),
+    })
+    const service = new ExpectedResultsService(repo, membershipsRepo)
+
+    const result = await service.upsertExpectedResult(USER_ID, MATCH_ID, 2, 1, QUINIELA_ID)
+
+    expect(result).toEqual({ success: true })
+    expect(repo.upsert).toHaveBeenCalledWith({
+      userId: USER_ID,
+      matchId: MATCH_ID,
+      homeScore: 2,
+      awayScore: 1,
+      quinielaId: QUINIELA_ID,
+    })
+  })
+
+  it('passes null quinielaId through to repository.upsert (shared mode explicit null)', async () => {
+    const membershipsRepo = makeMembershipsRepository({
+      countByUser: jest.fn().mockResolvedValue(1),
+    })
+    const repo = makeExpectedResultsRepository({
+      upsert: jest.fn().mockResolvedValue(undefined),
+    })
+    const service = new ExpectedResultsService(repo, membershipsRepo)
+
+    const result = await service.upsertExpectedResult(USER_ID, MATCH_ID, 0, 0, null)
+
+    expect(result).toEqual({ success: true })
+    expect(repo.upsert).toHaveBeenCalledWith({
+      userId: USER_ID,
+      matchId: MATCH_ID,
+      homeScore: 0,
+      awayScore: 0,
+      quinielaId: null,
+    })
+  })
+
+  it('is backwards-compatible: no quinielaId arg still works (undefined)', async () => {
+    const membershipsRepo = makeMembershipsRepository({
+      countByUser: jest.fn().mockResolvedValue(1),
+    })
+    const repo = makeExpectedResultsRepository({
+      upsert: jest.fn().mockResolvedValue(undefined),
+    })
+    const service = new ExpectedResultsService(repo, membershipsRepo)
+
+    const result = await service.upsertExpectedResult(USER_ID, MATCH_ID, 1, 0)
+
+    expect(result).toEqual({ success: true })
+    expect(repo.upsert).toHaveBeenCalledWith({
+      userId: USER_ID,
+      matchId: MATCH_ID,
+      homeScore: 1,
+      awayScore: 0,
+      quinielaId: undefined,
+    })
+  })
+
+  it('still returns NOT_APPROVED when quinielaId is provided but user is not approved', async () => {
+    const membershipsRepo = makeMembershipsRepository({
+      countByUser: jest.fn().mockResolvedValue(0),
+    })
+    const repo = makeExpectedResultsRepository()
+    const service = new ExpectedResultsService(repo, membershipsRepo)
+
+    const result = await service.upsertExpectedResult(USER_ID, MATCH_ID, 2, 1, QUINIELA_ID)
+
+    expect(result).toEqual({ success: false, error: 'NOT_APPROVED' })
     expect(repo.upsert).not.toHaveBeenCalled()
   })
 })

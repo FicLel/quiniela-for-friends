@@ -81,17 +81,21 @@ export class PredictionScoreRepository implements IPredictionScoreRepository {
   /**
    * Return all predictions (with their quiniela context) for a given match.
    *
-   * Strategy:
-   * - Join user_expected_results with quiniela_memberships on user_id.
-   * - Filter by match_id and approved_at IS NOT NULL.
-   * - Returns PredictionWithQuiniela[].
+   * Routing strategy based on per-quiniela mode:
+   * - Rows with quiniela_id set → score ONLY against that specific quiniela.
+   *   These are per-quiniela predictions; they do not fan out.
+   * - Rows with quiniela_id IS NULL → fan out across ALL quinielas the user
+   *   is an approved member of (existing shared-mode behaviour).
+   *
+   * Both cases require the user to have at least one approved membership
+   * (approved_at IS NOT NULL) to be included in scoring.
    *
    * Throws on Supabase error.
    */
   async findPredictionsWithQuinielas(matchId: string): Promise<PredictionWithQuiniela[]> {
     await this.verifySchema()
 
-    // user_expected_results joined with quiniela_memberships via user_id
+    // Fetch all predictions for the match, including quiniela_id and memberships
     const { data, error } = await this.supabase
       .from('user_expected_results')
       .select(`
@@ -99,6 +103,7 @@ export class PredictionScoreRepository implements IPredictionScoreRepository {
         user_id,
         home_score,
         away_score,
+        quiniela_id,
         quiniela_memberships!inner(quiniela_id, approved_at)
       `)
       .eq('match_id', matchId)
@@ -115,6 +120,7 @@ export class PredictionScoreRepository implements IPredictionScoreRepository {
       user_id: string
       home_score: number
       away_score: number
+      quiniela_id: string | null
       quiniela_memberships: { quiniela_id: string; approved_at: string | null }[]
     }
 
@@ -124,8 +130,26 @@ export class PredictionScoreRepository implements IPredictionScoreRepository {
         ? row.quiniela_memberships
         : [row.quiniela_memberships]
 
-      for (const membership of memberships) {
-        if (membership.approved_at !== null) {
+      const approvedMemberships = memberships.filter((m) => m.approved_at !== null)
+
+      if (row.quiniela_id !== null) {
+        // Per-quiniela prediction: score only against the pinned quiniela,
+        // but only if the user is actually an approved member of that quiniela.
+        const isMemberOfPinnedQuiniela = approvedMemberships.some(
+          (m) => m.quiniela_id === row.quiniela_id,
+        )
+        if (isMemberOfPinnedQuiniela) {
+          results.push({
+            predictionId: row.id,
+            userId: row.user_id,
+            homeScore: row.home_score,
+            awayScore: row.away_score,
+            quinielaId: row.quiniela_id,
+          })
+        }
+      } else {
+        // Shared prediction (quiniela_id IS NULL): fan out across all approved memberships
+        for (const membership of approvedMemberships) {
           results.push({
             predictionId: row.id,
             userId: row.user_id,

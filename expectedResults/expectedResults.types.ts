@@ -12,6 +12,8 @@ export type ExpectedResult = {
   id: string
   userId: string
   matchId: string
+  /** Present when prediction_mode is 'per_quiniela'; null for shared predictions. */
+  quinielaId: string | null
   homeScore: number
   awayScore: number
   lockedAt: Date | null
@@ -29,6 +31,8 @@ export type UpsertExpectedResultInput = {
   matchId: string
   homeScore: number
   awayScore: number
+  /** When set, the prediction is scoped to a specific quiniela (per_quiniela mode). */
+  quinielaId?: string | null
 }
 
 export type SaveExpectedResultResult =
@@ -40,7 +44,7 @@ export type SaveExpectedResultResult =
 // ---------------------------------------------------------------------------
 
 export interface IExpectedResultsRepository {
-  /** Insert or update a prediction row keyed on (user_id, match_id). */
+  /** Insert or update a prediction row keyed on (user_id, match_id) or (user_id, match_id, quiniela_id). */
   upsert(input: UpsertExpectedResultInput): Promise<void>
   /** Return all predictions for a given user. */
   findByUserId(userId: string): Promise<ExpectedResult[]>
@@ -48,6 +52,11 @@ export interface IExpectedResultsRepository {
   deleteByUserId(userId: string): Promise<void>
   /** Return all predictions for a given match. */
   findByMatchId(matchId: string): Promise<ExpectedResult[]>
+  /**
+   * Return all predictions for a given user scoped to a quiniela.
+   * Pass null as quinielaId to retrieve shared (NULL quiniela_id) predictions.
+   */
+  findByUserIdAndQuiniela(userId: string, quinielaId: string | null): Promise<ExpectedResult[]>
 }
 
 /**
@@ -68,6 +77,7 @@ export interface IExpectedResultsService {
     matchId: string,
     homeScore: number,
     awayScore: number,
+    quinielaId?: string | null,
   ): Promise<SaveExpectedResultResult>
   /** Delete all prediction rows for a given user. No-op if none exist. */
   deleteExpectedResultsForUser(userId: string): Promise<void>
