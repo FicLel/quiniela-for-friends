@@ -7,3 +7,4 @@
 - [Expected Results & Score Input Patterns](project-expected-results-patterns.md) — Repository bypass in cascade delete, leaveQuiniela missing cascade, non-serializable function prop at server-client boundary, missing Repository test
 - [Scoring & Leaderboard Patterns](project-scoring-leaderboard-patterns.md) — earnedPoints never wired in page, isMember missing approved_at filter, crowd pct false-null edge, no syncRegulationResults tests, hardcoded "Predictions closed" string
 - [Players Sync Patterns & Gap Types](project-players-sync-patterns.md) — getActiveSync swallows errors, orphan in_progress on partial failure, missing player-role 403 tests in 3 routes, save-team per-team recovery not tested
+- [Per-Quiniela Predictions Patterns](project-per-quiniela-predictions-patterns.md) — Invalid PostgREST FK join in fan-out, broken onConflict after constraint drop, page directly calls repository, unapproved quinielas in switcher
