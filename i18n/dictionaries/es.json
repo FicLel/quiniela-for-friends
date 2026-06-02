@@ -71,6 +71,17 @@
     "syncKnockoutButton": "Sincronizar equipos eliminatorios",
     "syncingKnockout": "Sincronizando…",
     "syncKnockoutSuccess": "Equipos eliminatorios actualizados ({count}).",
+    "syncPlayersButton": "Sincronizar jugadores del Mundial 2026",
+    "syncingPlayers": "Sincronizando jugadores…",
+    "syncPlayersProgress": "Equipo {current}/{total} — {players} jugadores guardados",
+    "syncPlayersSuccess": "Sincronización completada — {players} jugadores guardados.",
+    "syncPlayersErrors": {
+      "SYNC_IN_PROGRESS": "Ya hay una sincronización en progreso.",
+      "DB_ERROR": "Ocurrió un error de base de datos. Inténtalo de nuevo.",
+      "NETWORK_ERROR": "Error de red. Inténtalo de nuevo.",
+      "UNAUTHORIZED": "No tienes permiso para realizar esta acción.",
+      "UNKNOWN_ERROR": "Ocurrió un error inesperado."
+    },
     "status": {
       "FINISHED": "FINALIZADO",
       "IN_PLAY": "EN JUEGO",

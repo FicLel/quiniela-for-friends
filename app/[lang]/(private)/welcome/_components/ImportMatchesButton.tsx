@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { importWorldCupMatches, seedKnockoutPlaceholders, syncKnockoutMatches } from '../actions'
 import type { ImportMatchesResult, SeedPlaceholdersResult } from '@/competitions/competitions.types'
 import type { Dictionary } from '@/i18n/getDictionary'
+import { useSyncPlayers } from '../_hooks/useSyncPlayers'
 
 type ImportMatchesButtonProps = {
   userRole: 'admin' | 'player'
@@ -39,6 +40,7 @@ export default function ImportMatchesButton({ userRole, dict }: ImportMatchesBut
       <ImportMatchesButtonInner dict={dict} />
       <SeedPlaceholdersButtonInner dict={dict} />
       <SyncKnockoutButtonInner dict={dict} />
+      <SyncPlayersButtonInner dict={dict} />
     </div>
   )
 }
@@ -177,6 +179,55 @@ function SyncKnockoutButtonInner({ dict }: { dict: Dictionary['welcome'] }) {
       {result !== null && !result.success && (
         <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
           {dict.importErrors[result.error as ImportErrorCode] ?? dict.importErrors.UNKNOWN_ERROR}
+        </p>
+      )}
+    </div>
+  )
+}
+
+type SyncPlayersErrorCode = 'SYNC_IN_PROGRESS' | 'DB_ERROR' | 'NETWORK_ERROR' | 'UNAUTHORIZED' | 'UNKNOWN_ERROR'
+
+function SyncPlayersButtonInner({ dict }: { dict: Dictionary['welcome'] }) {
+  const { state, progress, error, start } = useSyncPlayers()
+
+  const isRunning = state === 'running'
+
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        onClick={() => void start()}
+        disabled={isRunning}
+        className="flex w-full items-center justify-center rounded-lg bg-purple-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-purple-800 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-purple-400 sm:w-auto"
+      >
+        {isRunning ? (
+          <span className="flex items-center gap-2">
+            <LoadingSpinner />
+            {dict.syncingPlayers}
+          </span>
+        ) : (
+          dict.syncPlayersButton
+        )}
+      </button>
+
+      {isRunning && progress.total > 0 && (
+        <p role="status" className="rounded-lg bg-purple-50 px-3 py-2 text-sm text-purple-700">
+          {dict.syncPlayersProgress
+            .replace('{current}', String(progress.current))
+            .replace('{total}', String(progress.total))
+            .replace('{players}', String(progress.playersUpserted))}
+        </p>
+      )}
+
+      {state === 'completed' && (
+        <p role="status" className="rounded-lg bg-purple-50 px-3 py-2 text-sm text-purple-700">
+          {dict.syncPlayersSuccess.replace('{players}', String(progress.playersUpserted))}
+        </p>
+      )}
+
+      {state === 'failed' && error !== null && (
+        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          {dict.syncPlayersErrors[error as SyncPlayersErrorCode] ??
+            dict.syncPlayersErrors.UNKNOWN_ERROR}
         </p>
       )}
     </div>

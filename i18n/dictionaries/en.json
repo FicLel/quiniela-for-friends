@@ -71,6 +71,17 @@
     "syncKnockoutButton": "Sync Knockout Teams",
     "syncingKnockout": "Syncing…",
     "syncKnockoutSuccess": "Knockout teams updated ({count}).",
+    "syncPlayersButton": "Sync WC 2026 Players",
+    "syncingPlayers": "Syncing players…",
+    "syncPlayersProgress": "Team {current}/{total} — {players} players saved",
+    "syncPlayersSuccess": "Sync complete — {players} players saved.",
+    "syncPlayersErrors": {
+      "SYNC_IN_PROGRESS": "A sync is already running.",
+      "DB_ERROR": "A database error occurred. Please try again.",
+      "NETWORK_ERROR": "Network error. Please try again.",
+      "UNAUTHORIZED": "You are not authorized to perform this action.",
+      "UNKNOWN_ERROR": "An unexpected error occurred."
+    },
     "status": {
       "FINISHED": "FINISHED",
       "IN_PLAY": "IN PLAY",
