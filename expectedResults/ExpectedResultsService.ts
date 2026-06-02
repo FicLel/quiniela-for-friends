@@ -44,6 +44,18 @@ export class ExpectedResultsService implements IExpectedResultsService {
   }
 
   /**
+   * Return all predictions for a given user scoped to a quiniela.
+   * Pass null as quinielaId to retrieve shared (NULL quiniela_id) predictions.
+   * Delegates directly to the repository — no additional business rules apply.
+   */
+  async findByUserIdAndQuiniela(
+    userId: string,
+    quinielaId: string | null,
+  ): Promise<ExpectedResult[]> {
+    return this.repository.findByUserIdAndQuiniela(userId, quinielaId)
+  }
+
+  /**
    * Delete all prediction rows for the given user.
    * No-op when the user has no predictions.
    * Delegates directly to the repository — no additional business rules apply.

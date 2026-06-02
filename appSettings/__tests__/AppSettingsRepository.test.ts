@@ -61,7 +61,11 @@ const mockSelect = jest.fn((_arg: string) => ({ limit: mockFindLimit }))
 
 const mockMembershipsMaybeSingle = jest.fn()
 const mockMembershipsLimit = jest.fn(() => ({ maybeSingle: mockMembershipsMaybeSingle }))
-const mockMembershipsOrder = jest.fn(() => ({ limit: mockMembershipsLimit }))
+// mockMembershipsOrder supports chaining multiple .order() calls by returning both order and limit
+const mockMembershipsOrder: jest.Mock = jest.fn(() => ({
+  order: mockMembershipsOrder,
+  limit: mockMembershipsLimit,
+}))
 const mockMembershipsNot = jest.fn(() => ({ order: mockMembershipsOrder }))
 const mockMembershipsSelect = jest.fn(() => ({ not: mockMembershipsNot }))
 

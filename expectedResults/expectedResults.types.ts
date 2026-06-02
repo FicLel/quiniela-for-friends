@@ -72,6 +72,11 @@ export interface IMatchKickoffReader {
 export interface IExpectedResultsService {
   isUserApproved(userId: string): Promise<boolean>
   getExpectedResultsForUser(userId: string): Promise<ExpectedResult[]>
+  /**
+   * Return all predictions for a given user scoped to a quiniela.
+   * Pass null as quinielaId to retrieve shared (NULL quiniela_id) predictions.
+   */
+  findByUserIdAndQuiniela(userId: string, quinielaId: string | null): Promise<ExpectedResult[]>
   upsertExpectedResult(
     userId: string,
     matchId: string,

@@ -90,72 +90,93 @@ export class PredictionScoreRepository implements IPredictionScoreRepository {
    * Both cases require the user to have at least one approved membership
    * (approved_at IS NOT NULL) to be included in scoring.
    *
+   * Uses two separate Supabase queries (no PostgREST join) because there is no
+   * FK between user_expected_results and quiniela_memberships:
+   *   1. Fetch all prediction rows for the match.
+   *   2. For per-quiniela rows: yield (predictionId, quiniela_id) directly.
+   *   3. For shared rows: fetch approved memberships for the user, then fan out.
+   *
    * Throws on Supabase error.
    */
   async findPredictionsWithQuinielas(matchId: string): Promise<PredictionWithQuiniela[]> {
     await this.verifySchema()
 
-    // Fetch all predictions for the match, including quiniela_id and memberships
-    const { data, error } = await this.supabase
+    // Step 1: Fetch all predictions for the match
+    const { data: predictions, error: predictionsError } = await this.supabase
       .from('user_expected_results')
-      .select(`
-        id,
-        user_id,
-        home_score,
-        away_score,
-        quiniela_id,
-        quiniela_memberships!inner(quiniela_id, approved_at)
-      `)
+      .select('id, user_id, home_score, away_score, quiniela_id')
       .eq('match_id', matchId)
-      .not('quiniela_memberships.approved_at', 'is', null)
 
-    if (error) {
-      throw new Error(`findPredictionsWithQuinielas failed: ${error.message}`)
+    if (predictionsError) {
+      throw new Error(`findPredictionsWithQuinielas failed: ${predictionsError.message}`)
     }
 
-    if (!data || data.length === 0) return []
+    if (!predictions || predictions.length === 0) return []
 
-    type Row = {
+    type PredictionRow = {
       id: string
       user_id: string
       home_score: number
       away_score: number
       quiniela_id: string | null
-      quiniela_memberships: { quiniela_id: string; approved_at: string | null }[]
     }
 
+    const rows = predictions as unknown as PredictionRow[]
+
+    // Separate per-quiniela rows (quiniela_id set) from shared rows (quiniela_id IS NULL)
+    const perQuinielaRows = rows.filter((r) => r.quiniela_id !== null)
+    const sharedRows = rows.filter((r) => r.quiniela_id === null)
+
     const results: PredictionWithQuiniela[] = []
-    for (const row of data as unknown as Row[]) {
-      const memberships = Array.isArray(row.quiniela_memberships)
-        ? row.quiniela_memberships
-        : [row.quiniela_memberships]
 
-      const approvedMemberships = memberships.filter((m) => m.approved_at !== null)
+    // Step 2: Per-quiniela predictions — yield directly, no fan-out needed
+    for (const row of perQuinielaRows) {
+      results.push({
+        predictionId: row.id,
+        userId: row.user_id,
+        homeScore: row.home_score,
+        awayScore: row.away_score,
+        quinielaId: row.quiniela_id as string,
+      })
+    }
 
-      if (row.quiniela_id !== null) {
-        // Per-quiniela prediction: score only against the pinned quiniela,
-        // but only if the user is actually an approved member of that quiniela.
-        const isMemberOfPinnedQuiniela = approvedMemberships.some(
-          (m) => m.quiniela_id === row.quiniela_id,
-        )
-        if (isMemberOfPinnedQuiniela) {
+    // Step 3: Shared predictions — fan out across all approved memberships for each user
+    if (sharedRows.length > 0) {
+      // Collect distinct user IDs among shared predictions
+      const userIds = Array.from(new Set(sharedRows.map((r) => r.user_id)))
+
+      // Fetch all approved memberships for these users in one query
+      const { data: memberships, error: membershipsError } = await this.supabase
+        .from('quiniela_memberships')
+        .select('user_id, quiniela_id')
+        .in('user_id', userIds)
+        .not('approved_at', 'is', null)
+
+      if (membershipsError) {
+        throw new Error(`findPredictionsWithQuinielas memberships fetch failed: ${membershipsError.message}`)
+      }
+
+      type MembershipRow = { user_id: string; quiniela_id: string }
+      const membershipRows = (memberships ?? []) as unknown as MembershipRow[]
+
+      // Build a map: userId → quiniela_id[]
+      const userQuinielaMap = new Map<string, string[]>()
+      for (const m of membershipRows) {
+        const existing = userQuinielaMap.get(m.user_id) ?? []
+        existing.push(m.quiniela_id)
+        userQuinielaMap.set(m.user_id, existing)
+      }
+
+      // Fan out each shared prediction across the user's approved quinielas
+      for (const row of sharedRows) {
+        const quinielaIds = userQuinielaMap.get(row.user_id) ?? []
+        for (const quinielaId of quinielaIds) {
           results.push({
             predictionId: row.id,
             userId: row.user_id,
             homeScore: row.home_score,
             awayScore: row.away_score,
-            quinielaId: row.quiniela_id,
-          })
-        }
-      } else {
-        // Shared prediction (quiniela_id IS NULL): fan out across all approved memberships
-        for (const membership of approvedMemberships) {
-          results.push({
-            predictionId: row.id,
-            userId: row.user_id,
-            homeScore: row.home_score,
-            awayScore: row.away_score,
-            quinielaId: membership.quiniela_id,
+            quinielaId,
           })
         }
       }

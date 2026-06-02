@@ -91,8 +91,9 @@ export class QuinielasRepository implements IQuinielasRepository {
     await this.verifySchema()
     const { data, error } = await this.supabase
       .from('quinielas')
-      .select('*, quiniela_memberships!inner(user_id)')
+      .select('*, quiniela_memberships!inner(user_id, approved_at)')
       .eq('quiniela_memberships.user_id', userId)
+      .not('quiniela_memberships.approved_at', 'is', null)
 
     if (error) throw new Error(`findAllForUser failed: ${error.message}`)
     if (!data) return []

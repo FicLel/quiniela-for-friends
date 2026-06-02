@@ -109,7 +109,7 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
     // In per_quiniela mode, fetch only predictions for the active quiniela
     userId
       ? predictionMode === 'per_quiniela' && activeQuinielaId !== undefined
-        ? new ExpectedResultsRepository().findByUserIdAndQuiniela(userId, activeQuinielaId)
+        ? expectedResultsService.findByUserIdAndQuiniela(userId, activeQuinielaId)
         : expectedResultsService.getExpectedResultsForUser(userId)
       : Promise.resolve([]),
   ])

@@ -3,26 +3,35 @@
  *
  * @supabase/supabase-js is mocked at the module level.
  * Tests cover all public methods: upsert (insert + update idempotency),
- * findByUserId (found / empty), findByMatchId, and deleteByUserId (delete / no-op).
- * Follows the same mock-chain pattern as CompetitionsRepository.test.ts and
- * UsersRepository.test.ts.
+ * findByUserId (found / empty), findByMatchId, deleteByUserId,
+ * and findByUserIdAndQuiniela (null quiniela_id / specific quiniela_id).
  *
  * Call chains on the `user_expected_results` table:
  *
  *   1. Schema-check:
  *        from('user_expected_results').select('id').limit(0) → { error }
  *
- *   2. upsert (select check):
- *        from('user_expected_results').select('id, submitted_at').eq(...).eq(...).maybeSingle() → { data, error }
+ *   2. upsert (pre-check):
+ *        from('user_expected_results').select('id, submitted_at').eq(...).eq(...).is()/eq().maybeSingle()
+ *        → { data, error }
  *
- *   3. upsert (write):
- *        from('user_expected_results').upsert({...}, { onConflict: 'user_id,match_id' }) → { error }
+ *   3. upsert (insert — new row):
+ *        from('user_expected_results').insert({...}) → { error }
  *
- *   4. findByUserId:
+ *   4. upsert (update — existing row):
+ *        from('user_expected_results').update({...}).eq('id', existingId) → { error }
+ *
+ *   5. findByUserId:
  *        from('user_expected_results').select('*').eq('user_id', userId) → { data, error }
  *
- *   5. deleteByUserId:
+ *   6. findByMatchId:
+ *        from('user_expected_results').select('*').eq('match_id', matchId) → { data, error }
+ *
+ *   7. deleteByUserId:
  *        from('user_expected_results').delete().eq('user_id', userId) → { error }
+ *
+ *   8. findByUserIdAndQuiniela:
+ *        from('user_expected_results').select('*').eq('user_id', userId).eq/is('quiniela_id', ...) → { data, error }
  */
 
 import { ExpectedResultsRepository } from '../ExpectedResultsRepository'
@@ -34,11 +43,13 @@ import { ExpectedResultsRepository } from '../ExpectedResultsRepository'
 // Schema-check terminator: limit(0) → Promise<{ error }>
 const mockSchemaLimit = jest.fn()
 
-// upsert write terminator: .upsert(rows, opts) → Promise<{ error }>
-const mockUpsert = jest.fn()
+// INSERT terminator: .insert(row) → Promise<{ error }>
+const mockInsert = jest.fn()
 
-// findByUserId chain: .select('*').eq('user_id', id) → Promise<{ data, error }>
-const mockFindEq = jest.fn()
+// UPDATE chain:
+//   .update(payload).eq('id', existingId) → Promise<{ error }>
+const mockUpdateEq = jest.fn()
+const mockUpdate = jest.fn(() => ({ eq: mockUpdateEq }))
 
 // deleteByUserId chain: .delete().eq('user_id', id) → Promise<{ error }>
 const mockDeleteEq = jest.fn()
@@ -48,9 +59,7 @@ const mockDelete = jest.fn(() => ({ eq: mockDeleteEq }))
 //   shared:   .select('id, submitted_at').eq(user_id).eq(match_id).is('quiniela_id', null).maybeSingle()
 //   per-quin: .select('id, submitted_at').eq(user_id).eq(match_id).eq('quiniela_id', id).maybeSingle()
 const mockPreCheckMaybeSingle = jest.fn()
-// Last filter — either .is() or .eq() — both terminate in maybySingle
 const mockPreCheckLastFilter = jest.fn(() => ({ maybeSingle: mockPreCheckMaybeSingle }))
-// Second eq (match_id): exposes .eq() for per-quiniela AND .is() for shared
 const mockPreCheckEq2 = jest.fn(() => ({
   eq: mockPreCheckLastFilter,
   is: mockPreCheckLastFilter,
@@ -58,18 +67,41 @@ const mockPreCheckEq2 = jest.fn(() => ({
 }))
 const mockPreCheckEq1 = jest.fn(() => ({ eq: mockPreCheckEq2 }))
 
+// ----------------------------------------------------------------------------
+// findByUserId, findByMatchId, findByUserIdAndQuiniela share the select('*') path.
+//
+// findByUserId / findByMatchId:
+//   select('*').eq('<col>', value)  — result is awaited directly
+//
+// findByUserIdAndQuiniela:
+//   select('*').eq('user_id', id) → query object with .eq / .is
+//              .eq/is('quiniela_id', ...) — result is awaited
+//
+// Strategy: select('*') returns { eq: mockDataEq }.
+//   mockDataEq always returns a thenable object { data, error } AND
+//   also exposes .eq and .is methods that point to mockDataQuinielaFilter.
+//   mockDataQuinielaFilter returns the actual awaitable result.
+//
+// For findByUserId/findByMatchId: await mockDataEq('col', val) → {data, error}
+// For findByUserIdAndQuiniela:
+//   mockDataEq('user_id', id) returns { eq: mockDataQuinielaFilter, is: mockDataQuinielaFilter }
+//   then await mockDataQuinielaFilter('quiniela_id', val) → {data, error}
+// ----------------------------------------------------------------------------
+
+const mockDataQuinielaFilter = jest.fn() // terminal for findByUserIdAndQuiniela
+
+// mockDataEq is called for the FIRST .eq() after select('*')
+// It must resolve as {data, error} for findByUserId/findByMatchId
+// AND return chain-able { eq, is } for findByUserIdAndQuiniela.
+// We'll use a factory function that returns a resolved-promise-like object with .eq/.is.
+const mockDataEq = jest.fn()
+
 // Schema-check select: .select('id').limit(0)
 const mockSchemaSelectLimit = jest.fn((n: number) => {
   if (n === 0) return mockSchemaLimit()
   return Promise.resolve({ data: null, error: null })
 })
 
-/**
- * Combined select: routes on argument
- *   'id'              → schema-check path
- *   'id, submitted_at' → upsert pre-check path
- *   '*'               → findByUserId path
- */
 const mockSelect = jest.fn((arg: string) => {
   if (arg === 'id') {
     return { limit: mockSchemaSelectLimit }
@@ -77,14 +109,14 @@ const mockSelect = jest.fn((arg: string) => {
   if (arg === 'id, submitted_at') {
     return { eq: mockPreCheckEq1 }
   }
-  // '*' → data path (findByUserId / findByMatchId)
-  return { eq: mockFindEq }
+  // '*' → data path
+  return { eq: mockDataEq }
 })
 
-// Router
 const mockFrom = jest.fn(() => ({
   select: mockSelect,
-  upsert: mockUpsert,
+  insert: mockInsert,
+  update: mockUpdate,
   delete: mockDelete,
 }))
 
@@ -122,9 +154,12 @@ const DB_ROW_2 = {
   updated_at: '2026-06-01T00:00:00Z',
 }
 
-/**
- * Set env vars, prime the schema-check mock, and return a new repo instance.
- */
+const DB_ROW_QUINIELA = {
+  ...DB_ROW,
+  id: 'result-uuid-q',
+  quiniela_id: 'quiniela-uuid',
+}
+
 function makeRepo(schemaExists = true) {
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
@@ -136,7 +171,6 @@ function makeRepo(schemaExists = true) {
   return new ExpectedResultsRepository()
 }
 
-/** Set env vars without priming any schema mock. */
 function setEnvVars() {
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
@@ -182,7 +216,7 @@ describe('ExpectedResultsRepository – verifySchema', () => {
   it('proceeds normally when the user_expected_results table exists', async () => {
     setEnvVars()
     mockSchemaLimit.mockResolvedValueOnce({ error: null })
-    mockFindEq.mockResolvedValueOnce({ data: [], error: null })
+    mockDataEq.mockResolvedValueOnce({ data: [], error: null })
 
     const repo = new ExpectedResultsRepository()
     const result = await repo.findByUserId('user-uuid')
@@ -202,7 +236,7 @@ describe('ExpectedResultsRepository – verifySchema', () => {
   it('calls the schema check only once across multiple method calls on the same instance', async () => {
     setEnvVars()
     mockSchemaLimit.mockResolvedValueOnce({ error: null })
-    mockFindEq
+    mockDataEq
       .mockResolvedValueOnce({ data: [], error: null })
       .mockResolvedValueOnce({ data: [], error: null })
 
@@ -220,11 +254,10 @@ describe('ExpectedResultsRepository – verifySchema', () => {
 // ---------------------------------------------------------------------------
 
 describe('ExpectedResultsRepository – upsert (insert)', () => {
-  it('calls upsert with correct snake_case payload including submitted_at when inserting', async () => {
+  it('calls insert with correct snake_case payload including submitted_at when inserting', async () => {
     const repo = makeRepo()
-    // Pre-check: no existing row
     mockPreCheckMaybeSingle.mockResolvedValueOnce({ data: null, error: null })
-    mockUpsert.mockResolvedValueOnce({ error: null })
+    mockInsert.mockResolvedValueOnce({ error: null })
 
     await repo.upsert({
       userId: 'user-uuid',
@@ -233,7 +266,7 @@ describe('ExpectedResultsRepository – upsert (insert)', () => {
       awayScore: 1,
     })
 
-    expect(mockUpsert).toHaveBeenCalledWith(
+    expect(mockInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         user_id: 'user-uuid',
         match_id: 'match-uuid',
@@ -241,24 +274,23 @@ describe('ExpectedResultsRepository – upsert (insert)', () => {
         away_score: 1,
         submitted_at: expect.any(String),
       }),
-      { onConflict: 'user_id,match_id' },
     )
   })
 
   it('resolves without error on a successful insert', async () => {
     const repo = makeRepo()
     mockPreCheckMaybeSingle.mockResolvedValueOnce({ data: null, error: null })
-    mockUpsert.mockResolvedValueOnce({ error: null })
+    mockInsert.mockResolvedValueOnce({ error: null })
 
     await expect(
       repo.upsert({ userId: 'user-uuid', matchId: 'match-uuid', homeScore: 3, awayScore: 0 }),
     ).resolves.toBeUndefined()
   })
 
-  it('throws "upsert expected result failed: <msg>" on Supabase error', async () => {
+  it('throws "upsert expected result failed: <msg>" on Supabase error during insert', async () => {
     const repo = makeRepo()
     mockPreCheckMaybeSingle.mockResolvedValueOnce({ data: null, error: null })
-    mockUpsert.mockResolvedValueOnce({ error: { message: 'unique constraint' } })
+    mockInsert.mockResolvedValueOnce({ error: { message: 'unique constraint' } })
 
     await expect(
       repo.upsert({ userId: 'user-uuid', matchId: 'match-uuid', homeScore: 1, awayScore: 1 }),
@@ -273,12 +305,11 @@ describe('ExpectedResultsRepository – upsert (insert)', () => {
 describe('ExpectedResultsRepository – upsert (update / idempotent)', () => {
   it('does NOT include submitted_at when updating an existing row', async () => {
     const repo = makeRepo()
-    // Pre-check: existing row found
     mockPreCheckMaybeSingle.mockResolvedValueOnce({
       data: { id: 'existing-uuid', submitted_at: '2026-01-01T00:00:00Z' },
       error: null,
     })
-    mockUpsert.mockResolvedValueOnce({ error: null })
+    mockUpdateEq.mockResolvedValueOnce({ error: null })
 
     await repo.upsert({
       userId: 'user-uuid',
@@ -287,54 +318,90 @@ describe('ExpectedResultsRepository – upsert (update / idempotent)', () => {
       awayScore: 2,
     })
 
-    const calledRow = (mockUpsert as jest.Mock).mock.calls[0][0] as Record<string, unknown>
-    expect(calledRow.submitted_at).toBeUndefined()
+    const updatePayload = (mockUpdate as jest.Mock).mock.calls[0][0] as Record<string, unknown>
+    expect(updatePayload.submitted_at).toBeUndefined()
+  })
+
+  it('calls update with the existing row id when a pre-existing row is found', async () => {
+    const repo = makeRepo()
+    mockPreCheckMaybeSingle.mockResolvedValueOnce({
+      data: { id: 'existing-uuid', submitted_at: '2026-01-01T00:00:00Z' },
+      error: null,
+    })
+    mockUpdateEq.mockResolvedValueOnce({ error: null })
+
+    await repo.upsert({
+      userId: 'user-uuid',
+      matchId: 'match-uuid',
+      homeScore: 3,
+      awayScore: 2,
+    })
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ home_score: 3, away_score: 2 }),
+    )
+    expect(mockUpdateEq).toHaveBeenCalledWith('id', 'existing-uuid')
   })
 
   it('is idempotent: calling upsert twice with the same key produces no error', async () => {
     const repo = makeRepo()
     // First call: insert (no existing row)
     mockPreCheckMaybeSingle.mockResolvedValueOnce({ data: null, error: null })
-    mockUpsert.mockResolvedValueOnce({ error: null })
+    mockInsert.mockResolvedValueOnce({ error: null })
     // Second call: update (existing row)
     mockPreCheckMaybeSingle.mockResolvedValueOnce({
       data: { id: 'existing-uuid', submitted_at: '2026-01-01T00:00:00Z' },
       error: null,
     })
-    mockUpsert.mockResolvedValueOnce({ error: null })
+    mockUpdateEq.mockResolvedValueOnce({ error: null })
 
     await repo.upsert({ userId: 'user-uuid', matchId: 'match-uuid', homeScore: 2, awayScore: 1 })
     await repo.upsert({ userId: 'user-uuid', matchId: 'match-uuid', homeScore: 3, awayScore: 2 })
 
-    expect(mockUpsert).toHaveBeenCalledTimes(2)
-    expect(mockUpsert).toHaveBeenLastCalledWith(
-      expect.objectContaining({ user_id: 'user-uuid', match_id: 'match-uuid', home_score: 3, away_score: 2 }),
-      { onConflict: 'user_id,match_id' },
+    expect(mockInsert).toHaveBeenCalledTimes(1)
+    expect(mockUpdate).toHaveBeenCalledTimes(1)
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ home_score: 3, away_score: 2 }),
     )
   })
 
   it('passes scores of 0,0 correctly (valid edge case)', async () => {
     const repo = makeRepo()
     mockPreCheckMaybeSingle.mockResolvedValueOnce({ data: null, error: null })
-    mockUpsert.mockResolvedValueOnce({ error: null })
+    mockInsert.mockResolvedValueOnce({ error: null })
 
     await repo.upsert({ userId: 'user-uuid', matchId: 'match-uuid', homeScore: 0, awayScore: 0 })
 
-    expect(mockUpsert).toHaveBeenCalledWith(
+    expect(mockInsert).toHaveBeenCalledWith(
       expect.objectContaining({ home_score: 0, away_score: 0 }),
-      expect.any(Object),
     )
+  })
+
+  it('throws "upsert expected result failed: <msg>" on Supabase error during update', async () => {
+    const repo = makeRepo()
+    mockPreCheckMaybeSingle.mockResolvedValueOnce({
+      data: { id: 'existing-uuid', submitted_at: '2026-01-01T00:00:00Z' },
+      error: null,
+    })
+    mockUpdateEq.mockResolvedValueOnce({ error: { message: 'update constraint' } })
+
+    await expect(
+      repo.upsert({ userId: 'user-uuid', matchId: 'match-uuid', homeScore: 1, awayScore: 1 }),
+    ).rejects.toThrow('upsert expected result failed: update constraint')
   })
 })
 
 // ---------------------------------------------------------------------------
 // findByUserId
+//
+// Chain: select('*').eq('user_id', userId) → awaited as { data, error }
+// mockDataEq is called with ('user_id', userId) and resolves as { data, error }
 // ---------------------------------------------------------------------------
 
 describe('ExpectedResultsRepository – findByUserId', () => {
   it('returns mapped ExpectedResult objects for a user with results', async () => {
     const repo = makeRepo()
-    mockFindEq.mockResolvedValueOnce({ data: [DB_ROW, DB_ROW_2], error: null })
+    mockDataEq.mockResolvedValueOnce({ data: [DB_ROW, DB_ROW_2], error: null })
 
     const results = await repo.findByUserId('user-uuid')
 
@@ -367,7 +434,7 @@ describe('ExpectedResultsRepository – findByUserId', () => {
 
   it('returns [] when the user has no results (empty array)', async () => {
     const repo = makeRepo()
-    mockFindEq.mockResolvedValueOnce({ data: [], error: null })
+    mockDataEq.mockResolvedValueOnce({ data: [], error: null })
 
     const results = await repo.findByUserId('user-no-results')
 
@@ -376,7 +443,7 @@ describe('ExpectedResultsRepository – findByUserId', () => {
 
   it('returns [] when data is null', async () => {
     const repo = makeRepo()
-    mockFindEq.mockResolvedValueOnce({ data: null, error: null })
+    mockDataEq.mockResolvedValueOnce({ data: null, error: null })
 
     const results = await repo.findByUserId('user-no-results')
 
@@ -385,16 +452,16 @@ describe('ExpectedResultsRepository – findByUserId', () => {
 
   it('queries by user_id column', async () => {
     const repo = makeRepo()
-    mockFindEq.mockResolvedValueOnce({ data: [], error: null })
+    mockDataEq.mockResolvedValueOnce({ data: [], error: null })
 
     await repo.findByUserId('user-uuid')
 
-    expect(mockFindEq).toHaveBeenCalledWith('user_id', 'user-uuid')
+    expect(mockDataEq).toHaveBeenCalledWith('user_id', 'user-uuid')
   })
 
   it('throws "findByUserId failed: <msg>" on Supabase error', async () => {
     const repo = makeRepo()
-    mockFindEq.mockResolvedValueOnce({ error: { message: 'permission denied' } })
+    mockDataEq.mockResolvedValueOnce({ error: { message: 'permission denied' } })
 
     await expect(repo.findByUserId('user-uuid')).rejects.toThrow(
       'findByUserId failed: permission denied',
@@ -404,12 +471,14 @@ describe('ExpectedResultsRepository – findByUserId', () => {
 
 // ---------------------------------------------------------------------------
 // findByMatchId
+//
+// Chain: select('*').eq('match_id', matchId) → awaited as { data, error }
 // ---------------------------------------------------------------------------
 
 describe('ExpectedResultsRepository – findByMatchId', () => {
   it('returns mapped ExpectedResult objects for a match', async () => {
     const repo = makeRepo()
-    mockFindEq.mockResolvedValueOnce({ data: [DB_ROW], error: null })
+    mockDataEq.mockResolvedValueOnce({ data: [DB_ROW], error: null })
 
     const results = await repo.findByMatchId('match-uuid')
 
@@ -420,12 +489,12 @@ describe('ExpectedResultsRepository – findByMatchId', () => {
       homeScore: 2,
       awayScore: 1,
     })
-    expect(mockFindEq).toHaveBeenCalledWith('match_id', 'match-uuid')
+    expect(mockDataEq).toHaveBeenCalledWith('match_id', 'match-uuid')
   })
 
   it('returns [] when no results for the match', async () => {
     const repo = makeRepo()
-    mockFindEq.mockResolvedValueOnce({ data: [], error: null })
+    mockDataEq.mockResolvedValueOnce({ data: [], error: null })
 
     const results = await repo.findByMatchId('match-no-results')
 
@@ -434,7 +503,7 @@ describe('ExpectedResultsRepository – findByMatchId', () => {
 
   it('throws "findByMatchId failed: <msg>" on Supabase error', async () => {
     const repo = makeRepo()
-    mockFindEq.mockResolvedValueOnce({ error: { message: 'permission denied' } })
+    mockDataEq.mockResolvedValueOnce({ error: { message: 'permission denied' } })
 
     await expect(repo.findByMatchId('match-uuid')).rejects.toThrow(
       'findByMatchId failed: permission denied',
@@ -465,8 +534,6 @@ describe('ExpectedResultsRepository – deleteByUserId', () => {
   })
 
   it('is a no-op (resolves without error) when the user has no rows', async () => {
-    // Supabase DELETE with no matching rows returns { error: null } — the
-    // repository should treat this the same as a successful delete.
     const repo = makeRepo()
     mockDeleteEq.mockResolvedValueOnce({ error: null })
 
@@ -480,5 +547,143 @@ describe('ExpectedResultsRepository – deleteByUserId', () => {
     await expect(repo.deleteByUserId('user-uuid')).rejects.toThrow(
       'deleteByUserId failed: permission denied',
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// findByUserIdAndQuiniela
+//
+// Chain: select('*').eq('user_id', userId) → returns chain object
+//        .eq('quiniela_id', id)  OR  .is('quiniela_id', null)
+//        → awaited as { data, error }
+//
+// mockDataEq('user_id', userId) must return { eq, is } for the second filter.
+// mockDataQuinielaFilter is then called as the final terminator.
+// ---------------------------------------------------------------------------
+
+describe('ExpectedResultsRepository – findByUserIdAndQuiniela', () => {
+  describe('with quinielaId = null (shared predictions)', () => {
+    it('filters quiniela_id IS NULL when quinielaId is null', async () => {
+      const repo = makeRepo()
+      mockDataEq.mockReturnValueOnce({
+        eq: mockDataQuinielaFilter,
+        is: mockDataQuinielaFilter,
+      })
+      mockDataQuinielaFilter.mockResolvedValueOnce({ data: [DB_ROW], error: null })
+
+      await repo.findByUserIdAndQuiniela('user-uuid', null)
+
+      expect(mockDataEq).toHaveBeenCalledWith('user_id', 'user-uuid')
+      // null quinielaId → .is('quiniela_id', null)
+      expect(mockDataQuinielaFilter).toHaveBeenCalledWith('quiniela_id', null)
+    })
+
+    it('returns mapped results for shared predictions', async () => {
+      const repo = makeRepo()
+      mockDataEq.mockReturnValueOnce({
+        eq: mockDataQuinielaFilter,
+        is: mockDataQuinielaFilter,
+      })
+      mockDataQuinielaFilter.mockResolvedValueOnce({ data: [DB_ROW, DB_ROW_2], error: null })
+
+      const results = await repo.findByUserIdAndQuiniela('user-uuid', null)
+
+      expect(results).toHaveLength(2)
+      expect(results[0]).toMatchObject({
+        id: 'result-uuid',
+        userId: 'user-uuid',
+        matchId: 'match-uuid',
+        quinielaId: null,
+        homeScore: 2,
+        awayScore: 1,
+      })
+    })
+
+    it('returns [] when no shared predictions exist', async () => {
+      const repo = makeRepo()
+      mockDataEq.mockReturnValueOnce({
+        eq: mockDataQuinielaFilter,
+        is: mockDataQuinielaFilter,
+      })
+      mockDataQuinielaFilter.mockResolvedValueOnce({ data: [], error: null })
+
+      const results = await repo.findByUserIdAndQuiniela('user-uuid', null)
+
+      expect(results).toEqual([])
+    })
+
+    it('throws "findByUserIdAndQuiniela failed: <msg>" on Supabase error', async () => {
+      const repo = makeRepo()
+      mockDataEq.mockReturnValueOnce({
+        eq: mockDataQuinielaFilter,
+        is: mockDataQuinielaFilter,
+      })
+      mockDataQuinielaFilter.mockResolvedValueOnce({ error: { message: 'permission denied' } })
+
+      await expect(repo.findByUserIdAndQuiniela('user-uuid', null)).rejects.toThrow(
+        'findByUserIdAndQuiniela failed: permission denied',
+      )
+    })
+  })
+
+  describe('with a specific quinielaId', () => {
+    it('filters quiniela_id = <quinielaId> when quinielaId is set', async () => {
+      const repo = makeRepo()
+      mockDataEq.mockReturnValueOnce({
+        eq: mockDataQuinielaFilter,
+        is: mockDataQuinielaFilter,
+      })
+      mockDataQuinielaFilter.mockResolvedValueOnce({ data: [DB_ROW_QUINIELA], error: null })
+
+      await repo.findByUserIdAndQuiniela('user-uuid', 'quiniela-uuid')
+
+      expect(mockDataEq).toHaveBeenCalledWith('user_id', 'user-uuid')
+      // non-null quinielaId → .eq('quiniela_id', 'quiniela-uuid')
+      expect(mockDataQuinielaFilter).toHaveBeenCalledWith('quiniela_id', 'quiniela-uuid')
+    })
+
+    it('returns mapped results for per-quiniela predictions', async () => {
+      const repo = makeRepo()
+      mockDataEq.mockReturnValueOnce({
+        eq: mockDataQuinielaFilter,
+        is: mockDataQuinielaFilter,
+      })
+      mockDataQuinielaFilter.mockResolvedValueOnce({ data: [DB_ROW_QUINIELA], error: null })
+
+      const results = await repo.findByUserIdAndQuiniela('user-uuid', 'quiniela-uuid')
+
+      expect(results).toHaveLength(1)
+      expect(results[0]).toMatchObject({
+        id: 'result-uuid-q',
+        userId: 'user-uuid',
+        quinielaId: 'quiniela-uuid',
+      })
+    })
+
+    it('returns [] when no predictions exist for that quiniela', async () => {
+      const repo = makeRepo()
+      mockDataEq.mockReturnValueOnce({
+        eq: mockDataQuinielaFilter,
+        is: mockDataQuinielaFilter,
+      })
+      mockDataQuinielaFilter.mockResolvedValueOnce({ data: [], error: null })
+
+      const results = await repo.findByUserIdAndQuiniela('user-uuid', 'quiniela-uuid')
+
+      expect(results).toEqual([])
+    })
+
+    it('throws "findByUserIdAndQuiniela failed: <msg>" on Supabase error', async () => {
+      const repo = makeRepo()
+      mockDataEq.mockReturnValueOnce({
+        eq: mockDataQuinielaFilter,
+        is: mockDataQuinielaFilter,
+      })
+      mockDataQuinielaFilter.mockResolvedValueOnce({ error: { message: 'DB error' } })
+
+      await expect(repo.findByUserIdAndQuiniela('user-uuid', 'quiniela-uuid')).rejects.toThrow(
+        'findByUserIdAndQuiniela failed: DB error',
+      )
+    })
   })
 })

@@ -99,33 +99,42 @@ export class ExpectedResultsRepository implements IExpectedResultsRepository {
 
     const isFirstInsert = !existing
 
-    const row: Record<string, unknown> = {
-      user_id: input.userId,
-      match_id: input.matchId,
-      home_score: input.homeScore,
-      away_score: input.awayScore,
-      quiniela_id: input.quinielaId ?? null,
-    }
-
+    // Use explicit INSERT or UPDATE instead of .upsert() to work around
+    // PostgREST's inability to resolve partial unique indexes via onConflict.
+    // The migration replaced the named constraint with a partial unique index
+    // (user_id, match_id WHERE quiniela_id IS NULL), which PostgREST cannot
+    // target by column name in onConflict.
     if (isFirstInsert) {
-      row.submitted_at = new Date().toISOString()
-    }
+      const row: Record<string, unknown> = {
+        user_id: input.userId,
+        match_id: input.matchId,
+        home_score: input.homeScore,
+        away_score: input.awayScore,
+        quiniela_id: input.quinielaId ?? null,
+        submitted_at: new Date().toISOString(),
+      }
 
-    // Use the appropriate conflict target based on whether quiniela_id is set.
-    // For shared rows (quiniela_id IS NULL), the partial unique index
-    // (user_id, match_id) WHERE quiniela_id IS NULL handles deduplication —
-    // Supabase upsert requires a named constraint, so we fall back to INSERT ... ON CONFLICT DO UPDATE
-    // via the composite constraint for per-quiniela rows.
-    const onConflict = hasQuiniela
-      ? 'user_id,match_id,quiniela_id'
-      : 'user_id,match_id'
+      const { error } = await this.supabase
+        .from('user_expected_results')
+        .insert(row)
 
-    const { error } = await this.supabase
-      .from('user_expected_results')
-      .upsert(row, { onConflict })
+      if (error) {
+        throw new Error(`upsert expected result failed: ${error.message}`)
+      }
+    } else {
+      const updatePayload: Record<string, unknown> = {
+        home_score: input.homeScore,
+        away_score: input.awayScore,
+      }
 
-    if (error) {
-      throw new Error(`upsert expected result failed: ${error.message}`)
+      const { error } = await this.supabase
+        .from('user_expected_results')
+        .update(updatePayload)
+        .eq('id', existing.id as string)
+
+      if (error) {
+        throw new Error(`upsert expected result failed: ${error.message}`)
+      }
     }
   }
 

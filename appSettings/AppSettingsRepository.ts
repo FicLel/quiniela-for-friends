@@ -135,9 +135,10 @@ export class AppSettingsRepository implements IAppSettingsRepository {
   async findOldestQuinielaId(): Promise<string | null> {
     const { data, error } = await this.supabase
       .from('quiniela_memberships')
-      .select('quiniela_id, quinielas!inner(created_at)')
+      .select('quiniela_id, quinielas!inner(created_at, id)')
       .not('approved_at', 'is', null)
       .order('quinielas(created_at)', { ascending: true })
+      .order('quinielas(id)', { ascending: true })
       .limit(1)
       .maybeSingle()
 
