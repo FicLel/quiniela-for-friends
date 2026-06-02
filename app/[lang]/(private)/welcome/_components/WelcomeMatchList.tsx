@@ -1,3 +1,5 @@
+'use client'
+
 import GroupAccordion from './GroupAccordion'
 import ViewToggle from './ViewToggle'
 import DateGroupedView from './DateGroupedView'
