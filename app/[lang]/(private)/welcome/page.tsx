@@ -10,9 +10,14 @@ import { MembershipsRepository } from '@/memberships/MembershipsRepository'
 import { ScoringService, calculateScore } from '@/scoring/ScoringService'
 import { PredictionScoreRepository } from '@/scoring/PredictionScoreRepository'
 import { AuthClient } from '@/auth/AuthClient'
+import { AppSettingsService } from '@/appSettings/AppSettingsService'
+import { AppSettingsRepository } from '@/appSettings/AppSettingsRepository'
+import { QuinielasService } from '@/quinielas/QuinielasService'
+import { QuinielasRepository } from '@/quinielas/QuinielasRepository'
 import ImportMatchesButton from './_components/ImportMatchesButton'
 import WelcomeMatchList from './_components/WelcomeMatchList'
 import EmptyState from './_components/EmptyState'
+import QuinielaSwitcher from './_components/QuinielaSwitcher'
 import type { MatchCardData } from './_components/MatchCard'
 import type { Locale } from '@/i18n/i18n.types'
 import { saveExpectedResult } from './actions'
@@ -64,11 +69,49 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
     new PredictionScoreRepository(),
     competitionsRepository,
   )
+  const appSettingsService = new AppSettingsService(new AppSettingsRepository())
+
+  // -------------------------------------------------------------------------
+  // Resolve prediction mode and active quiniela
+  // -------------------------------------------------------------------------
+  const settingsResult = await appSettingsService.getSettings()
+  // If settings row is missing, fall back to 'shared' (safe default)
+  const predictionMode =
+    settingsResult.success ? settingsResult.settings.predictionMode : 'shared'
+
+  // User's quinielas — needed only in per_quiniela mode but fetched in parallel
+  const userQuinielas: { id: string; name: string }[] = []
+  let activeQuinielaId: string | undefined = undefined
+
+  if (predictionMode === 'per_quiniela' && userId) {
+    const quinielasService = new QuinielasService(new QuinielasRepository())
+    const quinielasResult = await quinielasService.listQuinielasForUser(userId)
+    if (quinielasResult.success && quinielasResult.quinielas.length > 0) {
+      for (const q of quinielasResult.quinielas) {
+        userQuinielas.push({ id: q.id, name: q.name })
+      }
+    }
+
+    // Resolve active quiniela from ?quiniela=<uuid> param, falling back to first
+    const quinielaParam = resolvedSearchParams.quiniela
+    const quinielaParamStr = Array.isArray(quinielaParam) ? quinielaParam[0] : quinielaParam
+    const paramMatchesKnown =
+      quinielaParamStr !== undefined &&
+      userQuinielas.some((q) => q.id === quinielaParamStr)
+    activeQuinielaId = paramMatchesKnown
+      ? quinielaParamStr
+      : userQuinielas[0]?.id
+  }
 
   const [allMatches, isApproved, expectedResults] = await Promise.all([
     competitionsService.getAllMatches(),
     userId ? expectedResultsService.isUserApproved(userId) : Promise.resolve(false),
-    userId ? expectedResultsService.getExpectedResultsForUser(userId) : Promise.resolve([]),
+    // In per_quiniela mode, fetch only predictions for the active quiniela
+    userId
+      ? predictionMode === 'per_quiniela' && activeQuinielaId !== undefined
+        ? new ExpectedResultsRepository().findByUserIdAndQuiniela(userId, activeQuinielaId)
+        : expectedResultsService.getExpectedResultsForUser(userId)
+      : Promise.resolve([]),
   ])
 
   // Build O(1) lookup map: matchId → { homeScore, awayScore }
@@ -152,12 +195,45 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
 
   const sortedGroups = Array.from(groupMap.entries()).sort(([a], [b]) => a.localeCompare(b))
 
+  // Resolve the name of the currently selected quiniela (for display in the heading)
+  const activeQuinielaName =
+    activeQuinielaId !== undefined
+      ? userQuinielas.find((q) => q.id === activeQuinielaId)?.name
+      : undefined
+
   return (
     <main className="min-h-screen bg-green-50 px-4 py-8">
       <div className="mx-auto w-full max-w-3xl">
         <div className="mb-6 rounded-2xl bg-white p-8 shadow-lg">
           <h1 className="text-3xl font-bold text-green-900">{dict.welcome.heading}</h1>
           <p className="mt-3 text-base text-green-700">{dict.welcome.subtitle}</p>
+
+          {/* Per-quiniela mode: show switcher and active quiniela name */}
+          {predictionMode === 'per_quiniela' && (
+            <div className="mt-4">
+              {userQuinielas.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  {activeQuinielaName && (
+                    <p className="text-sm font-medium text-green-800">
+                      {activeQuinielaName}
+                    </p>
+                  )}
+                  <QuinielaSwitcher
+                    quinielas={userQuinielas}
+                    defaultId={activeQuinielaId ?? userQuinielas[0].id}
+                    dict={{
+                      label: dict.welcome.quinielaSwitcherLabel,
+                      noQuinielas: dict.welcome.quinielaSwitcherNoQuinielas,
+                    }}
+                  />
+                </div>
+              ) : (
+                <p className="text-sm text-green-700">
+                  {dict.welcome.quinielaSwitcherNoQuinielas}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {userRole === 'admin' && (
@@ -177,6 +253,7 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
             dict={dict.welcome}
             lang={locale}
             isApproved={isApproved}
+            activeQuinielaId={activeQuinielaId}
             onSaveScore={saveExpectedResult}
           />
         )}

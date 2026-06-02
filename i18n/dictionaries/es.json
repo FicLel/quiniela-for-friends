@@ -82,6 +82,9 @@
       "UNAUTHORIZED": "No tienes permiso para realizar esta acción.",
       "UNKNOWN_ERROR": "Ocurrió un error inesperado."
     },
+    "quinielaSwitcherLabel": "Viendo predicciones para",
+    "quinielaSwitcherNoQuinielas": "No eres miembro de ninguna quiniela.",
+    "predictionsClosedForQuiniela": "Las predicciones están cerradas para esta quiniela.",
     "status": {
       "FINISHED": "FINALIZADO",
       "IN_PLAY": "EN JUEGO",
@@ -91,6 +94,19 @@
       "POSTPONED": "POSPUESTO",
       "CANCELLED": "CANCELADO",
       "SUSPENDED": "SUSPENDIDO"
+    }
+  },
+  "adminSettings": {
+    "heading": "Configuración de la app",
+    "predictionModeLabel": "Modo de predicciones",
+    "predictionModeShared": "Compartido (todos los usuarios comparten un conjunto de predicciones)",
+    "predictionModePerQuiniela": "Por quiniela (cada quiniela tiene sus propias predicciones)",
+    "saveButton": "Guardar",
+    "saving": "Guardando...",
+    "saveSuccess": "Configuración actualizada.",
+    "errors": {
+      "INVALID_PAYLOAD": "Payload de configuración inválido.",
+      "UNKNOWN_ERROR": "Ocurrió un error inesperado."
     }
   },
   "changePassword": {
@@ -115,7 +131,8 @@
     "quinielas": "Quinielas",
     "users": "Usuarios",
     "leaderboard": "Marcador",
-    "selectQuiniela": "Seleccionar quiniela"
+    "selectQuiniela": "Seleccionar quiniela",
+    "settings": "Configuración"
   },
   "quinielas": {
     "heading": "Mis Quinielas",

@@ -82,6 +82,9 @@
       "UNAUTHORIZED": "You are not authorized to perform this action.",
       "UNKNOWN_ERROR": "An unexpected error occurred."
     },
+    "quinielaSwitcherLabel": "Viewing predictions for",
+    "quinielaSwitcherNoQuinielas": "You are not a member of any quiniela.",
+    "predictionsClosedForQuiniela": "Predictions are closed for this quiniela.",
     "status": {
       "FINISHED": "FINISHED",
       "IN_PLAY": "IN PLAY",
@@ -91,6 +94,19 @@
       "POSTPONED": "POSTPONED",
       "CANCELLED": "CANCELLED",
       "SUSPENDED": "SUSPENDED"
+    }
+  },
+  "adminSettings": {
+    "heading": "App Settings",
+    "predictionModeLabel": "Prediction mode",
+    "predictionModeShared": "Shared (all users share one set of predictions)",
+    "predictionModePerQuiniela": "Per-quiniela (each quiniela has its own predictions)",
+    "saveButton": "Save",
+    "saving": "Saving...",
+    "saveSuccess": "Settings updated.",
+    "errors": {
+      "INVALID_PAYLOAD": "Invalid settings payload.",
+      "UNKNOWN_ERROR": "An unexpected error occurred."
     }
   },
   "changePassword": {
@@ -115,7 +131,8 @@
     "quinielas": "Quinielas",
     "users": "Users",
     "leaderboard": "Leaderboard",
-    "selectQuiniela": "Select quiniela"
+    "selectQuiniela": "Select quiniela",
+    "settings": "Settings"
   },
   "quinielas": {
     "heading": "My Quinielas",

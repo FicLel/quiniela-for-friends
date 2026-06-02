@@ -28,11 +28,15 @@ export async function importWorldCupMatches(): Promise<ImportMatchesResult> {
  *
  * Requires an active session. If no session is found, returns NOT_APPROVED
  * (the user cannot interact with predictions without being authenticated).
+ *
+ * @param quinielaId - When provided, scopes the prediction to a specific quiniela
+ *   (per_quiniela mode). When absent, the prediction is shared across all quinielas.
  */
 export async function saveExpectedResult(
   matchId: string,
   homeScore: number,
   awayScore: number,
+  quinielaId?: string,
 ): Promise<SaveExpectedResultResult> {
   const authClient = new AuthClient()
   const token = await authClient.getTokenFromServerAction()
@@ -48,7 +52,7 @@ export async function saveExpectedResult(
     new CompetitionsRepository(),
   )
 
-  return service.upsertExpectedResult(session.sub, matchId, homeScore, awayScore)
+  return service.upsertExpectedResult(session.sub, matchId, homeScore, awayScore, quinielaId ?? null)
 }
 
 /**

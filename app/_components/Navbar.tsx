@@ -39,6 +39,14 @@ export function Navbar({ lang, dict, isAdmin = false, quinielas = [] }: NavbarPr
               {dict.users}
             </Link>
           )}
+          {isAdmin && (
+            <Link
+              href={`/${lang}/admin/settings`}
+              className="text-sm font-medium text-green-200 transition hover:text-white"
+            >
+              {dict.settings}
+            </Link>
+          )}
           <QuinielaLeaderboardNav
             lang={lang}
             quinielas={quinielas}

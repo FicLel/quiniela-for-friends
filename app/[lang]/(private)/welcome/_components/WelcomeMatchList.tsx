@@ -14,7 +14,9 @@ type WelcomeMatchListProps = {
   dict: Dictionary['welcome']
   lang: Locale
   isApproved: boolean
-  onSaveScore?: (matchId: string, home: number, away: number) => Promise<unknown>
+  /** The active quiniela id when prediction mode is per_quiniela; undefined in shared mode. */
+  activeQuinielaId?: string
+  onSaveScore?: (matchId: string, home: number, away: number, quinielaId?: string) => Promise<unknown>
 }
 
 export default function WelcomeMatchList({
@@ -25,8 +27,14 @@ export default function WelcomeMatchList({
   dict,
   lang,
   isApproved,
+  activeQuinielaId,
   onSaveScore,
 }: WelcomeMatchListProps) {
+  // Wrap the raw onSaveScore so the quinielaId is automatically forwarded
+  const saveScore = onSaveScore
+    ? (matchId: string, home: number, away: number) =>
+        onSaveScore(matchId, home, away, activeQuinielaId)
+    : undefined
   return (
     <div className="flex flex-col gap-4">
       {/* View toggle — sticky at top */}
@@ -41,7 +49,7 @@ export default function WelcomeMatchList({
           dict={dict}
           lang={lang}
           isApproved={isApproved}
-          onSaveScore={onSaveScore}
+          onSaveScore={saveScore}
         />
       ) : (
         // Group view: group stage in accordions + knockout rounds by bracket stage
@@ -55,7 +63,7 @@ export default function WelcomeMatchList({
                 dict={dict}
                 lang={lang}
                 isApproved={isApproved}
-                onSaveScore={onSaveScore}
+                onSaveScore={saveScore}
               />
             ))}
           </div>
@@ -64,7 +72,7 @@ export default function WelcomeMatchList({
             dict={dict}
             lang={lang}
             isApproved={isApproved}
-            onSaveScore={onSaveScore}
+            onSaveScore={saveScore}
           />
         </>
       )}
