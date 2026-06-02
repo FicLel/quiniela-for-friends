@@ -6,3 +6,4 @@
 - [Users Dashboard & Approval Gate Patterns](project-users-dashboard-approval-patterns.md) — quinielaId passed instead of membershipId, repository bypass in actions, stale [token] route, missing MembersClient approve tests, double DB read
 - [Expected Results & Score Input Patterns](project-expected-results-patterns.md) — Repository bypass in cascade delete, leaveQuiniela missing cascade, non-serializable function prop at server-client boundary, missing Repository test
 - [Scoring & Leaderboard Patterns](project-scoring-leaderboard-patterns.md) — earnedPoints never wired in page, isMember missing approved_at filter, crowd pct false-null edge, no syncRegulationResults tests, hardcoded "Predictions closed" string
+- [Players Sync Patterns & Gap Types](project-players-sync-patterns.md) — getActiveSync swallows errors, orphan in_progress on partial failure, missing player-role 403 tests in 3 routes, save-team per-team recovery not tested

@@ -4,3 +4,4 @@
 - [Auth module patterns](auth-module-patterns.md) — AuthClient factory methods, proxy cookie strategy, Server Action wiring, unit test mock shape.
 - [Repository patterns](repository-patterns.md) — Supabase JS client, lazy verifySchema, toX mapper, snake↔camel. No TypeORM entities.
 - [Server Action patterns](server-action-patterns.md) — 'use server', auth check, redirect placement, discriminated union returns.
+- [Import button pattern](import-button-pattern.md) — Admin action buttons are private sub-components inside ImportMatchesButton.tsx, not separate files.
