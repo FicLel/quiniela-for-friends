@@ -246,6 +246,7 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
           <EmptyState dict={dict.welcome} />
         ) : (
           <WelcomeMatchList
+            key={activeQuinielaId ?? 'shared'}
             viewMode={viewMode}
             groupStageMatches={groupStageMatches}
             knockoutMatches={knockoutMatches}
@@ -253,8 +254,7 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
             dict={dict.welcome}
             lang={locale}
             isApproved={isApproved}
-            activeQuinielaId={activeQuinielaId}
-            onSaveScore={saveExpectedResult}
+            onSaveScore={saveExpectedResult.bind(null, activeQuinielaId)}
           />
         )}
       </div>

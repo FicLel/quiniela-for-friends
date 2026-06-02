@@ -33,10 +33,10 @@ export async function importWorldCupMatches(): Promise<ImportMatchesResult> {
  *   (per_quiniela mode). When absent, the prediction is shared across all quinielas.
  */
 export async function saveExpectedResult(
+  quinielaId: string | undefined,
   matchId: string,
   homeScore: number,
   awayScore: number,
-  quinielaId?: string,
 ): Promise<SaveExpectedResultResult> {
   const authClient = new AuthClient()
   const token = await authClient.getTokenFromServerAction()

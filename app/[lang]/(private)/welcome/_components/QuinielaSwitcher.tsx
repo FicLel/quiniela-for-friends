@@ -49,12 +49,12 @@ export default function QuinielaSwitcher({
       </label>
 
       {/* Pill-style select wrapper */}
-      <div className="relative inline-block">
+      <div className="relative w-full">
         <select
           id="quiniela-switcher"
           value={selectedId}
           onChange={handleChange}
-          className="appearance-none rounded-full border border-green-300 bg-white py-1.5 pl-4 pr-8 text-sm font-semibold text-green-900 shadow-sm transition hover:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
+          className="block w-full cursor-pointer appearance-none rounded-md border border-green-300 bg-white py-1.5 pl-4 pr-8 text-sm font-semibold text-green-900 shadow-sm transition hover:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
           aria-label={`${dict.label}: ${selectedName}`}
         >
           {quinielas.map((q) => (
