@@ -36,13 +36,15 @@ export async function submitAnswer(
   questionId: string,
   answerText: string,
 ): Promise<SubmitAnswerResult> {
-  const session = await getCallerSession()
-  if (!session) {
-    return { success: false, error: 'UNAUTHORIZED' }
+  try {
+    const session = await getCallerSession()
+    if (!session) return { success: false, error: 'UNAUTHORIZED' }
+    const service = makeService()
+    return service.submitAnswer(quinielaId, questionId, session.sub, answerText)
+  } catch (err) {
+    console.error('[submitAnswer action] unhandled error:', err)
+    return { success: false, error: 'DB_ERROR' }
   }
-
-  const service = makeService()
-  return service.submitAnswer(quinielaId, questionId, session.sub, answerText)
 }
 
 /**
@@ -53,13 +55,15 @@ export async function createQuestion(
   quinielaId: string,
   input: { questionText: string; questionType: ExtraQuestionType },
 ): Promise<CreateQuestionResult> {
-  const session = await getCallerSession()
-  if (!session) {
-    return { success: false, error: 'UNAUTHORIZED' }
+  try {
+    const session = await getCallerSession()
+    if (!session) return { success: false, error: 'UNAUTHORIZED' }
+    const service = makeService()
+    return service.createQuestion(quinielaId, input, session.sub)
+  } catch (err) {
+    console.error('[createQuestion action] unhandled error:', err)
+    return { success: false, error: 'DB_ERROR' }
   }
-
-  const service = makeService()
-  return service.createQuestion(quinielaId, input, session.sub)
 }
 
 /**
@@ -71,11 +75,13 @@ export async function resolveQuestion(
   questionId: string,
   correctAnswer: string,
 ): Promise<ResolveQuestionResult> {
-  const session = await getCallerSession()
-  if (!session) {
-    return { success: false, error: 'UNAUTHORIZED' }
+  try {
+    const session = await getCallerSession()
+    if (!session) return { success: false, error: 'UNAUTHORIZED' }
+    const service = makeService()
+    return service.resolveQuestion(quinielaId, questionId, correctAnswer, session.sub)
+  } catch (err) {
+    console.error('[resolveQuestion action] unhandled error:', err)
+    return { success: false, error: 'DB_ERROR' }
   }
-
-  const service = makeService()
-  return service.resolveQuestion(quinielaId, questionId, correctAnswer, session.sub)
 }

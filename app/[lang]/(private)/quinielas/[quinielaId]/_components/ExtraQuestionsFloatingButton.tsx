@@ -18,7 +18,7 @@ export default function ExtraQuestionsFloatingButton({
   if (totalQuestions === 0) return null
 
   return (
-    <div className="fixed bottom-20 left-6 z-30">
+    <div className="fixed bottom-6 right-6 z-30">
       <Link
         href={`/${lang}/quinielas/${quinielaId}/extra-questions`}
         className="relative flex items-center gap-2 rounded-full bg-green-700 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"

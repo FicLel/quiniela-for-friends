@@ -48,7 +48,8 @@ export class ExtraQuestionsService implements IExtraQuestionsService {
       )
 
       return { success: true, questions, userAnswers }
-    } catch {
+    } catch (err) {
+      console.error('[ExtraQuestionsService] listQuestions failed:', err)
       return { success: false, error: 'UNKNOWN_ERROR' }
     }
   }
@@ -90,7 +91,8 @@ export class ExtraQuestionsService implements IExtraQuestionsService {
       })
 
       return { success: true, question }
-    } catch {
+    } catch (err) {
+      console.error('[ExtraQuestionsService] createQuestion failed:', err)
       return { success: false, error: 'DB_ERROR' }
     }
   }
@@ -137,7 +139,8 @@ export class ExtraQuestionsService implements IExtraQuestionsService {
       })
 
       return { success: true }
-    } catch {
+    } catch (err) {
+      console.error('[ExtraQuestionsService] submitAnswer failed:', err)
       return { success: false, error: 'DB_ERROR' }
     }
   }
@@ -206,9 +209,10 @@ export class ExtraQuestionsService implements IExtraQuestionsService {
       }
 
       return { success: true, membersRescored: answers.length }
-    } catch {
+    } catch (err) {
       // If already returned AUDIT_FAILED above, this won't be reached
       // Catch-all for unexpected DB errors in steps 1-7
+      console.error('[ExtraQuestionsService] resolveQuestion failed:', err)
       return { success: false, error: 'DB_ERROR' }
     }
   }

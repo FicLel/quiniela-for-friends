@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS public.extra_questions (
   status          TEXT        NOT NULL DEFAULT 'unresolved'
                               CHECK (status IN ('unresolved', 'resolved')),
   correct_answer  TEXT        NULL,
-  created_by      UUID        NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
+  created_by      UUID        NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -44,7 +44,7 @@ CREATE POLICY "extra_questions_service_role"
 CREATE TABLE IF NOT EXISTS public.extra_question_answers (
   id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   question_id   UUID        NOT NULL REFERENCES public.extra_questions(id) ON DELETE CASCADE,
-  user_id       UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id       UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   answer_text   TEXT        NOT NULL CHECK (char_length(answer_text) BETWEEN 1 AND 200),
   submitted_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -75,7 +75,7 @@ CREATE POLICY "extra_question_answers_service_role"
 CREATE TABLE IF NOT EXISTS public.extra_question_results (
   id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   question_id   UUID        NOT NULL REFERENCES public.extra_questions(id) ON DELETE CASCADE,
-  user_id       UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id       UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   quiniela_id   UUID        NOT NULL REFERENCES public.quinielas(id) ON DELETE CASCADE,
   points        SMALLINT    NOT NULL DEFAULT 0 CHECK (points IN (0, 1)),
   scored_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS public.extra_question_audit_log (
   id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   question_id       UUID        NOT NULL REFERENCES public.extra_questions(id) ON DELETE CASCADE,
   quiniela_id       UUID        NOT NULL REFERENCES public.quinielas(id) ON DELETE CASCADE,
-  changed_by        UUID        NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
+  changed_by        UUID        NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT,
   previous_answer   TEXT        NULL,
   new_answer        TEXT        NOT NULL,
   members_rescored  INTEGER     NOT NULL DEFAULT 0,

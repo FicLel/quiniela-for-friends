@@ -115,16 +115,20 @@ function CreateQuestionForm({ quinielaId, onSuccess, onCancel }: CreateQuestionF
     }
 
     startTransition(async () => {
-      const result = await createQuestion(quinielaId, { questionText: questionText.trim(), questionType })
+      try {
+        const result = await createQuestion(quinielaId, { questionText: questionText.trim(), questionType })
 
-      if (result.success) {
-        router.refresh()
-        onSuccess()
-      } else if (result.error === 'NO_COMPETITION_DATA') {
-        setError('Competition data is not available. Cannot create question.')
-      } else if (result.error === 'INVALID_INPUT') {
-        setError('Invalid input. Please check the question text.')
-      } else {
+        if (result.success) {
+          router.refresh()
+          onSuccess()
+        } else if (result.error === 'NO_COMPETITION_DATA') {
+          setError('Competition data is not available. Cannot create question.')
+        } else if (result.error === 'INVALID_INPUT') {
+          setError('Invalid input. Please check the question text.')
+        } else {
+          setError('Something went wrong. Please try again.')
+        }
+      } catch {
         setError('Something went wrong. Please try again.')
       }
     })
@@ -232,18 +236,22 @@ function AdminQuestionCard({ question, quinielaId }: AdminQuestionCardProps) {
     setResolveSuccess(false)
 
     startTransition(async () => {
-      const result = await resolveQuestion(quinielaId, question.id, correctAnswer)
+      try {
+        const result = await resolveQuestion(quinielaId, question.id, correctAnswer)
 
-      if (result.success) {
-        setResolveSuccess(true)
-        router.refresh()
-      } else if (result.error === 'AUDIT_FAILED') {
-        setError('Failed to write audit log. Please try again.')
-      } else if (result.error === 'INVALID_INPUT') {
-        setError('Please enter a valid answer.')
-      } else if (result.error === 'QUESTION_NOT_FOUND') {
-        setError('Question not found.')
-      } else {
+        if (result.success) {
+          setResolveSuccess(true)
+          router.refresh()
+        } else if (result.error === 'AUDIT_FAILED') {
+          setError('Failed to write audit log. Please try again.')
+        } else if (result.error === 'INVALID_INPUT') {
+          setError('Please enter a valid answer.')
+        } else if (result.error === 'QUESTION_NOT_FOUND') {
+          setError('Question not found.')
+        } else {
+          setError('Something went wrong. Please try again.')
+        }
+      } catch {
         setError('Something went wrong. Please try again.')
       }
     })
