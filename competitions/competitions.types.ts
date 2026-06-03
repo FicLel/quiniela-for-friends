@@ -149,6 +149,19 @@ export interface ICompetitionsRepository {
 
   /** Return the scheduled_at timestamp for the given match, or null if not found. */
   findKickoffAt(matchId: string): Promise<Date | null>
+
+  /**
+   * Return true if at least one match row exists in the matches table.
+   * Used to gate feature creation that requires competition data.
+   */
+  hasAnyMatches(): Promise<boolean>
+
+  /**
+   * Return all distinct teams from the matches table, deduplicated by externalId.
+   * Returns [] if no matches exist or all team external IDs are null.
+   * Sorted alphabetically by name.
+   */
+  findDistinctTeams(): Promise<{ name: string; externalId: number }[]>
 }
 
 export interface ICompetitionsService {

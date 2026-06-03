@@ -69,13 +69,63 @@ const mockSelect = jest.fn((arg: string) => {
 })
 
 // --------------------------------------------------------------------------
+// aggregateByQuiniela: prediction_scores complex select
+//
+//   from('prediction_scores')
+//     .select(`total_points, home_goal_point, away_goal_point, outcome_point, user_expected_results!inner(user_id)`)
+//     .eq('quiniela_id', id)
+//
+// Terminal call is .eq('quiniela_id', id).
+// --------------------------------------------------------------------------
+const mockPredictionScoresEq = jest.fn()  // terminal eq for prediction_scores aggregate
+
+// --------------------------------------------------------------------------
+// aggregateByQuiniela: extra_question_results select
+//
+//   from('extra_question_results').select('user_id, points').eq('quiniela_id', id)
+//
+// Terminal call is .eq('quiniela_id', id).
+// --------------------------------------------------------------------------
+const mockExtraResultsEq = jest.fn()  // terminal eq for extra_question_results
+
+// --------------------------------------------------------------------------
+// prediction_scores select router
+// Routes schema check vs aggregation query based on arg.
+// --------------------------------------------------------------------------
+const mockPredictionScoresSelect = jest.fn((arg: string) => {
+  if (arg === 'id') {
+    // schema check: select('id').limit(0)
+    return { limit: mockSchemaSelectLimit }
+  }
+  // aggregateByQuiniela: select(multiline join string).eq('quiniela_id', id)
+  return { eq: mockPredictionScoresEq }
+})
+
+// --------------------------------------------------------------------------
+// extra_question_results select router
+// Routes schema check vs data query.
+// --------------------------------------------------------------------------
+const mockExtraResultsSelect = jest.fn((arg: string) => {
+  if (arg === 'id') {
+    return { limit: mockSchemaSelectLimit }
+  }
+  return { eq: mockExtraResultsEq }
+})
+
+// --------------------------------------------------------------------------
 // from router: routes by table name
 // --------------------------------------------------------------------------
 const mockFrom = jest.fn((table: string) => {
   if (table === 'quiniela_memberships') {
     return { select: mockSelect }
   }
-  // prediction_scores and user_expected_results
+  if (table === 'prediction_scores') {
+    return { select: mockPredictionScoresSelect }
+  }
+  if (table === 'extra_question_results') {
+    return { select: mockExtraResultsSelect }
+  }
+  // user_expected_results and other tables
   return { select: mockSelect }
 })
 
@@ -465,6 +515,111 @@ describe('PredictionScoreRepository – findCrowdOutcomes', () => {
 
     await expect(repo.findCrowdOutcomes('match-uuid')).rejects.toThrow(
       'findCrowdOutcomes failed: permission denied',
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// aggregateByQuiniela — with extra_question_results extension
+//
+// Chain (prediction_scores):
+//   from('prediction_scores').select(...).eq('quiniela_id', id) → { data, error }
+//
+// Chain (extra_question_results):
+//   from('extra_question_results').select('user_id, points').eq('quiniela_id', id) → { data, error }
+// ---------------------------------------------------------------------------
+
+describe('PredictionScoreRepository – aggregateByQuiniela (extra points extension)', () => {
+  it('adds extra question points on top of prediction scores for existing users', async () => {
+    const repo = makeRepo()
+
+    // prediction_scores query
+    mockPredictionScoresEq.mockResolvedValueOnce({
+      data: [
+        {
+          total_points: 3,
+          home_goal_point: 1,
+          away_goal_point: 1,
+          outcome_point: 1,
+          user_expected_results: { user_id: 'user-uuid-1' },
+        },
+      ],
+      error: null,
+    })
+    // extra_question_results query
+    mockExtraResultsEq.mockResolvedValueOnce({
+      data: [{ user_id: 'user-uuid-1', points: 1 }],
+      error: null,
+    })
+
+    const results = await repo.aggregateByQuiniela('quiniela-uuid')
+
+    expect(results).toHaveLength(1)
+    expect(results[0]).toEqual(
+      expect.objectContaining({ userId: 'user-uuid-1', totalPoints: 4 }),
+    )
+  })
+
+  it('creates a new entry for users with only extra question results (no prediction scores)', async () => {
+    const repo = makeRepo()
+
+    // prediction_scores query: empty
+    mockPredictionScoresEq.mockResolvedValueOnce({ data: [], error: null })
+
+    // extra_question_results query: one extra-only user
+    mockExtraResultsEq.mockResolvedValueOnce({
+      data: [{ user_id: 'extra-only-user', points: 1 }],
+      error: null,
+    })
+
+    const results = await repo.aggregateByQuiniela('quiniela-uuid')
+
+    expect(results).toHaveLength(1)
+    expect(results[0]).toEqual({
+      userId: 'extra-only-user',
+      totalPoints: 1,
+      exactScoreHits: 0,
+      correctOutcomeHits: 0,
+      predictedMatchCount: 0,
+    })
+  })
+
+  it('does not affect users who have only prediction scores (no extra results)', async () => {
+    const repo = makeRepo()
+
+    mockPredictionScoresEq.mockResolvedValueOnce({
+      data: [
+        {
+          total_points: 2,
+          home_goal_point: 1,
+          away_goal_point: 0,
+          outcome_point: 1,
+          user_expected_results: { user_id: 'predict-only-user' },
+        },
+      ],
+      error: null,
+    })
+    // No extra question results
+    mockExtraResultsEq.mockResolvedValueOnce({ data: [], error: null })
+
+    const results = await repo.aggregateByQuiniela('quiniela-uuid')
+
+    expect(results).toHaveLength(1)
+    expect(results[0]).toEqual(
+      expect.objectContaining({ userId: 'predict-only-user', totalPoints: 2 }),
+    )
+  })
+
+  it('throws when the extra_question_results query fails', async () => {
+    const repo = makeRepo()
+
+    mockPredictionScoresEq.mockResolvedValueOnce({ data: [], error: null })
+    mockExtraResultsEq.mockResolvedValueOnce({
+      error: { message: 'permission denied on extra_question_results' },
+    })
+
+    await expect(repo.aggregateByQuiniela('quiniela-uuid')).rejects.toThrow(
+      'aggregateByQuiniela extra_question_results failed: permission denied on extra_question_results',
     )
   })
 })

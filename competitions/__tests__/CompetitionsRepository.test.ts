@@ -753,3 +753,185 @@ describe('CompetitionsRepository – updateKnockoutTeams', () => {
     expect(mockUpdate).toHaveBeenCalledTimes(1)
   })
 })
+
+// ---------------------------------------------------------------------------
+// hasAnyMatches
+//
+// Chain: from('matches').select('id', { count: 'exact', head: true }).limit(1)
+//   → { count, error }
+//
+// The select('id') call routes to { limit: mockSchemaSelectLimit }.
+// limit(0) → schema check (consumes first mockResolvedValueOnce from mockSchemaLimit).
+// limit(1) → hasAnyMatches result (second mockResolvedValueOnce from mockSchemaSelectLimit).
+//
+// We prime two values: one for limit(0) via mockSchemaLimit, one for limit(1) directly
+// via mockSchemaSelectLimit.
+// ---------------------------------------------------------------------------
+
+describe('CompetitionsRepository – hasAnyMatches', () => {
+  it('returns true when at least one match exists', async () => {
+    setEnvVars()
+    // Prime mockSchemaSelectLimit queue in order of calls:
+    //   1st call: limit(0) — schema check — delegate to mockSchemaLimit
+    //   2nd call: limit(1) — hasAnyMatches data — return { count: 48, error: null }
+    mockSchemaLimit.mockResolvedValueOnce({ error: null })
+    mockSchemaSelectLimit
+      .mockImplementationOnce(() => mockSchemaLimit())
+      .mockResolvedValueOnce({ count: 48, error: null })
+
+    const repo = new CompetitionsRepository()
+    const result = await repo.hasAnyMatches()
+
+    expect(result).toBe(true)
+  })
+
+  it('returns false when the matches table is empty (count = 0)', async () => {
+    setEnvVars()
+    mockSchemaLimit.mockResolvedValueOnce({ error: null })
+    mockSchemaSelectLimit
+      .mockImplementationOnce(() => mockSchemaLimit())
+      .mockResolvedValueOnce({ count: 0, error: null })
+
+    const repo = new CompetitionsRepository()
+    const result = await repo.hasAnyMatches()
+
+    expect(result).toBe(false)
+  })
+
+  it('returns false when count is null', async () => {
+    setEnvVars()
+    mockSchemaLimit.mockResolvedValueOnce({ error: null })
+    mockSchemaSelectLimit
+      .mockImplementationOnce(() => mockSchemaLimit())
+      .mockResolvedValueOnce({ count: null, error: null })
+
+    const repo = new CompetitionsRepository()
+    const result = await repo.hasAnyMatches()
+
+    expect(result).toBe(false)
+  })
+
+  it('throws "hasAnyMatches failed: <msg>" on Supabase error', async () => {
+    setEnvVars()
+    mockSchemaLimit.mockResolvedValueOnce({ error: null })
+    mockSchemaSelectLimit
+      .mockImplementationOnce(() => mockSchemaLimit())
+      .mockResolvedValueOnce({ count: null, error: { message: 'permission denied' } })
+
+    const repo = new CompetitionsRepository()
+    await expect(repo.hasAnyMatches()).rejects.toThrow(
+      'hasAnyMatches failed: permission denied',
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// findDistinctTeams
+//
+// Chain: from('matches').select('home_team_name, home_team_external_id, away_team_name, away_team_external_id')
+//   → { data, error }   (no further chaining after select)
+//
+// select('home_team_name, ...') → the default mock branch returns { order: mockFindOrder1 },
+// but findDistinctTeams awaits the select directly (no .order() call).
+// We need select() to return a Promise for this specific arg.
+//
+// Strategy: override mockSelect with mockImplementation for the duration of each test,
+// calling the schema check path for 'id' and returning a Promise for all other args.
+// Use afterEach to restore the default implementation.
+// ---------------------------------------------------------------------------
+
+describe('CompetitionsRepository – findDistinctTeams', () => {
+  // Dedicated terminal mock for findDistinctTeams data calls
+  const mockDistinctTeamsSelect = jest.fn()
+
+  beforeEach(() => {
+    // Override mockSelect to handle the team-columns select directly
+    mockSelect.mockImplementation((arg: string) => {
+      if (arg === 'id') return { limit: mockSchemaSelectLimit }
+      if (arg === 'bracket_slot') return { eq: mockBracketSlotEq }
+      if (arg === '*') {
+        if (useFindAllChain) return { order: mockFindAllOrder }
+        return { order: mockFindOrder1 }
+      }
+      // For any other arg (e.g. team column string): return the terminal mock
+      return mockDistinctTeamsSelect()
+    })
+  })
+
+  afterEach(() => {
+    // Restore the original mockSelect implementation after each findDistinctTeams test
+    mockSelect.mockImplementation((arg: string) => {
+      if (arg === 'id') return { limit: mockSchemaSelectLimit }
+      if (arg === 'bracket_slot') return { eq: mockBracketSlotEq }
+      if (arg === '*') {
+        if (useFindAllChain) return { order: mockFindAllOrder }
+        return { order: mockFindOrder1 }
+      }
+      return { order: mockFindOrder1 }
+    })
+  })
+
+  it('deduplicates teams by externalId and sorts alphabetically', async () => {
+    const repo = makeRepo()
+    mockDistinctTeamsSelect.mockReturnValueOnce(Promise.resolve({
+      data: [
+        { home_team_name: 'Germany', home_team_external_id: 759, away_team_name: 'Scotland', away_team_external_id: 762 },
+        { home_team_name: 'Germany', home_team_external_id: 759, away_team_name: 'Hungary', away_team_external_id: 770 },
+      ],
+      error: null,
+    }))
+
+    const teams = await repo.findDistinctTeams()
+
+    expect(teams).toHaveLength(3)
+    // Sorted alphabetically
+    expect(teams[0].name).toBe('Germany')
+    expect(teams[1].name).toBe('Hungary')
+    expect(teams[2].name).toBe('Scotland')
+  })
+
+  it('returns [] when there are no matches', async () => {
+    const repo = makeRepo()
+    mockDistinctTeamsSelect.mockReturnValueOnce(Promise.resolve({ data: [], error: null }))
+
+    const teams = await repo.findDistinctTeams()
+
+    expect(teams).toEqual([])
+  })
+
+  it('returns [] when data is null', async () => {
+    const repo = makeRepo()
+    mockDistinctTeamsSelect.mockReturnValueOnce(Promise.resolve({ data: null, error: null }))
+
+    const teams = await repo.findDistinctTeams()
+
+    expect(teams).toEqual([])
+  })
+
+  it('skips rows where team externalId is null', async () => {
+    const repo = makeRepo()
+    mockDistinctTeamsSelect.mockReturnValueOnce(Promise.resolve({
+      data: [
+        // home has null externalId → skip home; away is valid
+        { home_team_name: 'TBD', home_team_external_id: null, away_team_name: 'France', away_team_external_id: 773 },
+      ],
+      error: null,
+    }))
+
+    const teams = await repo.findDistinctTeams()
+
+    expect(teams).toHaveLength(1)
+    expect(teams[0]).toEqual({ name: 'France', externalId: 773 })
+  })
+
+  it('throws "findDistinctTeams failed: <msg>" on Supabase error', async () => {
+    const repo = makeRepo()
+    mockDistinctTeamsSelect.mockReturnValueOnce(
+      Promise.resolve({ data: null, error: { message: 'permission denied' } }),
+    )
+
+    await expect(repo.findDistinctTeams()).rejects.toThrow(
+      'findDistinctTeams failed: permission denied',
+    )
+  })
+})

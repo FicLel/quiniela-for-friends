@@ -70,6 +70,12 @@ export interface IPlayersRepository {
   getDistinctTeamExternalIds(): Promise<number[]>
 
   /**
+   * Return all players belonging to the given team external IDs, ordered by name.
+   * Returns [] immediately if teamExternalIds is empty (no DB call).
+   */
+  findByTeamExternalIds(teamExternalIds: number[]): Promise<Player[]>
+
+  /**
    * Upsert player rows keyed on provider_player_id.
    * Returns the number of rows submitted (not necessarily inserted/updated).
    */

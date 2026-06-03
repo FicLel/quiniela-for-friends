@@ -7,10 +7,12 @@ import { MembershipsRepository } from '@/memberships/MembershipsRepository'
 import { InvitationsService } from '@/invitations/InvitationsService'
 import { InvitationsRepository } from '@/invitations/InvitationsRepository'
 import { UsersRepository } from '@/users/UsersRepository'
+import { ExtraQuestionsRepository } from '@/extraQuestions/ExtraQuestionsRepository'
 import type { Locale } from '@/i18n/i18n.types'
 import type { InvitationWithStatus } from '@/invitations/invitations.types'
 import MembersClient from './_components/MembersClient'
 import PendingApprovalScreen from '@/app/[lang]/(private)/_components/PendingApprovalScreen'
+import ExtraQuestionsFloatingButton from '../_components/ExtraQuestionsFloatingButton'
 import { inviteMember, removeMember, revokeInvite, leaveQuiniela, approveMember } from './actions'
 
 type PageProps = {
@@ -77,11 +79,26 @@ export default async function MembersPage({ params }: PageProps) {
     ? approveMember.bind(null, locale, quinielaId)
     : undefined
 
+  // Extra questions floating button data
+  const extraQuestionsRepo = new ExtraQuestionsRepository()
+  const [totalQuestions, unansweredCount] = await Promise.all([
+    extraQuestionsRepo.countAll(quinielaId),
+    extraQuestionsRepo.countUnansweredOpenByUser(quinielaId, session.sub),
+  ])
+
   return (
     <main className="min-h-screen bg-green-50 px-4 py-8">
       <div className="mx-auto w-full max-w-3xl">
-        {/* Leaderboard navigation link */}
-        <div className="mb-4 flex justify-end">
+        {/* Navigation links */}
+        <div className="mb-4 flex items-center justify-end gap-2">
+          {isAdmin && (
+            <Link
+              href={`/${locale}/quinielas/${quinielaId}/admin/extra-questions`}
+              className="rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-2 text-sm font-medium text-yellow-800 shadow-sm transition hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-1"
+            >
+              Extra Questions
+            </Link>
+          )}
           <Link
             href={`/${locale}/quinielas/${quinielaId}/leaderboard`}
             className="rounded-lg border border-green-200 bg-white px-4 py-2 text-sm font-medium text-green-700 shadow-sm transition hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-1"
@@ -107,6 +124,13 @@ export default async function MembersPage({ params }: PageProps) {
           approveMemberAction={boundApproveMember}
         />
       </div>
+
+      <ExtraQuestionsFloatingButton
+        quinielaId={quinielaId}
+        lang={locale}
+        unansweredCount={unansweredCount}
+        totalQuestions={totalQuestions}
+      />
     </main>
   )
 }

@@ -281,6 +281,74 @@ export class CompetitionsRepository implements ICompetitionsRepository {
   }
 
   /**
+   * Return true if at least one match row exists in the matches table.
+   * Uses a count-head query to avoid fetching any row data.
+   * Throws on Supabase error.
+   */
+  async hasAnyMatches(): Promise<boolean> {
+    await this.verifySchema()
+
+    const { count, error } = await this.supabase
+      .from('matches')
+      .select('id', { count: 'exact', head: true })
+      .limit(1)
+
+    if (error) {
+      throw new Error(`hasAnyMatches failed: ${error.message}`)
+    }
+
+    return (count ?? 0) > 0
+  }
+
+  /**
+   * Return all distinct teams from the matches table, deduplicated by externalId.
+   * Skips rows where externalId is null.
+   * Sorted alphabetically by name.
+   * Returns [] if no matches exist.
+   * Throws on Supabase error.
+   */
+  async findDistinctTeams(): Promise<{ name: string; externalId: number }[]> {
+    await this.verifySchema()
+
+    const { data, error } = await this.supabase
+      .from('matches')
+      .select('home_team_name, home_team_external_id, away_team_name, away_team_external_id')
+
+    if (error) {
+      throw new Error(`findDistinctTeams failed: ${error.message}`)
+    }
+
+    if (!data || data.length === 0) return []
+
+    type MatchTeamRow = {
+      home_team_name: string
+      home_team_external_id: number | null
+      away_team_name: string
+      away_team_external_id: number | null
+    }
+
+    const byExternalId = new Map<number, string>()
+
+    for (const row of data as unknown as MatchTeamRow[]) {
+      if (row.home_team_external_id !== null) {
+        byExternalId.set(row.home_team_external_id, row.home_team_name)
+      }
+      if (row.away_team_external_id !== null) {
+        byExternalId.set(row.away_team_external_id, row.away_team_name)
+      }
+    }
+
+    const teams = Array.from(byExternalId.entries()).map(([externalId, name]) => ({
+      name,
+      externalId,
+    }))
+
+    teams.sort((a, b) => a.name.localeCompare(b.name))
+
+    return teams
+  }
+
+  /**
    * Update team details on knockout placeholder matches, matched positionally
    * within each stage by scheduled_at order.
    *

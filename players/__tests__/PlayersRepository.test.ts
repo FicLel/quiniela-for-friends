@@ -60,15 +60,29 @@ const mockActiveSyncEq = jest.fn(() => ({ gte: mockActiveSyncGte }))
 // rpc
 const mockRpc = jest.fn()
 
+// findByTeamExternalIds: .select('*').in('team_external_id', ids).order('name')
+const mockFindByTeamOrder = jest.fn()  // terminal: .order('name') → Promise<{data, error}>
+const mockFindByTeamIn = jest.fn(() => ({ order: mockFindByTeamOrder }))
+
+// Track which table context select('*') is called in
+let activeTable = ''
+
 // Combined select: routes on which table is queried via `from`
 const mockSelect = jest.fn((arg: string) => {
   if (arg === 'id') return { limit: mockSchemaSelectLimit }
-  if (arg === '*') return { eq: mockActiveSyncEq }
+  if (arg === '*') {
+    if (activeTable === 'players') {
+      // findByTeamExternalIds chain
+      return { in: mockFindByTeamIn, eq: mockActiveSyncEq }
+    }
+    return { eq: mockActiveSyncEq }
+  }
   return { limit: mockSchemaSelectLimit }
 })
 
 // Router: routes based on table name
 const mockFrom = jest.fn((table: string) => {
+  activeTable = table
   if (table === 'players') {
     return { select: mockSelect, upsert: mockUpsert }
   }
@@ -537,5 +551,105 @@ describe('PlayersRepository – getDistinctTeamExternalIds', () => {
     await expect(repo.getDistinctTeamExternalIds()).rejects.toThrow(
       'getDistinctTeamExternalIds failed: function not found',
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// findByTeamExternalIds
+//
+// Chain: from('players').select('*').in('team_external_id', ids).order('name')
+//   → { data, error }
+// ---------------------------------------------------------------------------
+
+describe('PlayersRepository – findByTeamExternalIds', () => {
+  const DB_PLAYER_ROW = {
+    id: 'player-uuid-1',
+    provider_player_id: 1001,
+    team_external_id: 759,
+    name: 'Manuel Neuer',
+    position: 'Goalkeeper',
+    shirt_number: 1,
+    created_at: '2026-06-08T00:00:00Z',
+    updated_at: '2026-06-08T00:00:00Z',
+  }
+
+  it('returns [] immediately without querying DB when teamExternalIds is empty', async () => {
+    const repo = makeRepo()
+
+    const players = await repo.findByTeamExternalIds([])
+
+    expect(players).toEqual([])
+    // verifySchema should NOT have been called (no DB interaction at all)
+    expect(mockSchemaLimit).not.toHaveBeenCalled()
+    expect(mockFindByTeamIn).not.toHaveBeenCalled()
+  })
+
+  it('maps DB rows to Player domain objects', async () => {
+    const repo = makeRepo()
+    mockFindByTeamOrder.mockResolvedValueOnce({ data: [DB_PLAYER_ROW], error: null })
+
+    const players = await repo.findByTeamExternalIds([759])
+
+    expect(players).toHaveLength(1)
+    expect(players[0]).toEqual({
+      id: 'player-uuid-1',
+      providerPlayerId: 1001,
+      teamExternalId: 759,
+      name: 'Manuel Neuer',
+      position: 'Goalkeeper',
+      shirtNumber: 1,
+      createdAt: new Date('2026-06-08T00:00:00Z'),
+      updatedAt: new Date('2026-06-08T00:00:00Z'),
+    })
+  })
+
+  it('calls .in("team_external_id", ids).order("name")', async () => {
+    const repo = makeRepo()
+    mockFindByTeamOrder.mockResolvedValueOnce({ data: [], error: null })
+
+    await repo.findByTeamExternalIds([759, 762])
+
+    expect(mockFindByTeamIn).toHaveBeenCalledWith('team_external_id', [759, 762])
+    expect(mockFindByTeamOrder).toHaveBeenCalledWith('name')
+  })
+
+  it('returns [] when data is null', async () => {
+    const repo = makeRepo()
+    mockFindByTeamOrder.mockResolvedValueOnce({ data: null, error: null })
+
+    const players = await repo.findByTeamExternalIds([759])
+
+    expect(players).toEqual([])
+  })
+
+  it('returns [] when data is empty', async () => {
+    const repo = makeRepo()
+    mockFindByTeamOrder.mockResolvedValueOnce({ data: [], error: null })
+
+    const players = await repo.findByTeamExternalIds([759])
+
+    expect(players).toEqual([])
+  })
+
+  it('throws "findByTeamExternalIds failed: <msg>" on Supabase error', async () => {
+    const repo = makeRepo()
+    mockFindByTeamOrder.mockResolvedValueOnce({ error: { message: 'permission denied' } })
+
+    await expect(repo.findByTeamExternalIds([759])).rejects.toThrow(
+      'findByTeamExternalIds failed: permission denied',
+    )
+  })
+
+  it('maps null position and shirtNumber to null in Player domain object', async () => {
+    const repo = makeRepo()
+    mockFindByTeamOrder.mockResolvedValueOnce({
+      data: [{ ...DB_PLAYER_ROW, position: null, shirt_number: null }],
+      error: null,
+    })
+
+    const players = await repo.findByTeamExternalIds([759])
+
+    expect(players[0].position).toBeNull()
+    expect(players[0].shirtNumber).toBeNull()
   })
 })

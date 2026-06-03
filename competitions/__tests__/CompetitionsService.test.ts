@@ -83,6 +83,8 @@ function makeRepository(
     findById: jest.fn().mockResolvedValue(null),
     updateRegulationResults: jest.fn().mockResolvedValue(undefined),
     findKickoffAt: jest.fn().mockResolvedValue(null),
+    hasAnyMatches: jest.fn().mockResolvedValue(false),
+    findDistinctTeams: jest.fn().mockResolvedValue([]),
     ...override,
   }
 }

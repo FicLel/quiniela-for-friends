@@ -215,6 +215,31 @@ export class PlayersRepository implements IPlayersRepository {
   }
 
   /**
+   * Return all players belonging to the given team external IDs, ordered by name.
+   * Returns [] immediately if teamExternalIds is empty (no DB call).
+   * Throws on Supabase error.
+   */
+  async findByTeamExternalIds(teamExternalIds: number[]): Promise<Player[]> {
+    if (teamExternalIds.length === 0) return []
+
+    await this.verifySchema()
+
+    const { data, error } = await this.supabase
+      .from('players')
+      .select('*')
+      .in('team_external_id', teamExternalIds)
+      .order('name')
+
+    if (error) {
+      throw new Error(`findByTeamExternalIds failed: ${error.message}`)
+    }
+
+    if (!data || data.length === 0) return []
+
+    return (data as Record<string, unknown>[]).map((row) => this.toPlayer(row))
+  }
+
+  /**
    * Return the active in_progress sync run, or null if none exists.
    * Runs started more than 30 minutes ago are treated as stale and return null.
    */

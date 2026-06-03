@@ -5,8 +5,10 @@ import { MembershipsRepository } from '@/memberships/MembershipsRepository'
 import { LeaderboardService } from '@/scoring/LeaderboardService'
 import { PredictionScoreRepository } from '@/scoring/PredictionScoreRepository'
 import { UsersRepository } from '@/users/UsersRepository'
+import { ExtraQuestionsRepository } from '@/extraQuestions/ExtraQuestionsRepository'
 import type { Locale } from '@/i18n/i18n.types'
 import LeaderboardClient from './_components/LeaderboardClient'
+import ExtraQuestionsFloatingButton from '../_components/ExtraQuestionsFloatingButton'
 
 type PageProps = {
   params: Promise<{ lang: string; quinielaId: string }>
@@ -42,6 +44,13 @@ export default async function LeaderboardPage({ params }: PageProps) {
 
   const rows = await leaderboardService.getLeaderboard(quinielaId)
 
+  // Extra questions floating button data
+  const extraQuestionsRepo = new ExtraQuestionsRepository()
+  const [totalQuestions, unansweredCount] = await Promise.all([
+    extraQuestionsRepo.countAll(quinielaId),
+    extraQuestionsRepo.countUnansweredOpenByUser(quinielaId, session.sub),
+  ])
+
   return (
     <main className="min-h-screen bg-green-50 px-4 py-8">
       <div className="mx-auto w-full max-w-3xl">
@@ -53,6 +62,13 @@ export default async function LeaderboardPage({ params }: PageProps) {
           dict={dict.leaderboard}
         />
       </div>
+
+      <ExtraQuestionsFloatingButton
+        quinielaId={quinielaId}
+        lang={locale}
+        unansweredCount={unansweredCount}
+        totalQuestions={totalQuestions}
+      />
     </main>
   )
 }

@@ -217,8 +217,6 @@ export class PredictionScoreRepository implements IPredictionScoreRepository {
       throw new Error(`aggregateByQuiniela failed: ${error.message}`)
     }
 
-    if (!data || data.length === 0) return []
-
     type ScoreRow = {
       total_points: number
       home_goal_point: number
@@ -236,7 +234,7 @@ export class PredictionScoreRepository implements IPredictionScoreRepository {
       predictedMatchCount: number
     }>()
 
-    for (const row of data as unknown as ScoreRow[]) {
+    for (const row of (data ?? []) as unknown as ScoreRow[]) {
       const userId = row.user_expected_results.user_id
       const existing = byUser.get(userId) ?? {
         userId,
@@ -257,6 +255,31 @@ export class PredictionScoreRepository implements IPredictionScoreRepository {
       }
 
       byUser.set(userId, existing)
+    }
+
+    // Fetch extra question results for the quiniela and merge into byUser
+    const { data: extraData, error: extraError } = await this.supabase
+      .from('extra_question_results')
+      .select('user_id, points')
+      .eq('quiniela_id', quinielaId)
+
+    if (extraError) {
+      throw new Error(`aggregateByQuiniela extra_question_results failed: ${extraError.message}`)
+    }
+
+    for (const row of (extraData ?? []) as { user_id: string; points: number }[]) {
+      const existing = byUser.get(row.user_id)
+      if (existing) {
+        existing.totalPoints += row.points
+      } else {
+        byUser.set(row.user_id, {
+          userId: row.user_id,
+          totalPoints: row.points,
+          exactScoreHits: 0,
+          correctOutcomeHits: 0,
+          predictedMatchCount: 0,
+        })
+      }
     }
 
     return Array.from(byUser.values())
