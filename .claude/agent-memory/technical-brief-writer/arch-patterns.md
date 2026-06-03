@@ -12,7 +12,7 @@ Each domain is a top-level folder at project root (NOT under src/): /auth, /comp
 Module files inside each domain:
 - *Service.ts — business logic, depends only on port interfaces
 - *Client.ts — wraps external APIs (football-data.org) or Supabase JS client
-- *Repository.ts — Supabase JS client persistence adapter (NOT TypeORM despite docs/stack.md saying TypeORM)
+- *Repository.ts — Supabase JS client persistence adapter (PostgREST via `.from()`, `.select()`, `.insert()`, etc.)
 - *.types.ts — DTOs, domain types, and port interfaces
 - *.schemas.ts — validation schemas (optional)
 

@@ -4,7 +4,7 @@
 - Styling: Tailwind CSS v4 using `@import "tailwindcss"` and `@theme inline { ... }` in global CSS, not the old `@tailwind base/components/utilities`. [web:2][web:5]  
 - Package manager: pnpm.  
 - Database: Supabase Postgres (managed). [web:6][web:38]  
-- ORM: TypeORM, used on the server side to talk to the Supabase Postgres DB. [web:13][web:19]  
+- Database client: Supabase JS client (`@supabase/supabase-js`), used on the server side via the PostgREST API.  
 - Auth: Supabase Auth integrated with Next.js App Router (server components, route handlers, etc.). [web:9][web:22][web:41]  
 - Linting: ESLint 9 flat config via `eslint.config.mjs` with `defineConfig` from `eslint/config`.
 

@@ -17,7 +17,7 @@ Core ideas:
 - Responsibilities:
   - Handle routing and rendering.
   - Call application services to perform actions.
-- Must **not** talk directly to TypeORM, Supabase client, or raw SQL.
+- Must **not** talk directly to the Supabase client or raw SQL.
 
 ### Services (Domain / Application)
 
@@ -28,7 +28,7 @@ Core ideas:
 ### Repositories & Clients (Infrastructure)
 
 - **Repositories**:
-  - Implement persistence ports using TypeORM targeting Supabase Postgres. [web:6][web:13]  
+  - Implement persistence ports using the Supabase JS client (`@supabase/supabase-js`) via PostgREST.  
 - **Clients**:
   - Wrap external APIs (including Supabase JS client when used as an API, if needed).
 - These live inside each module (auth, bets, matches, etc.) rather than a single global infra folder.
@@ -43,5 +43,5 @@ Core ideas:
 
 - UI → calls **services**.
 - Services → depend on **ports** (interfaces).
-- Repositories/Clients → implement ports, using Supabase and TypeORM.
+- Repositories/Clients → implement ports, using the Supabase JS client.
 - New features should be modeled first in services and ports, then implemented in repositories/clients, then finally wired into views.

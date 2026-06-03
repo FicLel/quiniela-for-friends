@@ -8,7 +8,7 @@ metadata:
 This is a quiniela / soccer betting SaaS built with Next.js 16 App Router (React 19, TypeScript). Key facts:
 
 - **Package manager**: pnpm
-- **Database**: Supabase Postgres (managed). TypeORM on the server side.
+- **Database**: Supabase Postgres (managed). Accessed via the Supabase JS client (`@supabase/supabase-js`) PostgREST API — no TypeORM.
 - **Auth**: Supabase Auth (Email OTP flow, no self-registration).
 - **Architecture**: Hexagonal — Views → Services → Ports → Repositories/Clients. No global `infra/` folder; infrastructure is scoped to each domain module (`/auth`, `/bets`, etc.).
 - **Path alias**: `@/*` resolves to the project root (not `./src`). No `src/` directory.

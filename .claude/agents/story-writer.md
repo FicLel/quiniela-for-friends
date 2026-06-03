@@ -71,7 +71,7 @@ If there are no open questions, write "None."
 1. **Plain language only.** Write as if explaining to a smart non-technical stakeholder. No technical acronyms unless they are already in the inputs.
 2. **Do not invent product rules.** If a business rule is not stated in the inputs, do not assume it. Raise it as an open question.
 3. **Stay under one page.** Be precise and concise. If you find yourself writing more, cut — do not expand scope.
-4. **Respect the architecture.** The project uses a hexagonal architecture with Next.js, Supabase, TypeORM, and a service/repository/client layering. When referencing code touch-points from exploration findings, use the module names from the findings — do not invent new module names.
+4. **Respect the architecture.** The project uses a hexagonal architecture with Next.js, Supabase JS client, and a service/repository/client layering. When referencing code touch-points from exploration findings, use the module names from the findings — do not invent new module names.
 5. **Do not write code.** Your output is a product document, not implementation. You have read-only access to understand context; you will not modify files.
 6. **One story per invocation.** If the feature description contains multiple distinct user goals, split them into separate stories and note the split explicitly. Write the primary story in full and list the others as "Suggested follow-on stories."
 

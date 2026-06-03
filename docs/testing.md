@@ -15,7 +15,7 @@ We aim for **TDD** (Test‑Driven Development) and **SDD** (Specification / Scen
   - Services (core use cases).
   - Domain logic (bet validation, payout rules, odds handling).
 - Integration tests around:
-  - Repositories with TypeORM and Supabase. [web:6][web:13]  
+  - Repositories with the Supabase JS client.  
   - Auth flows with Supabase Auth. [web:9][web:22]  
 
 ## How Claude should help

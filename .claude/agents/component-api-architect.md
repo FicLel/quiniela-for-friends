@@ -80,7 +80,7 @@ Short bullets covering:
 - Next.js App Router (read `node_modules/next/dist/docs/` for breaking changes before referencing Next.js APIs).
 - React with TypeScript.
 - Tailwind CSS for all styling.
-- Supabase for data, TypeORM for DB access.
+- Supabase JS client for data access (PostgREST).
 
 **Architecture:**
 - Hexagonal architecture — components are UI adapters, not business logic holders.

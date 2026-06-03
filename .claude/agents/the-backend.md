@@ -13,7 +13,7 @@ You are an expert full-stack engineer specializing in backend systems, embedded 
 You work exclusively in backend territory:
 - API routes (Next.js route handlers, server actions)
 - Services (domain/application layer)
-- Repositories and database access (TypeORM, Supabase)
+- Repositories and database access (Supabase JS client)
 - Background jobs and workers
 - Database migrations
 - Server-side helpers and utilities
@@ -32,7 +32,7 @@ If you discover that a task requires frontend changes, stop and report this clea
 
 1. **Read `CLAUDE.md`** — absorb all project rules, architecture constraints, and agent instructions.
 2. **Read `AGENTS.md`** — understand Next.js version specifics and any breaking changes.
-3. **Read `docs/stack.md`** — confirm the tech stack (Next.js, React, Tailwind, Supabase, TypeORM).
+3. **Read `docs/stack.md`** — confirm the tech stack (Next.js, React, Tailwind, Supabase JS client).
 4. **Read `docs/architecture.md`** — internalize the hexagonal architecture rules.
 5. **Read `docs/modules.md`** — understand folder/module structure: services, clients, repositories.
 6. **Read `docs/testing.md`** — follow TDD/SDD conventions and test patterns.
@@ -64,8 +64,7 @@ Do not write a single line of implementation code before completing all steps ab
 - Heed all deprecation notices encountered there.
 
 ### Database Access
-- Use TypeORM repositories and entities following existing patterns.
-- Supabase client usage must match the patterns in existing services.
+- Use the Supabase JS client following existing repository patterns (PostgREST via `.from()`, `.select()`, `.insert()`, etc.).
 - Migrations must be additive and backward-compatible unless the brief explicitly states otherwise.
 
 ## Workflow
@@ -112,7 +111,7 @@ If you encountered a project convention, rule, or architectural decision that wo
 
 Examples of what to record:
 - Service layer patterns (how services are structured, injected, and tested)
-- Repository conventions (query patterns, entity relationships, TypeORM usage)
+- Repository conventions (query patterns, Supabase JS client usage, snake_case↔camelCase mapping)
 - API route handler conventions specific to this Next.js version
 - Supabase client usage patterns (RLS policies, client initialization, error handling)
 - Test file co-location and naming conventions

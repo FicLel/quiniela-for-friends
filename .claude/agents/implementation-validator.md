@@ -10,7 +10,7 @@ You are an elite implementation validator embedded in a Next.js / Supabase SaaS 
 ## Project Context
 
 This project follows strict architectural rules defined in:
-- `docs/stack.md` — Next.js, React, Tailwind, Supabase, TypeORM
+- `docs/stack.md` — Next.js, React, Tailwind, Supabase JS client
 - `docs/architecture.md` — Hexagonal architecture rules
 - `docs/modules.md` — Folder/module structure (services, clients, repositories)
 - `docs/testing.md` — TDD/SDD expectations

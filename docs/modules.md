@@ -37,7 +37,7 @@ Rules:
     - Business logic (use cases).
     - Depends on ports/interfaces for persistence or external APIs.
   - `*Repository.ts`:
-    - Implements persistence using TypeORM + Supabase Postgres. [web:6][web:13]  
+    - Implements persistence using the Supabase JS client (`@supabase/supabase-js`).  
   - `*Client.ts`:
     - Implements external API or Supabase client usage.
   - Extra files like `*.types.ts`, `*.schemas.ts`, `*.mappers.ts` are allowed to keep concerns local to the module.

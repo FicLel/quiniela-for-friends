@@ -13,7 +13,7 @@ Your main goals:
 
 For details, always read these docs:
 
-- `docs/stack.md`          – stack (Next.js, React, Tailwind, Supabase, TypeORM)
+- `docs/stack.md`          – stack (Next.js, React, Tailwind, Supabase JS client)
 - `docs/architecture.md`   – hexagonal architecture rules
 - `docs/modules.md`        – folder and module structure (services, clients, repositories)
 - `docs/testing.md`        – TDD / SDD expectations
