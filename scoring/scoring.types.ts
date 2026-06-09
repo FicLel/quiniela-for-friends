@@ -35,6 +35,29 @@ export type LeaderboardRow = {
   exactScoreHits: number
   correctOutcomeHits: number
   predictedMatchCount: number
+  homeGoalPoints: number
+  awayGoalPoints: number
+  outcomePoints: number
+  extraQuestionPoints: number
+}
+
+/**
+ * A single match prediction entry for a player in a quiniela.
+ * Used by the player predictions viewer.
+ */
+export type PlayerPredictionEntry = {
+  matchId: string
+  homeTeamName: string
+  awayTeamName: string
+  scheduledAt: string
+  predictedHomeScore: number
+  predictedAwayScore: number
+  regulationHomeGoals: number
+  regulationAwayGoals: number
+  homeGoalPoint: 0 | 1
+  awayGoalPoint: 0 | 1
+  outcomePoint: 0 | 1
+  totalPoints: 0 | 1 | 2 | 3
 }
 
 /**
@@ -75,7 +98,7 @@ export interface IPredictionScoreRepository {
 
   /**
    * Aggregate prediction_scores by user for a quiniela.
-   * Returns one row per user with point totals and hit counts.
+   * Returns one row per user with point totals, hit counts, and per-category breakdowns.
    */
   aggregateByQuiniela(quinielaId: string): Promise<
     {
@@ -84,6 +107,10 @@ export interface IPredictionScoreRepository {
       exactScoreHits: number
       correctOutcomeHits: number
       predictedMatchCount: number
+      homeGoalPoints: number
+      awayGoalPoints: number
+      outcomePoints: number
+      extraQuestionPoints: number
     }[]
   >
 
@@ -92,6 +119,12 @@ export interface IPredictionScoreRepository {
    * Used to compute homeWinPct / drawPct / awayWinPct.
    */
   findCrowdOutcomes(matchId: string): Promise<{ homeScore: number; awayScore: number }[]>
+
+  /**
+   * Return all scored match predictions for a specific player in a quiniela.
+   * Only returns entries for FINISHED matches with non-null regulation goals.
+   */
+  findPlayerPredictionsForViewer(quinielaId: string, userId: string): Promise<PlayerPredictionEntry[]>
 }
 
 export interface IScoringService {
@@ -101,4 +134,5 @@ export interface IScoringService {
 
 export interface ILeaderboardService {
   getLeaderboard(quinielaId: string): Promise<LeaderboardRow[]>
+  getPlayerPredictions(quinielaId: string, userId: string): Promise<PlayerPredictionEntry[]>
 }

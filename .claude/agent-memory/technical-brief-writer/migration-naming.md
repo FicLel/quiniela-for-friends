@@ -7,8 +7,8 @@ metadata:
 
 Migration files live in `supabase/migrations/` and follow the pattern `YYYYMMDDHHMMSS_description.sql`.
 
-The latest existing migration is `20260609000000_per_quiniela_predictions.sql`.
+The latest existing migration is `20260611000000_fix_extra_questions_fk.sql`.
 
-The next migration should use a timestamp of `20260610000000` or later to maintain order.
+The next migration should use a timestamp of `20260612000000` or later to maintain order.
 
-**How to apply:** When creating a new migration, use `20260610000000_<description>.sql` as the filename. If multiple migrations land on the same day, use `20260610000001_<description>.sql` for the second, etc.
+**How to apply:** When creating a new migration, use `20260612000000_<description>.sql` as the filename. If multiple migrations land on the same day, use `20260612000001_<description>.sql` for the second, etc.

@@ -23,3 +23,17 @@ Patterns observed in the Three-Point Scoring / Leaderboard story validation (202
 6. **No LeaderboardService unit tests exist** — only LeaderboardClient UI tests exist; the service sorting/tiebreak logic is untested.
 
 7. **Leaderboard page directly instantiates repositories** — arch violation: page imports LeaderboardService directly (acceptable per architecture) but also imports PredictionScoreRepository and UsersRepository (infrastructure layer) directly in the view — same anti-pattern as previous stories.
+
+**Scoring Breakdown + Predictions Viewer validation (2026-06-09):**
+
+8. **PostgREST embedded filter (`.eq('relation.column', value)`) does NOT filter rows at the DB level when using `!inner` join** — it filters columns on the related record, not which parent rows are returned. In `findPlayerPredictionsForViewer`, `.eq('user_expected_results.user_id', userId)` combined with `!inner` performs an INNER JOIN and applies the filter on the related row, which effectively IS a row-level filter in PostgREST v2+. This is actually the correct behavior — but it is subtle and easy to mistake for a bug. Documented for future reference.
+
+9. **Mobile grid column count mismatch vs. AC2** — AC2 specifies 5 columns on mobile: Rank, Player, Exact Score Hits, Correct Outcome Hits, Total Pts. The implementation uses `grid-cols-[2rem_1fr_3.5rem_3.5rem_3.5rem]` (5 tracks) with visible headers for #, Player, Exact, Outcome, and then Total Pts — but the 5th visible column is labeled "Out." (Correct Outcome) not Total Pts in the mobile header area. Total Pts header is unconditionally rendered as a 9th grid item. Grid items beyond 5 wrap onto new lines in a 5-column grid. The Total Pts value renders in the 9th grid slot (item 9 of 10 defined), not in slot 5. This means on mobile the Total Pts column does not appear in the correct slot — it flows into a second row.
+
+10. **`aggregateByQuiniela` prediction_scores DB error path is untested** — the `mockPredictionScoresEq` mock is never given `{ error: {...} }` in any test. The `if (error) throw` branch in the first DB call has no test coverage.
+
+11. **`viewerLoading` key used with `?? 'Loading…'` fallback** — the `??` guard is unnecessary since the key is present in both dictionaries but harmless.
+
+12. **`colOutcomePts` header value collides with `colOutcome` header value in en.json** — both are `"Out."`, making them indistinguishable visually and by title attributes. es.json also uses `"Res."` for `colOutcomePts` and `"Result."` for `colOutcome` — disambiguated in Spanish but identical in English. This is a minor UX issue.
+
+13. **No focus-trap in PlayerPredictionsModal** — modal does not trap keyboard focus, violating WCAG 2.1 dialog pattern. The brief does not explicitly require focus-trap but `role="dialog"` + `aria-modal="true"` implies it.

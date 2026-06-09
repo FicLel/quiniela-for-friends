@@ -16,7 +16,7 @@
  * - All I/O goes through the injected repositories.
  */
 
-import type { IPredictionScoreRepository, ILeaderboardService, LeaderboardRow } from '@/scoring/scoring.types'
+import type { IPredictionScoreRepository, ILeaderboardService, LeaderboardRow, PlayerPredictionEntry } from '@/scoring/scoring.types'
 import type { IUsersRepository } from '@/users/users.types'
 import type { IMembershipsRepository } from '@/memberships/memberships.types'
 
@@ -52,6 +52,10 @@ export class LeaderboardService implements ILeaderboardService {
           exactScoreHits: 0,
           correctOutcomeHits: 0,
           predictedMatchCount: 0,
+          homeGoalPoints: 0,
+          awayGoalPoints: 0,
+          outcomePoints: 0,
+          extraQuestionPoints: 0,
         }))
     }
 
@@ -82,6 +86,18 @@ export class LeaderboardService implements ILeaderboardService {
       exactScoreHits: agg.exactScoreHits,
       correctOutcomeHits: agg.correctOutcomeHits,
       predictedMatchCount: agg.predictedMatchCount,
+      homeGoalPoints: agg.homeGoalPoints,
+      awayGoalPoints: agg.awayGoalPoints,
+      outcomePoints: agg.outcomePoints,
+      extraQuestionPoints: agg.extraQuestionPoints,
     }))
+  }
+
+  /**
+   * Return all scored match predictions for a specific player in a quiniela.
+   * Delegates directly to the repository.
+   */
+  async getPlayerPredictions(quinielaId: string, userId: string): Promise<PlayerPredictionEntry[]> {
+    return this.repo.findPlayerPredictionsForViewer(quinielaId, userId)
   }
 }

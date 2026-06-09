@@ -11,6 +11,7 @@
 import { createClient } from '@supabase/supabase-js'
 import type {
   IPredictionScoreRepository,
+  PlayerPredictionEntry,
   PredictionScore,
   PredictionWithQuiniela,
 } from '@/scoring/scoring.types'
@@ -197,6 +198,10 @@ export class PredictionScoreRepository implements IPredictionScoreRepository {
       exactScoreHits: number
       correctOutcomeHits: number
       predictedMatchCount: number
+      homeGoalPoints: number
+      awayGoalPoints: number
+      outcomePoints: number
+      extraQuestionPoints: number
     }[]
   > {
     await this.verifySchema()
@@ -232,6 +237,10 @@ export class PredictionScoreRepository implements IPredictionScoreRepository {
       exactScoreHits: number
       correctOutcomeHits: number
       predictedMatchCount: number
+      homeGoalPoints: number
+      awayGoalPoints: number
+      outcomePoints: number
+      extraQuestionPoints: number
     }>()
 
     for (const row of (data ?? []) as unknown as ScoreRow[]) {
@@ -242,10 +251,17 @@ export class PredictionScoreRepository implements IPredictionScoreRepository {
         exactScoreHits: 0,
         correctOutcomeHits: 0,
         predictedMatchCount: 0,
+        homeGoalPoints: 0,
+        awayGoalPoints: 0,
+        outcomePoints: 0,
+        extraQuestionPoints: 0,
       }
 
       existing.totalPoints += row.total_points
       existing.predictedMatchCount += 1
+      existing.homeGoalPoints += row.home_goal_point ?? 0
+      existing.awayGoalPoints += row.away_goal_point ?? 0
+      existing.outcomePoints += row.outcome_point ?? 0
 
       if (row.home_goal_point === 1 && row.away_goal_point === 1) {
         existing.exactScoreHits += 1
@@ -271,6 +287,7 @@ export class PredictionScoreRepository implements IPredictionScoreRepository {
       const existing = byUser.get(row.user_id)
       if (existing) {
         existing.totalPoints += row.points
+        existing.extraQuestionPoints += row.points
       } else {
         byUser.set(row.user_id, {
           userId: row.user_id,
@@ -278,11 +295,122 @@ export class PredictionScoreRepository implements IPredictionScoreRepository {
           exactScoreHits: 0,
           correctOutcomeHits: 0,
           predictedMatchCount: 0,
+          homeGoalPoints: 0,
+          awayGoalPoints: 0,
+          outcomePoints: 0,
+          extraQuestionPoints: row.points,
         })
       }
     }
 
     return Array.from(byUser.values())
+  }
+
+  /**
+   * Return all scored match predictions for a specific player in a quiniela.
+   * Only includes entries for FINISHED matches with non-null regulation goals.
+   *
+   * Two-step query pattern:
+   *   1. Fetch prediction_scores for (quiniela_id, user_id), joined with user_expected_results.
+   *   2. Fetch the distinct matches referenced by step 1.
+   *   3. In-memory: filter to FINISHED matches with non-null goals, then map to PlayerPredictionEntry.
+   *
+   * Throws on Supabase error.
+   */
+  async findPlayerPredictionsForViewer(quinielaId: string, userId: string): Promise<PlayerPredictionEntry[]> {
+    await this.verifySchema()
+
+    // Step 1: fetch prediction_scores for the (quiniela_id, user_id) pair
+    const { data: predictionRows, error: predError } = await this.supabase
+      .from('prediction_scores')
+      .select(`
+        home_goal_point,
+        away_goal_point,
+        outcome_point,
+        total_points,
+        user_expected_results!inner(
+          home_score,
+          away_score,
+          match_id,
+          user_id
+        )
+      `)
+      .eq('quiniela_id', quinielaId)
+      .eq('user_expected_results.user_id', userId)
+
+    if (predError) {
+      throw new Error(`findPlayerPredictionsForViewer failed: ${predError.message}`)
+    }
+
+    if (!predictionRows || predictionRows.length === 0) return []
+
+    type PredRow = {
+      home_goal_point: number
+      away_goal_point: number
+      outcome_point: number
+      total_points: number
+      user_expected_results: {
+        home_score: number
+        away_score: number
+        match_id: string
+        user_id: string
+      }
+    }
+
+    const typedPredRows = predictionRows as unknown as PredRow[]
+
+    // Step 2: fetch the distinct matches referenced by those prediction rows
+    const matchIds = [...new Set(typedPredRows.map((r) => r.user_expected_results.match_id))]
+    const { data: matchRows, error: matchError } = await this.supabase
+      .from('matches')
+      .select('id, home_team_name, away_team_name, scheduled_at, status, regulation_home_goals, regulation_away_goals')
+      .in('id', matchIds)
+
+    if (matchError) {
+      throw new Error(`findPlayerPredictionsForViewer matches fetch failed: ${matchError.message}`)
+    }
+
+    type MatchRow = {
+      id: string
+      home_team_name: string
+      away_team_name: string
+      scheduled_at: string
+      status: string
+      regulation_home_goals: number | null
+      regulation_away_goals: number | null
+    }
+
+    // Step 3: build match lookup map, filter to FINISHED with non-null goals, map to PlayerPredictionEntry
+    const matchMap = new Map<string, MatchRow>()
+    for (const m of (matchRows ?? []) as unknown as MatchRow[]) {
+      matchMap.set(m.id, m)
+    }
+
+    const results: PlayerPredictionEntry[] = []
+
+    for (const predRow of typedPredRows) {
+      const match = matchMap.get(predRow.user_expected_results.match_id)
+      if (!match) continue
+      if (match.status !== 'FINISHED') continue
+      if (match.regulation_home_goals === null || match.regulation_away_goals === null) continue
+
+      results.push({
+        matchId: match.id,
+        homeTeamName: match.home_team_name,
+        awayTeamName: match.away_team_name,
+        scheduledAt: match.scheduled_at,
+        predictedHomeScore: predRow.user_expected_results.home_score,
+        predictedAwayScore: predRow.user_expected_results.away_score,
+        regulationHomeGoals: match.regulation_home_goals,
+        regulationAwayGoals: match.regulation_away_goals,
+        homeGoalPoint: predRow.home_goal_point as 0 | 1,
+        awayGoalPoint: predRow.away_goal_point as 0 | 1,
+        outcomePoint: predRow.outcome_point as 0 | 1,
+        totalPoints: predRow.total_points as 0 | 1 | 2 | 3,
+      })
+    }
+
+    return results
   }
 
   /**

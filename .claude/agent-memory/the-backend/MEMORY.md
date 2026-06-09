@@ -7,3 +7,4 @@
 - [isMember vs isApprovedMember](feedback-ismember-vs-isapprovedmember.md) — isMember = any row (duplicate prevention); isApprovedMember = approved_at IS NOT NULL (access control gate)
 - [Fix Existing Tests When Mocks Break](feedback-fix-existing-tests-when-mocks-break.md) — When a repository Supabase chain changes, update test mocks in the same changeset
 - [Extra Points Questions Feature](project-extra-questions.md) — 4 tables, ExtraQuestionsRepository/Service/actions, 5 API routes, scoring aggregation extended
+- [Leaderboard Breakdown + Predictions Viewer](project-leaderboard-breakdown-predictions.md) — 4 breakdown fields on LeaderboardRow, PlayerPredictionEntry type, findPlayerPredictionsForViewer, getPlayerPredictions, new API route

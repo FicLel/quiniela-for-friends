@@ -1,3 +1,4 @@
 - [Codebase Overview](codebase-overview.md) — Next.js 16 App Router, Supabase, hexagonal architecture, module organization, patterns
 - [Scoring & Leaderboard Status](scoring-leaderboard-status.md) — current state vs. feature request gaps, data model additions, service architecture needed
 - [Squad Sync Module](squad-sync-module.md) — API client, repository, service patterns; existing infrastructure to leverage; migration structure; next steps
+- [Leaderboard Structure](leaderboard-structure.md) — complete data model, scoring flow, prediction types, match closure detection, i18n keys

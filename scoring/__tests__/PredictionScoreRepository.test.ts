@@ -6,6 +6,8 @@
  *  - findPredictionsWithQuinielas: shared prediction fans out across all approved memberships
  *  - findPredictionsWithQuinielas: per-quiniela prediction yields only its own quiniela_id
  *  - findCrowdOutcomes: aggregates all predictions for a match regardless of quiniela_id
+ *  - aggregateByQuiniela: accumulates homeGoalPoints/awayGoalPoints/outcomePoints/extraQuestionPoints
+ *  - findPlayerPredictionsForViewer: returns PlayerPredictionEntry[] for FINISHED matches
  *
  * The repository makes two separate Supabase queries (no FK join):
  *   1. from('user_expected_results').select(...).eq('match_id', matchId)
@@ -80,6 +82,20 @@ const mockSelect = jest.fn((arg: string) => {
 const mockPredictionScoresEq = jest.fn()  // terminal eq for prediction_scores aggregate
 
 // --------------------------------------------------------------------------
+// findPlayerPredictionsForViewer: prediction_scores join select
+//
+//   from('prediction_scores')
+//     .select(`home_goal_point, away_goal_point, outcome_point, total_points,
+//              user_expected_results!inner(home_score, away_score, match_id, user_id)`)
+//     .eq('quiniela_id', quinielaId)
+//     .eq('user_expected_results.user_id', userId)
+//
+// Chain: select(...) → eq('quiniela_id', ...) → eq('user_expected_results.user_id', ...)
+// --------------------------------------------------------------------------
+const mockPlayerPredictionsUserEq = jest.fn()  // second .eq (terminal) for findPlayerPredictionsForViewer
+const mockPlayerPredictionsQuinielaEq = jest.fn(() => ({ eq: mockPlayerPredictionsUserEq }))  // first .eq
+
+// --------------------------------------------------------------------------
 // aggregateByQuiniela: extra_question_results select
 //
 //   from('extra_question_results').select('user_id, points').eq('quiniela_id', id)
@@ -89,13 +105,32 @@ const mockPredictionScoresEq = jest.fn()  // terminal eq for prediction_scores a
 const mockExtraResultsEq = jest.fn()  // terminal eq for extra_question_results
 
 // --------------------------------------------------------------------------
+// matches query chain (for findPlayerPredictionsForViewer step 2)
+//
+//   from('matches').select(...).in('id', matchIds)
+// --------------------------------------------------------------------------
+const mockMatchesIn = jest.fn()  // terminal .in for matches query
+const mockMatchesSelect = jest.fn((arg: string) => {
+  if (arg === 'id') {
+    return { limit: mockSchemaSelectLimit }
+  }
+  return { in: mockMatchesIn }
+})
+
+// --------------------------------------------------------------------------
 // prediction_scores select router
-// Routes schema check vs aggregation query based on arg.
+// Routes schema check vs aggregation query vs findPlayerPredictions query.
 // --------------------------------------------------------------------------
 const mockPredictionScoresSelect = jest.fn((arg: string) => {
   if (arg === 'id') {
     // schema check: select('id').limit(0)
     return { limit: mockSchemaSelectLimit }
+  }
+  // findPlayerPredictionsForViewer: select with user_expected_results fields (home_score, away_score, match_id, user_id)
+  // aggregateByQuiniela: select with user_expected_results (user_id only)
+  // Differentiate by whether the select includes 'match_id' (findPlayerPredictionsForViewer)
+  if (arg.includes('match_id')) {
+    return { eq: mockPlayerPredictionsQuinielaEq }
   }
   // aggregateByQuiniela: select(multiline join string).eq('quiniela_id', id)
   return { eq: mockPredictionScoresEq }
@@ -124,6 +159,9 @@ const mockFrom = jest.fn((table: string) => {
   }
   if (table === 'extra_question_results') {
     return { select: mockExtraResultsSelect }
+  }
+  if (table === 'matches') {
+    return { select: mockMatchesSelect }
   }
   // user_expected_results and other tables
   return { select: mockSelect }
@@ -581,6 +619,10 @@ describe('PredictionScoreRepository – aggregateByQuiniela (extra points extens
       exactScoreHits: 0,
       correctOutcomeHits: 0,
       predictedMatchCount: 0,
+      homeGoalPoints: 0,
+      awayGoalPoints: 0,
+      outcomePoints: 0,
+      extraQuestionPoints: 1,
     })
   })
 
@@ -610,6 +652,19 @@ describe('PredictionScoreRepository – aggregateByQuiniela (extra points extens
     )
   })
 
+  it('throws when the prediction_scores query fails', async () => {
+    const repo = makeRepo()
+
+    mockPredictionScoresEq.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'db error' },
+    })
+
+    await expect(repo.aggregateByQuiniela('quiniela-uuid')).rejects.toThrow(
+      'aggregateByQuiniela failed',
+    )
+  })
+
   it('throws when the extra_question_results query fails', async () => {
     const repo = makeRepo()
 
@@ -620,6 +675,291 @@ describe('PredictionScoreRepository – aggregateByQuiniela (extra points extens
 
     await expect(repo.aggregateByQuiniela('quiniela-uuid')).rejects.toThrow(
       'aggregateByQuiniela extra_question_results failed: permission denied on extra_question_results',
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// aggregateByQuiniela — point breakdown counters (new fields)
+// ---------------------------------------------------------------------------
+
+describe('PredictionScoreRepository – aggregateByQuiniela (point breakdown counters)', () => {
+  it('accumulates homeGoalPoints, awayGoalPoints, outcomePoints across multiple prediction_score rows', async () => {
+    const repo = makeRepo()
+
+    mockPredictionScoresEq.mockResolvedValueOnce({
+      data: [
+        {
+          total_points: 3,
+          home_goal_point: 1,
+          away_goal_point: 1,
+          outcome_point: 1,
+          user_expected_results: { user_id: 'user-A' },
+        },
+        {
+          total_points: 2,
+          home_goal_point: 0,
+          away_goal_point: 1,
+          outcome_point: 1,
+          user_expected_results: { user_id: 'user-A' },
+        },
+        {
+          total_points: 0,
+          home_goal_point: 0,
+          away_goal_point: 0,
+          outcome_point: 0,
+          user_expected_results: { user_id: 'user-A' },
+        },
+      ],
+      error: null,
+    })
+    mockExtraResultsEq.mockResolvedValueOnce({ data: [], error: null })
+
+    const results = await repo.aggregateByQuiniela('quiniela-uuid')
+
+    expect(results).toHaveLength(1)
+    expect(results[0].homeGoalPoints).toBe(1)
+    expect(results[0].awayGoalPoints).toBe(2)
+    expect(results[0].outcomePoints).toBe(2)
+    expect(results[0].extraQuestionPoints).toBe(0)
+    expect(results[0].totalPoints).toBe(5)
+  })
+
+  it('homeGoalPoints + awayGoalPoints + outcomePoints + extraQuestionPoints === totalPoints for a mixed user', async () => {
+    const repo = makeRepo()
+
+    mockPredictionScoresEq.mockResolvedValueOnce({
+      data: [
+        {
+          total_points: 1,
+          home_goal_point: 0,
+          away_goal_point: 0,
+          outcome_point: 1,
+          user_expected_results: { user_id: 'user-B' },
+        },
+        {
+          total_points: 3,
+          home_goal_point: 1,
+          away_goal_point: 1,
+          outcome_point: 1,
+          user_expected_results: { user_id: 'user-B' },
+        },
+      ],
+      error: null,
+    })
+    mockExtraResultsEq.mockResolvedValueOnce({
+      data: [{ user_id: 'user-B', points: 2 }],
+      error: null,
+    })
+
+    const results = await repo.aggregateByQuiniela('quiniela-uuid')
+
+    expect(results).toHaveLength(1)
+    const row = results[0]
+    expect(row.homeGoalPoints + row.awayGoalPoints + row.outcomePoints + row.extraQuestionPoints).toBe(row.totalPoints)
+    expect(row.totalPoints).toBe(6)
+    expect(row.extraQuestionPoints).toBe(2)
+  })
+
+  it('user with extra question points only gets correct extraQuestionPoints and zeros for others', async () => {
+    const repo = makeRepo()
+
+    mockPredictionScoresEq.mockResolvedValueOnce({ data: [], error: null })
+    mockExtraResultsEq.mockResolvedValueOnce({
+      data: [{ user_id: 'extra-only', points: 3 }],
+      error: null,
+    })
+
+    const results = await repo.aggregateByQuiniela('quiniela-uuid')
+
+    expect(results).toHaveLength(1)
+    expect(results[0].extraQuestionPoints).toBe(3)
+    expect(results[0].homeGoalPoints).toBe(0)
+    expect(results[0].awayGoalPoints).toBe(0)
+    expect(results[0].outcomePoints).toBe(0)
+    expect(results[0].totalPoints).toBe(3)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// findPlayerPredictionsForViewer
+//
+// Step 1: from('prediction_scores').select(...).eq('quiniela_id', ...).eq('user_expected_results.user_id', ...)
+// Step 2: from('matches').select(...).in('id', matchIds)
+// ---------------------------------------------------------------------------
+
+describe('PredictionScoreRepository – findPlayerPredictionsForViewer', () => {
+  const QUINIELA_ID = 'quiniela-uuid'
+  const USER_ID = 'user-uuid-1'
+
+  const PRED_ROW = {
+    home_goal_point: 1,
+    away_goal_point: 1,
+    outcome_point: 1,
+    total_points: 3,
+    user_expected_results: {
+      home_score: 2,
+      away_score: 1,
+      match_id: 'match-uuid-1',
+      user_id: USER_ID,
+    },
+  }
+
+  const FINISHED_MATCH = {
+    id: 'match-uuid-1',
+    home_team_name: 'Germany',
+    away_team_name: 'Scotland',
+    scheduled_at: '2026-06-14T16:00:00Z',
+    status: 'FINISHED',
+    regulation_home_goals: 2,
+    regulation_away_goals: 1,
+  }
+
+  it('returns PlayerPredictionEntry[] for FINISHED matches with non-null goals', async () => {
+    const repo = makeRepo()
+
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({
+      data: [PRED_ROW],
+      error: null,
+    })
+    mockMatchesIn.mockResolvedValueOnce({
+      data: [FINISHED_MATCH],
+      error: null,
+    })
+
+    const results = await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)
+
+    expect(results).toHaveLength(1)
+    expect(results[0]).toEqual({
+      matchId: 'match-uuid-1',
+      homeTeamName: 'Germany',
+      awayTeamName: 'Scotland',
+      scheduledAt: '2026-06-14T16:00:00Z',
+      predictedHomeScore: 2,
+      predictedAwayScore: 1,
+      regulationHomeGoals: 2,
+      regulationAwayGoals: 1,
+      homeGoalPoint: 1,
+      awayGoalPoint: 1,
+      outcomePoint: 1,
+      totalPoints: 3,
+    })
+  })
+
+  it('returns [] when step 1 yields no rows', async () => {
+    const repo = makeRepo()
+
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({ data: [], error: null })
+
+    const results = await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)
+
+    expect(results).toEqual([])
+    expect(mockMatchesIn).not.toHaveBeenCalled()
+  })
+
+  it('returns [] when step 1 data is null', async () => {
+    const repo = makeRepo()
+
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({ data: null, error: null })
+
+    const results = await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)
+
+    expect(results).toEqual([])
+    expect(mockMatchesIn).not.toHaveBeenCalled()
+  })
+
+  it('returns [] when all matches have status !== FINISHED', async () => {
+    const repo = makeRepo()
+
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({
+      data: [PRED_ROW],
+      error: null,
+    })
+    mockMatchesIn.mockResolvedValueOnce({
+      data: [{ ...FINISHED_MATCH, status: 'SCHEDULED' }],
+      error: null,
+    })
+
+    const results = await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)
+
+    expect(results).toEqual([])
+  })
+
+  it('returns [] when regulation goals are null even if status is FINISHED', async () => {
+    const repo = makeRepo()
+
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({
+      data: [PRED_ROW],
+      error: null,
+    })
+    mockMatchesIn.mockResolvedValueOnce({
+      data: [{ ...FINISHED_MATCH, regulation_home_goals: null, regulation_away_goals: null }],
+      error: null,
+    })
+
+    const results = await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)
+
+    expect(results).toEqual([])
+  })
+
+  it('filters out unfinished matches while keeping finished ones', async () => {
+    const repo = makeRepo()
+
+    const predRow2 = {
+      ...PRED_ROW,
+      total_points: 0,
+      home_goal_point: 0,
+      away_goal_point: 0,
+      outcome_point: 0,
+      user_expected_results: {
+        ...PRED_ROW.user_expected_results,
+        match_id: 'match-uuid-2',
+      },
+    }
+
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({
+      data: [PRED_ROW, predRow2],
+      error: null,
+    })
+    mockMatchesIn.mockResolvedValueOnce({
+      data: [
+        FINISHED_MATCH,
+        { ...FINISHED_MATCH, id: 'match-uuid-2', status: 'IN_PLAY', regulation_home_goals: null, regulation_away_goals: null },
+      ],
+      error: null,
+    })
+
+    const results = await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)
+
+    expect(results).toHaveLength(1)
+    expect(results[0].matchId).toBe('match-uuid-1')
+  })
+
+  it('throws on step 1 Supabase error', async () => {
+    const repo = makeRepo()
+
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({
+      error: { message: 'prediction_scores query failed' },
+    })
+
+    await expect(repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)).rejects.toThrow(
+      'findPlayerPredictionsForViewer failed: prediction_scores query failed',
+    )
+  })
+
+  it('throws on step 2 Supabase error', async () => {
+    const repo = makeRepo()
+
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({
+      data: [PRED_ROW],
+      error: null,
+    })
+    mockMatchesIn.mockResolvedValueOnce({
+      error: { message: 'matches fetch failed' },
+    })
+
+    await expect(repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)).rejects.toThrow(
+      'findPlayerPredictionsForViewer matches fetch failed: matches fetch failed',
     )
   })
 })

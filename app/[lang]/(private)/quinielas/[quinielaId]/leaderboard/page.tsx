@@ -53,7 +53,7 @@ export default async function LeaderboardPage({ params }: PageProps) {
 
   return (
     <main className="min-h-screen bg-green-50 px-4 py-8">
-      <div className="mx-auto w-full max-w-3xl">
+      <div className="mx-auto w-full max-w-4xl">
         <LeaderboardClient
           rows={rows}
           callerUserId={session.sub}

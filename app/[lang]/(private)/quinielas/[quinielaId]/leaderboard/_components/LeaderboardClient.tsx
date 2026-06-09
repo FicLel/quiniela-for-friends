@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import type { LeaderboardRow } from '@/scoring/scoring.types'
 import type { Dictionary } from '@/i18n/getDictionary'
+import PlayerPredictionsModal from './PlayerPredictionsModal'
 
 type Props = {
   rows: LeaderboardRow[]
@@ -13,26 +14,20 @@ type Props = {
   dict: Dictionary['leaderboard']
 }
 
-const PODIUM: Record<number, { bg: string; border: string; pts: string; callerRing: string; height: string; mobileOrder: string; emoji: string }> = {
-  1: { bg: 'bg-yellow-50', border: 'border-yellow-200', pts: 'text-yellow-700', callerRing: 'ring-2 ring-green-400', height: 'sm:min-h-[130px]', mobileOrder: 'order-1 sm:order-none', emoji: '🥇' },
-  2: { bg: 'bg-gray-50',   border: 'border-gray-200',  pts: 'text-gray-600',   callerRing: 'ring-2 ring-green-400', height: 'sm:min-h-[100px]', mobileOrder: 'order-2 sm:order-none', emoji: '🥈' },
-  3: { bg: 'bg-amber-50',  border: 'border-amber-100', pts: 'text-amber-700',  callerRing: 'ring-2 ring-green-400', height: 'sm:min-h-[110px]', mobileOrder: 'order-3 sm:order-none', emoji: '🥉' },
+const PODIUM: Record<number, { bg: string; border: string; pts: string; callerRing: string; emoji: string }> = {
+  1: { bg: 'bg-yellow-50', border: 'border-yellow-200', pts: 'text-yellow-700', callerRing: 'ring-2 ring-green-400', emoji: '🥇' },
+  2: { bg: 'bg-gray-50',   border: 'border-gray-200',  pts: 'text-gray-600',   callerRing: 'ring-2 ring-green-400', emoji: '🥈' },
+  3: { bg: 'bg-amber-50',  border: 'border-amber-100', pts: 'text-amber-700',  callerRing: 'ring-2 ring-green-400', emoji: '🥉' },
 }
 
 export default function LeaderboardClient({ rows, callerUserId, lang, quinielaId, dict }: Props) {
   const [showPoints, setShowPoints] = useState(false)
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [selectedUserEmail, setSelectedUserEmail] = useState<string | null>(null)
 
   const hasScores = rows.some((r) => r.totalPoints > 0 || r.exactScoreHits > 0)
   const callerRow = rows.find((r) => r.userId === callerUserId)
-  const top3 = rows.slice(0, 3)
-  const rest = rows.slice(3)
   const showSticky = callerRow !== undefined && callerRow.rank > 3
-
-  // Podium DOM order: 2nd (left) | 1st (centre, tallest) | 3rd (right)
-  const podiumOrder =
-    top3.length === 3
-      ? [top3[1], top3[0], top3[2]]
-      : [...top3].sort((a, b) => a.rank - b.rank)
 
   if (rows.length === 0) {
     return (
@@ -135,99 +130,121 @@ export default function LeaderboardClient({ rows, callerUserId, lang, quinielaId
         </div>
       )}
 
-      {/* Podium — top 3 */}
-      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-center">
-        {podiumOrder.map((row) => {
-          const style = PODIUM[row.rank]
+      {/* Mobile: card list for all players (hidden on sm+) */}
+      <div className="flex flex-col gap-3 sm:hidden">
+        {rows.map((row) => {
           const isCaller = row.userId === callerUserId
+          const style = PODIUM[row.rank]
           return (
             <div
               key={row.userId}
-              className={`flex w-full flex-row items-center gap-4 rounded-xl border px-4 py-4 sm:max-w-[140px] sm:flex-1 sm:flex-col sm:items-center sm:justify-end sm:gap-1 sm:px-3 sm:text-center ${style.height} ${style.mobileOrder} ${style.bg} ${style.border} ${isCaller ? style.callerRing : ''}`}
+              className={`flex w-full flex-row items-center gap-4 rounded-xl border px-4 py-3 ${style ? `${style.bg} ${style.border}` : 'border-gray-100 bg-white'} ${isCaller ? 'ring-2 ring-green-400' : ''}`}
             >
-              {/* Left (mobile) / Top (desktop): medal + rank number */}
-              <div className="flex flex-col items-center gap-0.5">
-                <span className="text-2xl" role="img" aria-label={`Rank ${row.rank} medal`}>
-                  {style.emoji}
-                </span>
-                <span className="text-xl font-black tabular-nums text-gray-600 sm:hidden">
-                  #{row.rank}
-                </span>
+              {/* Rank indicator */}
+              <div className="flex w-8 shrink-0 items-center justify-center">
+                {style ? (
+                  <span className="text-2xl" role="img" aria-label={`Rank ${row.rank} medal`}>
+                    {style.emoji}
+                  </span>
+                ) : (
+                  <span className="text-base font-black tabular-nums text-gray-500">#{row.rank}</span>
+                )}
               </div>
-
-              {/* Right (mobile) / Bottom (desktop): points + email + YOU badge */}
-              <div className="flex flex-col sm:items-center">
-                <div className="flex items-baseline gap-1">
-                  <span className={`text-2xl font-black tabular-nums sm:text-lg ${style.pts}`}>
+              {/* Email + YOU badge + points */}
+              <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <span className="truncate text-sm text-gray-900" title={row.email}>
+                    {row.email}
+                  </span>
+                  {isCaller && (
+                    <span className="w-fit rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">
+                      {dict.youBadge}
+                    </span>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-baseline gap-1">
+                  <span className={`text-xl font-black tabular-nums ${style ? style.pts : 'text-gray-800'}`}>
                     {row.totalPoints}
                   </span>
                   <span className="text-xs text-gray-400">{dict.pts}</span>
                 </div>
-                <span className="max-w-[9rem] truncate text-xs text-gray-700 sm:max-w-[110px]" title={row.email}>
-                  {row.email}
-                </span>
-                {isCaller && (
-                  <span className="mt-0.5 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">
-                    {dict.youBadge}
-                  </span>
-                )}
               </div>
             </div>
           )
         })}
       </div>
 
-      {/* Column header + ranked list (rank 4+) */}
-      {rest.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-gray-100 bg-white">
-          <div className="overflow-x-auto">
-          <div className="grid grid-cols-[2rem_1fr_3.5rem_3.5rem_3.5rem] gap-2 border-b border-gray-100 px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-400">
-            <span>#</span>
-            <span>{dict.colPlayer}</span>
-            <span className="text-right" title={dict.colExactTitle}>
-              ⚽ {dict.colExact}
-            </span>
-            <span className="text-right" title={dict.colOutcomeTitle}>
-              ✓ {dict.colOutcome}
-            </span>
-            <span className="text-right" title={dict.colPtsTitle}>
-              ⭐ {dict.colPts}
-            </span>
-          </div>
-
-          <ol className="divide-y divide-gray-100">
-            {rest.map((row) => {
-              const isCaller = row.userId === callerUserId
-              return (
-                <li
-                  key={row.userId}
-                  className={`grid grid-cols-[2rem_1fr_3.5rem_3.5rem_3.5rem] gap-2 items-center px-4 py-3 transition ${isCaller ? 'bg-green-50' : 'hover:bg-green-50'}`}
-                  aria-current={isCaller ? 'true' : undefined}
-                >
-                  <span className="tabular-nums text-sm font-mono text-gray-400">{row.rank}</span>
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="truncate text-sm text-gray-900">{row.email}</span>
-                    {isCaller && (
-                      <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">
-                        {dict.youBadge}
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-right text-sm tabular-nums text-gray-600">
-                    {row.exactScoreHits}
-                  </span>
-                  <span className="text-right text-sm tabular-nums text-gray-600">
-                    {row.correctOutcomeHits}
-                  </span>
-                  <span className="text-right text-sm font-bold tabular-nums text-gray-800">
-                    {row.totalPoints}
-                  </span>
-                </li>
-              )
-            })}
-          </ol>
-          </div>
+      {/* Desktop: full table for all players (hidden on mobile) */}
+      <div className="hidden sm:block overflow-hidden rounded-xl border border-gray-100 bg-white">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 text-xs font-medium uppercase tracking-wide text-gray-400">
+                <th className="px-4 py-2 text-left font-medium">#</th>
+                <th className="px-2 py-2 text-left font-medium">{dict.colPlayer}</th>
+                <th className="px-2 py-2 text-right font-medium whitespace-nowrap" title={dict.colExactTitle}>⚽ {dict.colExact}</th>
+                <th className="px-2 py-2 text-right font-medium whitespace-nowrap" title={dict.colOutcomeTitle}>✓ {dict.colOutcome}</th>
+                <th className="px-2 py-2 text-right font-medium whitespace-nowrap" title={dict.colHomeGoalPtsTitle}>{dict.colHomeGoalPts}</th>
+                <th className="px-2 py-2 text-right font-medium whitespace-nowrap" title={dict.colAwayGoalPtsTitle}>{dict.colAwayGoalPts}</th>
+                <th className="px-2 py-2 text-right font-medium whitespace-nowrap" title={dict.colOutcomePtsTitle}>{dict.colOutcomePts}</th>
+                <th className="px-2 py-2 text-right font-medium whitespace-nowrap" title={dict.colExtraPtsTitle}>{dict.colExtraPts}</th>
+                <th className="px-2 py-2 text-right font-medium whitespace-nowrap" title={dict.colPtsTitle}>⭐ {dict.colPts}</th>
+                <th className="px-4 py-2 font-medium" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {rows.map((row) => {
+                const isCaller = row.userId === callerUserId
+                return (
+                  <tr
+                    key={row.userId}
+                    className={`transition ${isCaller ? 'bg-green-50' : 'hover:bg-green-50'}`}
+                    aria-current={isCaller ? 'true' : undefined}
+                  >
+                    <td className="px-4 py-3 font-mono text-sm tabular-nums text-gray-400">{row.rank}</td>
+                    <td className="px-2 py-3">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-sm text-gray-900">{row.email}</span>
+                        {isCaller && (
+                          <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">
+                            {dict.youBadge}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-2 py-3 text-right text-sm tabular-nums text-gray-600">{row.exactScoreHits}</td>
+                    <td className="px-2 py-3 text-right text-sm tabular-nums text-gray-600">{row.correctOutcomeHits}</td>
+                    <td className="px-2 py-3 text-right text-sm tabular-nums text-gray-600">{row.homeGoalPoints}</td>
+                    <td className="px-2 py-3 text-right text-sm tabular-nums text-gray-600">{row.awayGoalPoints}</td>
+                    <td className="px-2 py-3 text-right text-sm tabular-nums text-gray-600">{row.outcomePoints}</td>
+                    <td className="px-2 py-3 text-right text-sm tabular-nums text-gray-600">{row.extraQuestionPoints}</td>
+                    <td className="px-2 py-3 text-right text-sm font-bold tabular-nums text-gray-800">{row.totalPoints}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedUserId(row.userId); setSelectedUserEmail(row.email) }}
+                        className="text-xs text-green-700 underline hover:text-green-900 transition whitespace-nowrap"
+                      >
+                        {dict.seePredictionsButton}
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
+      </div>
+
+      {/* Predictions modal */}
+      {selectedUserId && (
+        <PlayerPredictionsModal
+          quinielaId={quinielaId}
+          userId={selectedUserId}
+          userEmail={selectedUserEmail ?? ''}
+          onClose={() => { setSelectedUserId(null); setSelectedUserEmail(null) }}
+          dict={dict}
+        />
       )}
 
       {/* Sticky footer: visible when caller is ranked 4+ */}
