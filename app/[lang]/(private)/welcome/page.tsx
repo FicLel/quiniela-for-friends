@@ -119,20 +119,20 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
     expectedResults.map((r) => [r.matchId, { homeScore: r.homeScore, awayScore: r.awayScore }]),
   )
 
-  // Fetch crowd percentages for all matches in parallel
+  // Fetch crowd percentages for all matches in a single batched query
   const crowdPercentagesMap = new Map<string, { homeWinPct: number; drawPct: number; awayWinPct: number } | null>()
-  await Promise.all(
-    allMatches.map(async (match) => {
-      try {
-        const pct = await scoringService.getCrowdPercentages(match.id)
-        // Treat all-zero (no predictions) as null
-        const hasPredictions = pct.homeWinPct > 0 || pct.drawPct > 0 || pct.awayWinPct > 0
-        crowdPercentagesMap.set(match.id, hasPredictions ? pct : null)
-      } catch {
-        crowdPercentagesMap.set(match.id, null)
-      }
-    }),
-  )
+  try {
+    const percentagesByMatch = await scoringService.getCrowdPercentagesForMatches(
+      allMatches.map((match) => match.id),
+    )
+    for (const [matchId, pct] of percentagesByMatch) {
+      // Treat all-zero (no predictions) as null
+      const hasPredictions = pct.homeWinPct > 0 || pct.drawPct > 0 || pct.awayWinPct > 0
+      crowdPercentagesMap.set(matchId, hasPredictions ? pct : null)
+    }
+  } catch {
+    // Crowd percentages are decorative — render without them on failure
+  }
 
   const now = new Date()
   const knockoutStages = new Set(['ROUND_OF_32', 'ROUND_OF_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'THIRD_PLACE', 'FINAL'])

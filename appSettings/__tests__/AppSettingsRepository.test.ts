@@ -26,7 +26,9 @@
  *        from('user_expected_results').update({...}).is('quiniela_id', null) → { error }
  */
 
-import { AppSettingsRepository } from '../AppSettingsRepository'
+import { AppSettingsRepository, resetAppSettingsCache } from '../AppSettingsRepository'
+import { resetSupabaseServerClient } from '@/lib/supabaseServerClient'
+import { resetSchemaCheckCache } from '@/lib/schemaCheckCache'
 
 // ---------------------------------------------------------------------------
 // Mock plumbing — app_settings table
@@ -129,6 +131,9 @@ function setEnvVars() {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  resetSupabaseServerClient()
+  resetSchemaCheckCache()
+  resetAppSettingsCache()
 })
 
 // ---------------------------------------------------------------------------
@@ -179,9 +184,9 @@ describe('AppSettingsRepository – verifySchema', () => {
   it('calls the schema check only once across multiple calls on the same instance', async () => {
     setEnvVars()
     mockSchemaLimit.mockResolvedValueOnce({ error: null })
-    mockFindMaybySingle
-      .mockResolvedValueOnce({ data: DB_ROW, error: null })
-      .mockResolvedValueOnce({ data: DB_ROW, error: null })
+    // Only one data fetch is primed: the second find() is served from the
+    // process-scoped settings cache and never reaches the DB.
+    mockFindMaybySingle.mockResolvedValueOnce({ data: DB_ROW, error: null })
 
     const repo = new AppSettingsRepository()
     await repo.find()
@@ -189,6 +194,7 @@ describe('AppSettingsRepository – verifySchema', () => {
 
     expect(mockFindLimit).toHaveBeenCalledWith(0)
     expect(mockSchemaLimit).toHaveBeenCalledTimes(1)
+    expect(mockFindMaybySingle).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -279,6 +285,47 @@ describe('AppSettingsRepository – setPredictionMode', () => {
     mockInsert.mockResolvedValueOnce({ error: { message: 'insert failed' } })
 
     await expect(repo.setPredictionMode('shared')).rejects.toThrow('setPredictionMode insert failed: insert failed')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Settings cache — find() caching and write invalidation
+// ---------------------------------------------------------------------------
+
+describe('AppSettingsRepository – settings cache', () => {
+  it('serves a second find() from the cache without re-querying', async () => {
+    const repo = makeRepo()
+    mockFindMaybySingle.mockResolvedValueOnce({ data: DB_ROW, error: null })
+
+    const first = await repo.find()
+    const second = await repo.find()
+
+    expect(second).toEqual(first)
+    expect(mockFindMaybySingle).toHaveBeenCalledTimes(1)
+  })
+
+  it('setPredictionMode invalidates the cache so the next find() re-queries', async () => {
+    const repo = makeRepo()
+
+    // 1st find: cache miss → DB returns 'shared'
+    mockFindMaybySingle.mockResolvedValueOnce({ data: DB_ROW, error: null })
+    const before = await repo.find()
+    expect(before?.predictionMode).toBe('shared')
+
+    // Write: update succeeds, existence check finds the row
+    mockUpdateGt.mockResolvedValueOnce({ error: null })
+    mockFindMaybySingle.mockResolvedValueOnce({ data: { id: 'settings-uuid' }, error: null })
+    await repo.setPredictionMode('per_quiniela')
+
+    // 2nd find: must hit the DB again and see the new value
+    mockFindMaybySingle.mockResolvedValueOnce({
+      data: { ...DB_ROW, prediction_mode: 'per_quiniela' },
+      error: null,
+    })
+    const after = await repo.find()
+
+    expect(after?.predictionMode).toBe('per_quiniela')
+    expect(mockFindMaybySingle).toHaveBeenCalledTimes(3)
   })
 })
 

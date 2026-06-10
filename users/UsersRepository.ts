@@ -1,44 +1,36 @@
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseServerClient } from '@/lib/supabaseServerClient'
+import { verifyTableOnce } from '@/lib/schemaCheckCache'
 import type { IUsersRepository, User, CreateUserInput, UserWithMemberships, UserListFilters, UserListSort } from '@/users/users.types'
 import { getCachedHasUsers, setCachedHasUsers } from '@/users/usersCache'
 
 export class UsersRepository implements IUsersRepository {
   private readonly supabase
-  /** Resolves once on the first successful schema check; rejects if the table is absent. */
-  private schemaCheck: Promise<void> | null = null
 
   constructor() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL is required')
-    if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is required')
-    this.supabase = createClient(url, key)
+    this.supabase = getSupabaseServerClient()
   }
 
   /**
    * Lazily verifies that `public.users` exists in the database.
-   * The check is performed at most once per repository instance — subsequent
+   * The check is performed at most once per server process — subsequent
    * calls reuse the cached Promise so there is no repeated round-trip.
    *
    * Throws:
    *   Error: Supabase table "public.users" does not exist — run pending migrations before starting the application.
    */
-  private async verifySchema(): Promise<void> {
-    if (this.schemaCheck === null) {
-      this.schemaCheck = (async () => {
-        const { error } = await this.supabase
-          .from('users')
-          .select('id')
-          .limit(0)
+  private verifySchema(): Promise<void> {
+    return verifyTableOnce('users', async () => {
+      const { error } = await this.supabase
+        .from('users')
+        .select('id')
+        .limit(0)
 
-        if (error) {
-          throw new Error(
-            'Supabase table "public.users" does not exist — run pending migrations before starting the application.',
-          )
-        }
-      })()
-    }
-    return this.schemaCheck
+      if (error) {
+        throw new Error(
+          'Supabase table "public.users" does not exist — run pending migrations before starting the application.',
+        )
+      }
+    })
   }
 
   private toUser(row: Record<string, unknown>): User {
@@ -63,6 +55,21 @@ export class UsersRepository implements IUsersRepository {
       .single()
     if (error || !data) return null
     return this.toUser(data)
+  }
+
+  /**
+   * Fetch all users whose id is in `ids` with a single query.
+   * Unknown ids are silently omitted from the result.
+   */
+  async findByIds(ids: string[]): Promise<User[]> {
+    if (ids.length === 0) return []
+    await this.verifySchema()
+    const { data, error } = await this.supabase
+      .from('users')
+      .select('*')
+      .in('id', ids)
+    if (error) throw new Error(`findByIds failed: ${error.message}`)
+    return ((data ?? []) as Record<string, unknown>[]).map((row) => this.toUser(row))
   }
 
   async findByEmail(email: string): Promise<User | null> {

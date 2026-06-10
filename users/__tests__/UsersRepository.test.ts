@@ -1,4 +1,6 @@
 import { UsersRepository } from '../UsersRepository'
+import { resetSupabaseServerClient } from '@/lib/supabaseServerClient'
+import { resetSchemaCheckCache } from '@/lib/schemaCheckCache'
 import * as usersCache from '../usersCache'
 
 // ---------------------------------------------------------------------------
@@ -29,6 +31,9 @@ const mockSchemaLimit = jest.fn()
 const mockSingle = jest.fn()
 const mockDataSelectEq = jest.fn(() => ({ single: mockSingle }))
 
+// findByIds chain: .select('*').in('id', ids) — terminal
+const mockDataSelectIn = jest.fn()
+
 // hasAnyUser chain: .select('id').limit(1).maybeSingle()
 const mockHasUsersMaybeSingle = jest.fn()
 
@@ -43,7 +48,7 @@ const mockDataSelect = jest.fn((arg: string) => {
   if (arg === 'id') {
     return { limit: mockLimit }
   }
-  return { eq: mockDataSelectEq }
+  return { eq: mockDataSelectEq, in: mockDataSelectIn }
 })
 
 // Update chain
@@ -104,6 +109,8 @@ function setEnvVars() {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  resetSupabaseServerClient()
+  resetSchemaCheckCache()
   jest.spyOn(usersCache, 'getCachedHasUsers').mockReturnValue(null)
   jest.spyOn(usersCache, 'setCachedHasUsers').mockImplementation(() => undefined)
 })
@@ -166,6 +173,7 @@ describe('UsersRepository – findByEmail', () => {
       passwordHash: ROW.password_hash,
       role: ROW.role,
       mustChangePassword: ROW.must_change_password,
+      tokenVersion: 1,
       createdAt: new Date(ROW.created_at),
       updatedAt: new Date(ROW.updated_at),
     })
@@ -251,6 +259,54 @@ describe('UsersRepository – setPasswordHash', () => {
 })
 
 // ---------------------------------------------------------------------------
+// findByIds
+// ---------------------------------------------------------------------------
+
+describe('UsersRepository – findByIds', () => {
+  it('returns [] without querying when ids is empty', async () => {
+    setEnvVars()
+    const repo = new UsersRepository()
+
+    const users = await repo.findByIds([])
+
+    expect(users).toEqual([])
+    expect(mockDataSelectIn).not.toHaveBeenCalled()
+    expect(mockSchemaLimit).not.toHaveBeenCalled()
+  })
+
+  it('fetches all matching users with a single .in query', async () => {
+    const repo = makeRepo()
+    const secondRow = { ...ROW, id: 'user-uuid-2', email: 'bob@example.com' }
+    mockDataSelectIn.mockResolvedValueOnce({ data: [ROW, secondRow], error: null })
+
+    const users = await repo.findByIds(['user-uuid', 'user-uuid-2'])
+
+    expect(mockDataSelectIn).toHaveBeenCalledTimes(1)
+    expect(mockDataSelectIn).toHaveBeenCalledWith('id', ['user-uuid', 'user-uuid-2'])
+    expect(users).toHaveLength(2)
+    expect(users[0].id).toBe('user-uuid')
+    expect(users[1].email).toBe('bob@example.com')
+  })
+
+  it('silently omits unknown ids', async () => {
+    const repo = makeRepo()
+    mockDataSelectIn.mockResolvedValueOnce({ data: [ROW], error: null })
+
+    const users = await repo.findByIds(['user-uuid', 'unknown-uuid'])
+
+    expect(users).toHaveLength(1)
+    expect(users[0].id).toBe('user-uuid')
+  })
+
+  it('throws "findByIds failed: <msg>" on Supabase error', async () => {
+    const repo = makeRepo()
+    mockDataSelectIn.mockResolvedValueOnce({ data: null, error: { message: 'permission denied' } })
+
+    await expect(repo.findByIds(['user-uuid'])).rejects.toThrow('findByIds failed: permission denied')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // create
 // ---------------------------------------------------------------------------
 
@@ -272,6 +328,7 @@ describe('UsersRepository – create', () => {
       passwordHash: ROW.password_hash,
       role: ROW.role,
       mustChangePassword: ROW.must_change_password,
+      tokenVersion: 1,
       createdAt: new Date(ROW.created_at),
       updatedAt: new Date(ROW.updated_at),
     })

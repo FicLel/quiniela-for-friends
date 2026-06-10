@@ -18,6 +18,8 @@
  */
 
 import { PredictionScoreRepository } from '../PredictionScoreRepository'
+import { resetSupabaseServerClient } from '@/lib/supabaseServerClient'
+import { resetSchemaCheckCache } from '@/lib/schemaCheckCache'
 
 // ---------------------------------------------------------------------------
 // Mock plumbing
@@ -56,6 +58,12 @@ const mockSchemaSelectLimit = jest.fn((n: number) => {
 })
 
 // --------------------------------------------------------------------------
+// findCrowdOutcomesByMatchIds chain:
+//   select('match_id, home_score, away_score').in('match_id', ids) — terminal
+// --------------------------------------------------------------------------
+const mockUerIn = jest.fn()
+
+// --------------------------------------------------------------------------
 // Combined select router
 // --------------------------------------------------------------------------
 const mockSelect = jest.fn((arg: string) => {
@@ -65,6 +73,10 @@ const mockSelect = jest.fn((arg: string) => {
   if (arg === 'user_id, quiniela_id') {
     // quiniela_memberships: .select('user_id, quiniela_id').in(...)
     return { in: mockMembershipsIn }
+  }
+  if (arg === 'match_id, home_score, away_score') {
+    // findCrowdOutcomesByMatchIds: batched crowd outcomes
+    return { in: mockUerIn }
   }
   // user_expected_results data selects: route to mockUerEq terminal
   return { eq: mockUerEq }
@@ -208,6 +220,8 @@ function makeRepo() {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  resetSupabaseServerClient()
+  resetSchemaCheckCache()
 })
 
 // ---------------------------------------------------------------------------
@@ -553,6 +567,74 @@ describe('PredictionScoreRepository – findCrowdOutcomes', () => {
 
     await expect(repo.findCrowdOutcomes('match-uuid')).rejects.toThrow(
       'findCrowdOutcomes failed: permission denied',
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// findCrowdOutcomesByMatchIds — batched crowd outcomes
+//
+// Chain:
+//   from('user_expected_results')
+//     .select('match_id, home_score, away_score')
+//     .in('match_id', matchIds) → { data, error }
+// ---------------------------------------------------------------------------
+
+describe('PredictionScoreRepository – findCrowdOutcomesByMatchIds', () => {
+  it('groups rows by match id with a single query', async () => {
+    const repo = makeRepo()
+
+    mockUerIn.mockResolvedValueOnce({
+      data: [
+        { match_id: 'match-1', home_score: 2, away_score: 1 },
+        { match_id: 'match-2', home_score: 0, away_score: 0 },
+        { match_id: 'match-1', home_score: 1, away_score: 1 },
+      ],
+      error: null,
+    })
+
+    const grouped = await repo.findCrowdOutcomesByMatchIds(['match-1', 'match-2'])
+
+    expect(mockUerIn).toHaveBeenCalledTimes(1)
+    expect(mockUerIn).toHaveBeenCalledWith('match_id', ['match-1', 'match-2'])
+    expect(grouped.get('match-1')).toEqual([
+      { homeScore: 2, awayScore: 1 },
+      { homeScore: 1, awayScore: 1 },
+    ])
+    expect(grouped.get('match-2')).toEqual([{ homeScore: 0, awayScore: 0 }])
+  })
+
+  it('omits matches that have no predictions', async () => {
+    const repo = makeRepo()
+
+    mockUerIn.mockResolvedValueOnce({
+      data: [{ match_id: 'match-1', home_score: 2, away_score: 1 }],
+      error: null,
+    })
+
+    const grouped = await repo.findCrowdOutcomesByMatchIds(['match-1', 'match-without-predictions'])
+
+    expect(grouped.has('match-without-predictions')).toBe(false)
+    expect(grouped.size).toBe(1)
+  })
+
+  it('returns an empty map without querying when matchIds is empty', async () => {
+    const repo = makeRepo()
+
+    const grouped = await repo.findCrowdOutcomesByMatchIds([])
+
+    expect(grouped.size).toBe(0)
+    expect(mockUerIn).not.toHaveBeenCalled()
+    expect(mockSchemaLimit).not.toHaveBeenCalled()
+  })
+
+  it('throws "findCrowdOutcomesByMatchIds failed: <msg>" on Supabase error', async () => {
+    const repo = makeRepo()
+
+    mockUerIn.mockResolvedValueOnce({ data: null, error: { message: 'permission denied' } })
+
+    await expect(repo.findCrowdOutcomesByMatchIds(['match-1'])).rejects.toThrow(
+      'findCrowdOutcomesByMatchIds failed: permission denied',
     )
   })
 })

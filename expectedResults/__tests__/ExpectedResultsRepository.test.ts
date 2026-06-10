@@ -35,6 +35,8 @@
  */
 
 import { ExpectedResultsRepository } from '../ExpectedResultsRepository'
+import { resetSupabaseServerClient } from '@/lib/supabaseServerClient'
+import { resetSchemaCheckCache } from '@/lib/schemaCheckCache'
 
 // ---------------------------------------------------------------------------
 // Mock plumbing
@@ -178,6 +180,8 @@ function setEnvVars() {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  resetSupabaseServerClient()
+  resetSchemaCheckCache()
 })
 
 // ---------------------------------------------------------------------------

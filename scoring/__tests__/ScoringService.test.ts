@@ -69,6 +69,7 @@ function makePredictionScoreRepository(
     findPredictionsWithQuinielas: jest.fn().mockResolvedValue([]),
     aggregateByQuiniela: jest.fn().mockResolvedValue([]),
     findCrowdOutcomes: jest.fn().mockResolvedValue([]),
+    findCrowdOutcomesByMatchIds: jest.fn().mockResolvedValue(new Map()),
     ...overrides,
   } as unknown as IPredictionScoreRepository
 }
@@ -335,5 +336,73 @@ describe('ScoringService.getCrowdPercentages', () => {
     expect(result.homeWinPct).toBe(33)
     expect(result.drawPct).toBe(33)
     expect(result.awayWinPct).toBe(33)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// ScoringService.getCrowdPercentagesForMatches — batched variant
+// ---------------------------------------------------------------------------
+
+describe('ScoringService.getCrowdPercentagesForMatches', () => {
+  it('computes percentages per match from a single batched repository call', async () => {
+    const outcomesByMatch = new Map([
+      [
+        'match-1',
+        [
+          { homeScore: 1, awayScore: 0 }, // HOME_WIN
+          { homeScore: 0, awayScore: 0 }, // DRAW
+        ],
+      ],
+      ['match-2', [{ homeScore: 0, awayScore: 2 }]], // AWAY_WIN
+    ])
+    const repo = makePredictionScoreRepository({
+      findCrowdOutcomesByMatchIds: jest.fn().mockResolvedValue(outcomesByMatch),
+    })
+
+    const service = new ScoringService(repo, makeCompetitionsRepository())
+    const result = await service.getCrowdPercentagesForMatches(['match-1', 'match-2'])
+
+    expect(repo.findCrowdOutcomesByMatchIds).toHaveBeenCalledTimes(1)
+    expect(repo.findCrowdOutcomesByMatchIds).toHaveBeenCalledWith(['match-1', 'match-2'])
+    expect(result.get('match-1')).toEqual({ homeWinPct: 50, drawPct: 50, awayWinPct: 0 })
+    expect(result.get('match-2')).toEqual({ homeWinPct: 0, drawPct: 0, awayWinPct: 100 })
+  })
+
+  it('returns all-zero percentages for matches without predictions (same as single-match)', async () => {
+    const repo = makePredictionScoreRepository({
+      findCrowdOutcomesByMatchIds: jest.fn().mockResolvedValue(new Map()),
+    })
+
+    const service = new ScoringService(repo, makeCompetitionsRepository())
+    const result = await service.getCrowdPercentagesForMatches(['match-1'])
+
+    expect(result.get('match-1')).toEqual({ homeWinPct: 0, drawPct: 0, awayWinPct: 0 })
+  })
+
+  it('returns an empty map for an empty match list', async () => {
+    const repo = makePredictionScoreRepository()
+
+    const service = new ScoringService(repo, makeCompetitionsRepository())
+    const result = await service.getCrowdPercentagesForMatches([])
+
+    expect(result.size).toBe(0)
+  })
+
+  it('matches getCrowdPercentages output for the same outcomes', async () => {
+    const outcomes = [
+      { homeScore: 1, awayScore: 0 },
+      { homeScore: 0, awayScore: 0 },
+      { homeScore: 0, awayScore: 1 },
+    ]
+    const repo = makePredictionScoreRepository({
+      findCrowdOutcomes: jest.fn().mockResolvedValue(outcomes),
+      findCrowdOutcomesByMatchIds: jest.fn().mockResolvedValue(new Map([['match-1', outcomes]])),
+    })
+
+    const service = new ScoringService(repo, makeCompetitionsRepository())
+    const single = await service.getCrowdPercentages('match-1')
+    const batched = await service.getCrowdPercentagesForMatches(['match-1'])
+
+    expect(batched.get('match-1')).toEqual(single)
   })
 })

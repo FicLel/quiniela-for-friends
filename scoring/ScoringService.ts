@@ -107,27 +107,51 @@ export class ScoringService implements IScoringService {
    */
   async getCrowdPercentages(matchId: string): Promise<CrowdPercentages> {
     const outcomes = await this.repo.findCrowdOutcomes(matchId)
+    return computeCrowdPercentages(outcomes)
+  }
 
-    if (outcomes.length === 0) {
-      return { homeWinPct: 0, drawPct: 0, awayWinPct: 0 }
+  /**
+   * Compute crowd percentages for many matches with a single repository call.
+   * Matches without predictions map to all-zero percentages, matching the
+   * single-match behaviour.
+   */
+  async getCrowdPercentagesForMatches(matchIds: string[]): Promise<Map<string, CrowdPercentages>> {
+    const outcomesByMatch = await this.repo.findCrowdOutcomesByMatchIds(matchIds)
+
+    const result = new Map<string, CrowdPercentages>()
+    for (const matchId of matchIds) {
+      result.set(matchId, computeCrowdPercentages(outcomesByMatch.get(matchId) ?? []))
     }
+    return result
+  }
+}
 
-    let homeWins = 0
-    let draws = 0
-    let awayWins = 0
+/**
+ * Derive outcome percentages (home win / draw / away win) from a list of
+ * crowd predictions. Returns zeroes when the list is empty.
+ */
+function computeCrowdPercentages(
+  outcomes: { homeScore: number; awayScore: number }[],
+): CrowdPercentages {
+  if (outcomes.length === 0) {
+    return { homeWinPct: 0, drawPct: 0, awayWinPct: 0 }
+  }
 
-    for (const o of outcomes) {
-      const outcome = deriveOutcome(o.homeScore, o.awayScore)
-      if (outcome === 'HOME_WIN') homeWins++
-      else if (outcome === 'DRAW') draws++
-      else awayWins++
-    }
+  let homeWins = 0
+  let draws = 0
+  let awayWins = 0
 
-    const total = outcomes.length
-    return {
-      homeWinPct: Math.floor((homeWins / total) * 100),
-      drawPct: Math.floor((draws / total) * 100),
-      awayWinPct: Math.floor((awayWins / total) * 100),
-    }
+  for (const o of outcomes) {
+    const outcome = deriveOutcome(o.homeScore, o.awayScore)
+    if (outcome === 'HOME_WIN') homeWins++
+    else if (outcome === 'DRAW') draws++
+    else awayWins++
+  }
+
+  const total = outcomes.length
+  return {
+    homeWinPct: Math.floor((homeWins / total) * 100),
+    drawPct: Math.floor((draws / total) * 100),
+    awayWinPct: Math.floor((awayWins / total) * 100),
   }
 }

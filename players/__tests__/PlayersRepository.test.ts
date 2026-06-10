@@ -1,5 +1,7 @@
 import { PlayersRepository } from '../PlayersRepository'
 import type { PlayerDbRow } from '../players.types'
+import { resetSupabaseServerClient } from '@/lib/supabaseServerClient'
+import { resetSchemaCheckCache } from '@/lib/schemaCheckCache'
 
 // ---------------------------------------------------------------------------
 // Mock plumbing
@@ -142,6 +144,8 @@ function setEnvVars() {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  resetSupabaseServerClient()
+  resetSchemaCheckCache()
 })
 
 // ---------------------------------------------------------------------------

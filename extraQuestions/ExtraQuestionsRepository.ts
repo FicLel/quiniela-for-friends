@@ -8,7 +8,8 @@
  * - Snake_case ↔ camelCase mapping at the boundary.
  */
 
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseServerClient } from '@/lib/supabaseServerClient'
+import { verifyTableOnce } from '@/lib/schemaCheckCache'
 import type {
   IExtraQuestionsRepository,
   ExtraQuestion,
@@ -21,38 +22,29 @@ import type {
 
 export class ExtraQuestionsRepository implements IExtraQuestionsRepository {
   private readonly supabase
-  /** Resolves once on the first successful schema check; rejects if the table is absent. */
-  private schemaCheck: Promise<void> | null = null
 
   constructor() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL is required')
-    if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is required')
-    this.supabase = createClient(url, key)
+    this.supabase = getSupabaseServerClient()
   }
 
   /**
    * Lazily verifies that `public.extra_questions` exists in the database.
-   * The check is performed at most once per repository instance — subsequent
+   * The check is performed at most once per server process — subsequent
    * calls reuse the cached Promise so there is no repeated round-trip.
    */
-  private async verifySchema(): Promise<void> {
-    if (this.schemaCheck === null) {
-      this.schemaCheck = (async () => {
-        const { error } = await this.supabase
-          .from('extra_questions')
-          .select('id')
-          .limit(1)
+  private verifySchema(): Promise<void> {
+    return verifyTableOnce('extra_questions', async () => {
+      const { error } = await this.supabase
+        .from('extra_questions')
+        .select('id')
+        .limit(1)
 
-        if (error) {
-          throw new Error(
-            'Supabase table "public.extra_questions" does not exist — run pending migrations before starting the application.',
-          )
-        }
-      })()
-    }
-    return this.schemaCheck
+      if (error) {
+        throw new Error(
+          'Supabase table "public.extra_questions" does not exist — run pending migrations before starting the application.',
+        )
+      }
+    })
   }
 
   /**

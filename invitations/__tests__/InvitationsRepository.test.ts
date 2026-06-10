@@ -8,6 +8,8 @@
  */
 
 import { InvitationsRepository } from '../InvitationsRepository'
+import { resetSupabaseServerClient } from '@/lib/supabaseServerClient'
+import { resetSchemaCheckCache } from '@/lib/schemaCheckCache'
 
 // ---------------------------------------------------------------------------
 // Mock plumbing
@@ -127,6 +129,8 @@ function makeRepo(schemaExists = true) {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  resetSupabaseServerClient()
+  resetSchemaCheckCache()
   useOpenChain = false
 })
 

@@ -59,14 +59,10 @@ export class LeaderboardService implements ILeaderboardService {
         }))
     }
 
-    // Resolve email for each userId
-    const emailByUserId = new Map<string, string>()
-    await Promise.all(
-      aggregates.map(async (agg) => {
-        const user = await this.usersRepo.findById(agg.userId)
-        emailByUserId.set(agg.userId, user?.email ?? agg.userId)
-      }),
-    )
+    // Resolve emails for all userIds with a single batched query;
+    // users missing from the result fall back to their userId.
+    const users = await this.usersRepo.findByIds(aggregates.map((agg) => agg.userId))
+    const emailByUserId = new Map<string, string>(users.map((u) => [u.id, u.email]))
 
     // Sort: totalPoints desc → exactScoreHits desc → correctOutcomeHits desc → email asc
     const sorted = [...aggregates].sort((a, b) => {

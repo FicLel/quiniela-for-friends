@@ -8,46 +8,52 @@
  * - Snake_case ↔ camelCase mapping at the boundary.
  */
 
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseServerClient } from '@/lib/supabaseServerClient'
+import { verifyTableOnce } from '@/lib/schemaCheckCache'
+import { TtlCache } from '@/lib/ttlCache'
 import type {
   IAppSettingsRepository,
   AppSettings,
   PredictionMode,
 } from '@/appSettings/appSettings.types'
 
+/**
+ * Process-scoped cache for the single settings row. Settings change rarely
+ * (admin action) but are read on every page view; writes invalidate the key
+ * so changes are visible immediately on this instance.
+ */
+const settingsCache = new TtlCache<AppSettings | null>(60_000, 1)
+const SETTINGS_CACHE_KEY = 'app_settings'
+
+/** Clear the settings cache — intended for tests only. */
+export function resetAppSettingsCache(): void {
+  settingsCache.clear()
+}
+
 export class AppSettingsRepository implements IAppSettingsRepository {
   private readonly supabase
-  /** Resolves once on the first successful schema check; rejects if the table is absent. */
-  private schemaCheck: Promise<void> | null = null
 
   constructor() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL is required')
-    if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is required')
-    this.supabase = createClient(url, key)
+    this.supabase = getSupabaseServerClient()
   }
 
   /**
    * Lazily verifies that `public.app_settings` exists in the database.
-   * The check is performed at most once per repository instance.
+   * The check is performed at most once per server process.
    */
-  private async verifySchema(): Promise<void> {
-    if (this.schemaCheck === null) {
-      this.schemaCheck = (async () => {
-        const { error } = await this.supabase
-          .from('app_settings')
-          .select('id')
-          .limit(0)
+  private verifySchema(): Promise<void> {
+    return verifyTableOnce('app_settings', async () => {
+      const { error } = await this.supabase
+        .from('app_settings')
+        .select('id')
+        .limit(0)
 
-        if (error) {
-          throw new Error(
-            'Supabase table "public.app_settings" does not exist — run pending migrations before starting the application.',
-          )
-        }
-      })()
-    }
-    return this.schemaCheck
+      if (error) {
+        throw new Error(
+          'Supabase table "public.app_settings" does not exist — run pending migrations before starting the application.',
+        )
+      }
+    })
   }
 
   private toAppSettings(row: Record<string, unknown>): AppSettings {
@@ -61,9 +67,13 @@ export class AppSettingsRepository implements IAppSettingsRepository {
 
   /**
    * Return the single settings row, or null if the table is empty.
+   * Served from the process-scoped cache for up to 60s; writes invalidate it.
    * Throws on Supabase error.
    */
   async find(): Promise<AppSettings | null> {
+    const cached = settingsCache.get(SETTINGS_CACHE_KEY)
+    if (cached !== undefined) return cached
+
     await this.verifySchema()
 
     const { data, error } = await this.supabase
@@ -76,9 +86,9 @@ export class AppSettingsRepository implements IAppSettingsRepository {
       throw new Error(`find app_settings failed: ${error.message}`)
     }
 
-    if (!data) return null
-
-    return this.toAppSettings(data as Record<string, unknown>)
+    const settings = data ? this.toAppSettings(data as Record<string, unknown>) : null
+    settingsCache.set(SETTINGS_CACHE_KEY, settings)
+    return settings
   }
 
   /**
@@ -125,6 +135,10 @@ export class AppSettingsRepository implements IAppSettingsRepository {
         throw new Error(`setPredictionMode insert failed: ${insertError.message}`)
       }
     }
+
+    // Drop the cached row only after the write lands so a concurrent find()
+    // cannot repopulate the cache with the value we are replacing.
+    settingsCache.invalidate(SETTINGS_CACHE_KEY)
   }
 
   /**

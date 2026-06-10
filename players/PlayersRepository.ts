@@ -9,7 +9,8 @@
  * - Snake_case ↔ camelCase mapping at the boundary.
  */
 
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseServerClient } from '@/lib/supabaseServerClient'
+import { verifyTableOnce } from '@/lib/schemaCheckCache'
 import type {
   IPlayersRepository,
   Player,
@@ -20,41 +21,32 @@ import type {
 
 export class PlayersRepository implements IPlayersRepository {
   private readonly supabase
-  /** Resolves once on the first successful schema check; rejects if the table is absent. */
-  private schemaCheck: Promise<void> | null = null
 
   constructor() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL is required')
-    if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is required')
-    this.supabase = createClient(url, key)
+    this.supabase = getSupabaseServerClient()
   }
 
   /**
    * Lazily verifies that `public.players` exists in the database.
-   * The check is performed at most once per repository instance — subsequent
+   * The check is performed at most once per server process — subsequent
    * calls reuse the cached Promise so there is no repeated round-trip.
    *
    * Throws:
    *   Error: Supabase table "public.players" does not exist — run pending migrations before starting the application.
    */
-  private async verifySchema(): Promise<void> {
-    if (this.schemaCheck === null) {
-      this.schemaCheck = (async () => {
-        const { error } = await this.supabase
-          .from('players')
-          .select('id')
-          .limit(0)
+  private verifySchema(): Promise<void> {
+    return verifyTableOnce('players', async () => {
+      const { error } = await this.supabase
+        .from('players')
+        .select('id')
+        .limit(0)
 
-        if (error) {
-          throw new Error(
-            'Supabase table "public.players" does not exist — run pending migrations before starting the application.',
-          )
-        }
-      })()
-    }
-    return this.schemaCheck
+      if (error) {
+        throw new Error(
+          'Supabase table "public.players" does not exist — run pending migrations before starting the application.',
+        )
+      }
+    })
   }
 
   /**

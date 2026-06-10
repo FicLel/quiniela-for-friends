@@ -84,6 +84,7 @@ function makePredictionScoreRepository(
     findPredictionsWithQuinielas: jest.fn().mockResolvedValue([]),
     aggregateByQuiniela: jest.fn().mockResolvedValue([]),
     findCrowdOutcomes: jest.fn().mockResolvedValue([]),
+    findCrowdOutcomesByMatchIds: jest.fn().mockResolvedValue(new Map()),
     findPlayerPredictionsForViewer: jest.fn().mockResolvedValue([]),
     ...overrides,
   } as unknown as IPredictionScoreRepository
@@ -92,9 +93,20 @@ function makePredictionScoreRepository(
 function makeUsersRepository(
   overrides: Partial<Record<keyof IUsersRepository, jest.Mock>> = {},
 ): IUsersRepository {
-  return {
+  const base = {
     findById: jest.fn().mockResolvedValue({ id: 'user-uuid-1', email: 'alice@example.com' }),
     ...overrides,
+  }
+  return {
+    ...base,
+    // Unless overridden, findByIds delegates to findById per id (in order) so
+    // existing tests that prime findById sequences keep working unchanged.
+    findByIds:
+      base.findByIds ??
+      jest.fn(async (ids: string[]) => {
+        const users = await Promise.all(ids.map((id) => base.findById(id)))
+        return users.filter((u) => u !== null && u !== undefined)
+      }),
   } as unknown as IUsersRepository
 }
 
@@ -191,6 +203,39 @@ describe('LeaderboardService – getLeaderboard (point breakdown fields)', () =>
     expect(row.outcomePoints).toBe(0)
     expect(row.extraQuestionPoints).toBe(0)
     expect(row.totalPoints).toBe(0)
+  })
+
+  it('resolves all emails with a single batched findByIds call (no per-user queries)', async () => {
+    const aggA = makeAggregateRow({ userId: 'user-A' })
+    const aggB = makeAggregateRow({ userId: 'user-B' })
+    const repo = makePredictionScoreRepository({
+      aggregateByQuiniela: jest.fn().mockResolvedValue([aggA, aggB]),
+    })
+    const findByIds = jest.fn().mockResolvedValue([
+      { id: 'user-A', email: 'alice@example.com' },
+      { id: 'user-B', email: 'bob@example.com' },
+    ])
+    const usersRepo = makeUsersRepository({ findByIds })
+
+    const service = new LeaderboardService(repo, usersRepo, makeMembershipsRepository())
+    const leaderboard = await service.getLeaderboard('quiniela-uuid')
+
+    expect(findByIds).toHaveBeenCalledTimes(1)
+    expect(findByIds).toHaveBeenCalledWith(['user-A', 'user-B'])
+    expect(leaderboard.map((r) => r.email).sort()).toEqual(['alice@example.com', 'bob@example.com'])
+  })
+
+  it('falls back to the userId when findByIds omits a user', async () => {
+    const agg = makeAggregateRow({ userId: 'user-missing' })
+    const repo = makePredictionScoreRepository({
+      aggregateByQuiniela: jest.fn().mockResolvedValue([agg]),
+    })
+    const usersRepo = makeUsersRepository({ findByIds: jest.fn().mockResolvedValue([]) })
+
+    const service = new LeaderboardService(repo, usersRepo, makeMembershipsRepository())
+    const leaderboard = await service.getLeaderboard('quiniela-uuid')
+
+    expect(leaderboard[0].email).toBe('user-missing')
   })
 
   it('sorts multiple users and passes 4 breakdown fields for each', async () => {

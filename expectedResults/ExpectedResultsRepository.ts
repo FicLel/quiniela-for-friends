@@ -9,7 +9,8 @@
  * - Snake_case ↔ camelCase mapping at the boundary.
  */
 
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseServerClient } from '@/lib/supabaseServerClient'
+import { verifyTableOnce } from '@/lib/schemaCheckCache'
 import type {
   IExpectedResultsRepository,
   ExpectedResult,
@@ -18,37 +19,28 @@ import type {
 
 export class ExpectedResultsRepository implements IExpectedResultsRepository {
   private readonly supabase
-  /** Resolves once on the first successful schema check; rejects if the table is absent. */
-  private schemaCheck: Promise<void> | null = null
 
   constructor() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL is required')
-    if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is required')
-    this.supabase = createClient(url, key)
+    this.supabase = getSupabaseServerClient()
   }
 
   /**
    * Lazily verifies that `public.user_expected_results` exists in the database.
-   * The check is performed at most once per repository instance.
+   * The check is performed at most once per server process.
    */
-  private async verifySchema(): Promise<void> {
-    if (this.schemaCheck === null) {
-      this.schemaCheck = (async () => {
-        const { error } = await this.supabase
-          .from('user_expected_results')
-          .select('id')
-          .limit(0)
+  private verifySchema(): Promise<void> {
+    return verifyTableOnce('user_expected_results', async () => {
+      const { error } = await this.supabase
+        .from('user_expected_results')
+        .select('id')
+        .limit(0)
 
-        if (error) {
-          throw new Error(
-            'Supabase table "public.user_expected_results" does not exist — run pending migrations before starting the application.',
-          )
-        }
-      })()
-    }
-    return this.schemaCheck
+      if (error) {
+        throw new Error(
+          'Supabase table "public.user_expected_results" does not exist — run pending migrations before starting the application.',
+        )
+      }
+    })
   }
 
   private toExpectedResult(row: Record<string, unknown>): ExpectedResult {

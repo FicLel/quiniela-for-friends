@@ -8,7 +8,9 @@
  * - Snake_case ↔ camelCase mapping at the boundary.
  */
 
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseServerClient } from '@/lib/supabaseServerClient'
+import { verifyTableOnce } from '@/lib/schemaCheckCache'
+import { TtlCache } from '@/lib/ttlCache'
 import type {
   ICompetitionsRepository,
   KnockoutPlaceholderRecord,
@@ -16,43 +18,47 @@ import type {
   MatchImportRecord,
 } from '@/competitions/competitions.types'
 
+/**
+ * Process-scoped cache for the full matches list — read on every page view
+ * but only changed by imports and result syncs, which invalidate the key.
+ * 30s TTL bounds staleness across server instances.
+ */
+const matchesCache = new TtlCache<Match[]>(30_000, 1)
+const ALL_MATCHES_CACHE_KEY = 'all_matches'
+
+/** Clear the matches cache — intended for tests only. */
+export function resetMatchesCache(): void {
+  matchesCache.clear()
+}
+
 export class CompetitionsRepository implements ICompetitionsRepository {
   private readonly supabase
-  /** Resolves once on the first successful schema check; rejects if the table is absent. */
-  private schemaCheck: Promise<void> | null = null
 
   constructor() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL is required')
-    if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is required')
-    this.supabase = createClient(url, key)
+    this.supabase = getSupabaseServerClient()
   }
 
   /**
    * Lazily verifies that `public.matches` exists in the database.
-   * The check is performed at most once per repository instance — subsequent
+   * The check is performed at most once per server process — subsequent
    * calls reuse the cached Promise so there is no repeated round-trip.
    *
    * Throws:
    *   Error: Supabase table "public.matches" does not exist — run pending migrations before starting the application.
    */
-  private async verifySchema(): Promise<void> {
-    if (this.schemaCheck === null) {
-      this.schemaCheck = (async () => {
-        const { error } = await this.supabase
-          .from('matches')
-          .select('id')
-          .limit(0)
+  private verifySchema(): Promise<void> {
+    return verifyTableOnce('matches', async () => {
+      const { error } = await this.supabase
+        .from('matches')
+        .select('id')
+        .limit(0)
 
-        if (error) {
-          throw new Error(
-            'Supabase table "public.matches" does not exist — run pending migrations before starting the application.',
-          )
-        }
-      })()
-    }
-    return this.schemaCheck
+      if (error) {
+        throw new Error(
+          'Supabase table "public.matches" does not exist — run pending migrations before starting the application.',
+        )
+      }
+    })
   }
 
   /**
@@ -131,6 +137,7 @@ export class CompetitionsRepository implements ICompetitionsRepository {
       throw new Error(`upsertMatches failed: ${error.message}`)
     }
 
+    matchesCache.invalidate(ALL_MATCHES_CACHE_KEY)
     return rows.length
   }
 
@@ -161,9 +168,13 @@ export class CompetitionsRepository implements ICompetitionsRepository {
   /**
    * Return all matches (all stages) ordered by scheduled_at.
    * Returns [] if the table is empty or data is null.
+   * Served from the process-scoped cache for up to 30s; writes invalidate it.
    * Throws on Supabase error.
    */
   async findAllMatches(): Promise<Match[]> {
+    const cached = matchesCache.get(ALL_MATCHES_CACHE_KEY)
+    if (cached !== undefined) return cached
+
     await this.verifySchema()
 
     const { data, error } = await this.supabase
@@ -175,9 +186,13 @@ export class CompetitionsRepository implements ICompetitionsRepository {
       throw new Error(`findAllMatches failed: ${error.message}`)
     }
 
-    if (!data || data.length === 0) return []
+    const matches =
+      !data || data.length === 0
+        ? []
+        : data.map((row) => this.toMatch(row as Record<string, unknown>))
 
-    return data.map((row) => this.toMatch(row as Record<string, unknown>))
+    matchesCache.set(ALL_MATCHES_CACHE_KEY, matches)
+    return matches
   }
 
   /**
@@ -217,6 +232,7 @@ export class CompetitionsRepository implements ICompetitionsRepository {
       throw new Error(`upsertKnockoutPlaceholders failed: ${error.message}`)
     }
 
+    matchesCache.invalidate(ALL_MATCHES_CACHE_KEY)
     return rows.length
   }
 
@@ -258,6 +274,8 @@ export class CompetitionsRepository implements ICompetitionsRepository {
     if (error) {
       throw new Error(`updateRegulationResults failed: ${error.message}`)
     }
+
+    matchesCache.invalidate(ALL_MATCHES_CACHE_KEY)
   }
 
   /**
@@ -421,6 +439,7 @@ export class CompetitionsRepository implements ICompetitionsRepository {
       }
     }
 
+    if (updated > 0) matchesCache.invalidate(ALL_MATCHES_CACHE_KEY)
     return updated
   }
 }

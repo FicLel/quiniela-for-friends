@@ -1,5 +1,7 @@
-import { CompetitionsRepository } from '../CompetitionsRepository'
+import { CompetitionsRepository, resetMatchesCache } from '../CompetitionsRepository'
 import type { MatchImportRecord } from '../competitions.types'
+import { resetSupabaseServerClient } from '@/lib/supabaseServerClient'
+import { resetSchemaCheckCache } from '@/lib/schemaCheckCache'
 
 // ---------------------------------------------------------------------------
 // Mock plumbing
@@ -182,6 +184,9 @@ function makeRepoForFindAllMatches(schemaExists = true) {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  resetSupabaseServerClient()
+  resetSchemaCheckCache()
+  resetMatchesCache()
   useFindAllChain = false
 })
 
@@ -541,6 +546,63 @@ describe('CompetitionsRepository – findAllMatches', () => {
     await expect(repo.findAllMatches()).rejects.toThrow(
       'Supabase table "public.matches" does not exist — run pending migrations before starting the application.',
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Matches cache — findAllMatches caching and write invalidation
+// ---------------------------------------------------------------------------
+
+describe('CompetitionsRepository – matches cache', () => {
+  it('serves a second findAllMatches() from the cache without re-querying', async () => {
+    const repo = makeRepoForFindAllMatches()
+    mockFindAllOrder.mockResolvedValueOnce({ data: [DB_ROW], error: null })
+
+    const first = await repo.findAllMatches()
+    const second = await repo.findAllMatches()
+
+    expect(second).toEqual(first)
+    expect(mockFindAllOrder).toHaveBeenCalledTimes(1)
+  })
+
+  it('updateRegulationResults invalidates the cache so the next read re-queries', async () => {
+    const repo = makeRepoForFindAllMatches()
+    mockFindAllOrder.mockResolvedValueOnce({ data: [DB_ROW], error: null })
+    await repo.findAllMatches()
+
+    mockUpdateEq.mockResolvedValueOnce({ error: null })
+    await repo.updateRegulationResults('match-uuid-1', 2, 1)
+
+    mockFindAllOrder.mockResolvedValueOnce({ data: [DB_ROW], error: null })
+    await repo.findAllMatches()
+
+    expect(mockFindAllOrder).toHaveBeenCalledTimes(2)
+  })
+
+  it('upsertMatches invalidates the cache so the next read re-queries', async () => {
+    const repo = makeRepoForFindAllMatches()
+    mockFindAllOrder.mockResolvedValueOnce({ data: [DB_ROW], error: null })
+    await repo.findAllMatches()
+
+    mockUpsert.mockResolvedValueOnce({ error: null })
+    await repo.upsertMatches([IMPORT_RECORD])
+
+    mockFindAllOrder.mockResolvedValueOnce({ data: [DB_ROW], error: null })
+    await repo.findAllMatches()
+
+    expect(mockFindAllOrder).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not cache a failed findAllMatches()', async () => {
+    const repo = makeRepoForFindAllMatches()
+    mockFindAllOrder.mockResolvedValueOnce({ error: { message: 'transient' } })
+    await expect(repo.findAllMatches()).rejects.toThrow('findAllMatches failed: transient')
+
+    mockFindAllOrder.mockResolvedValueOnce({ data: [DB_ROW], error: null })
+    const matches = await repo.findAllMatches()
+
+    expect(matches).toHaveLength(1)
+    expect(mockFindAllOrder).toHaveBeenCalledTimes(2)
   })
 })
 

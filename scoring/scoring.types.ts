@@ -121,6 +121,15 @@ export interface IPredictionScoreRepository {
   findCrowdOutcomes(matchId: string): Promise<{ homeScore: number; awayScore: number }[]>
 
   /**
+   * Return all (homeScore, awayScore) crowd predictions for a set of matches,
+   * grouped by match id, in a single query. Matches with no predictions are
+   * absent from the returned map.
+   */
+  findCrowdOutcomesByMatchIds(
+    matchIds: string[],
+  ): Promise<Map<string, { homeScore: number; awayScore: number }[]>>
+
+  /**
    * Return all scored match predictions for a specific player in a quiniela.
    * Only returns entries for FINISHED matches with non-null regulation goals.
    */
@@ -130,6 +139,7 @@ export interface IPredictionScoreRepository {
 export interface IScoringService {
   recalculateMatchScores(matchId: string): Promise<void>
   getCrowdPercentages(matchId: string): Promise<CrowdPercentages>
+  getCrowdPercentagesForMatches(matchIds: string[]): Promise<Map<string, CrowdPercentages>>
 }
 
 export interface ILeaderboardService {
