@@ -1,8 +1,13 @@
 /** @jest-environment jsdom */
-import { act, render, screen, fireEvent } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import MatchCard, { type MatchCardData } from '../MatchCard'
 import enDict from '@/i18n/dictionaries/en.json'
 import esDict from '@/i18n/dictionaries/es.json'
+
+const mockRouterRefresh = jest.fn()
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: mockRouterRefresh }),
+}))
 
 const baseMatch: MatchCardData = {
   id: 'match-1',
@@ -518,5 +523,199 @@ describe('MatchCard', () => {
       />,
     )
     expect(screen.getByText('No predictions yet')).toBeInTheDocument()
+  })
+
+  // -------------------------------------------------------------------------
+  // Admin: official result editor
+  // -------------------------------------------------------------------------
+
+  describe('admin result editor', () => {
+    beforeEach(() => {
+      mockRouterRefresh.mockClear()
+    })
+
+    it('does not render the official result editor for userRole="player"', () => {
+      const onSyncResult = jest.fn()
+      render(
+        <MatchCard
+          {...baseMatch}
+          dict={enWelcome}
+          lang="en"
+          isApproved={true}
+          userRole="player"
+          onSyncResult={onSyncResult}
+        />,
+      )
+      expect(screen.queryByText('Official result')).not.toBeInTheDocument()
+    })
+
+    it('does not render the official result editor when userRole is undefined', () => {
+      const onSyncResult = jest.fn()
+      render(
+        <MatchCard
+          {...baseMatch}
+          dict={enWelcome}
+          lang="en"
+          isApproved={true}
+          onSyncResult={onSyncResult}
+        />,
+      )
+      expect(screen.queryByText('Official result')).not.toBeInTheDocument()
+    })
+
+    it('does not render the official result editor when onSyncResult is not provided', () => {
+      render(
+        <MatchCard
+          {...baseMatch}
+          dict={enWelcome}
+          lang="en"
+          isApproved={true}
+          userRole="admin"
+        />,
+      )
+      expect(screen.queryByText('Official result')).not.toBeInTheDocument()
+    })
+
+    it('renders the official result editor for userRole="admin", pre-filled with the regulation score', () => {
+      const onSyncResult = jest.fn()
+      render(
+        <MatchCard
+          {...baseMatch}
+          dict={enWelcome}
+          lang="en"
+          isApproved={true}
+          userRole="admin"
+          onSyncResult={onSyncResult}
+          regulationHomeGoals={2}
+          regulationAwayGoals={1}
+        />,
+      )
+      expect(screen.getByText('Official result')).toBeInTheDocument()
+      expect(screen.getByLabelText('Germany official goals')).toHaveValue(2)
+      expect(screen.getByLabelText('Brazil official goals')).toHaveValue(1)
+    })
+
+    it('renders empty inputs and the "Save result" label when the match has no official result yet', () => {
+      const onSyncResult = jest.fn()
+      render(
+        <MatchCard
+          {...baseMatch}
+          dict={enWelcome}
+          lang="en"
+          isApproved={true}
+          userRole="admin"
+          onSyncResult={onSyncResult}
+        />,
+      )
+      expect(screen.getByLabelText('Germany official goals')).toHaveValue(null)
+      expect(screen.getByLabelText('Brazil official goals')).toHaveValue(null)
+      expect(screen.getByRole('button', { name: 'Save result' })).toBeInTheDocument()
+    })
+
+    it('shows the "Update result" label when the match already has an official result', () => {
+      const onSyncResult = jest.fn()
+      render(
+        <MatchCard
+          {...baseMatch}
+          dict={enWelcome}
+          lang="en"
+          isApproved={true}
+          userRole="admin"
+          onSyncResult={onSyncResult}
+          regulationHomeGoals={2}
+          regulationAwayGoals={1}
+        />,
+      )
+      expect(screen.getByRole('button', { name: 'Update result' })).toBeInTheDocument()
+    })
+
+    it('calls onSyncResult with the entered scores when "Save result" is clicked', async () => {
+      const onSyncResult = jest.fn().mockResolvedValue({ success: true, matchesUpdated: 1, scoresUpdated: 2 })
+      render(
+        <MatchCard
+          {...baseMatch}
+          dict={enWelcome}
+          lang="en"
+          isApproved={true}
+          userRole="admin"
+          onSyncResult={onSyncResult}
+        />,
+      )
+
+      fireEvent.change(screen.getByLabelText('Germany official goals'), { target: { value: '3' } })
+      fireEvent.change(screen.getByLabelText('Brazil official goals'), { target: { value: '1' } })
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Save result' }))
+      })
+
+      expect(onSyncResult).toHaveBeenCalledWith('match-1', 3, 1)
+    })
+
+    it('shows a success message and refreshes the router when the save succeeds', async () => {
+      const onSyncResult = jest.fn().mockResolvedValue({ success: true, matchesUpdated: 1, scoresUpdated: 2 })
+      render(
+        <MatchCard
+          {...baseMatch}
+          dict={enWelcome}
+          lang="en"
+          isApproved={true}
+          userRole="admin"
+          onSyncResult={onSyncResult}
+          regulationHomeGoals={2}
+          regulationAwayGoals={1}
+        />,
+      )
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Update result' }))
+      })
+
+      await waitFor(() => {
+        expect(screen.getByRole('status')).toHaveTextContent('Result saved — points updated.')
+      })
+      expect(mockRouterRefresh).toHaveBeenCalledTimes(1)
+    })
+
+    it('shows a mapped error message and does not refresh the router when the save fails', async () => {
+      const onSyncResult = jest.fn().mockResolvedValue({ success: false, error: 'DB_ERROR' })
+      render(
+        <MatchCard
+          {...baseMatch}
+          dict={enWelcome}
+          lang="en"
+          isApproved={true}
+          userRole="admin"
+          onSyncResult={onSyncResult}
+          regulationHomeGoals={2}
+          regulationAwayGoals={1}
+        />,
+      )
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Update result' }))
+      })
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent(enWelcome.syncResultErrors.DB_ERROR)
+      })
+      expect(mockRouterRefresh).not.toHaveBeenCalled()
+    })
+
+    it('renders the editor in Spanish using the es dictionary', () => {
+      const onSyncResult = jest.fn()
+      render(
+        <MatchCard
+          {...baseMatch}
+          dict={esWelcome}
+          lang="es"
+          isApproved={true}
+          userRole="admin"
+          onSyncResult={onSyncResult}
+        />,
+      )
+      expect(screen.getByText(esWelcome.officialResultLabel)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: esWelcome.saveResultButton })).toBeInTheDocument()
+    })
   })
 })

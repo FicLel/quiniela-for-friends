@@ -82,6 +82,17 @@
       "UNAUTHORIZED": "No tienes permiso para realizar esta acción.",
       "UNKNOWN_ERROR": "Ocurrió un error inesperado."
     },
+    "officialResultLabel": "Resultado oficial",
+    "saveResultButton": "Guardar resultado",
+    "updateResultButton": "Actualizar resultado",
+    "savingResult": "Guardando…",
+    "resultSaved": "Resultado guardado — puntos actualizados.",
+    "syncResultErrors": {
+      "UNAUTHORIZED": "No tienes permiso para realizar esta acción.",
+      "INVALID_PAYLOAD": "Ingresa marcadores válidos para ambos equipos.",
+      "DB_ERROR": "Ocurrió un error de base de datos. Inténtalo de nuevo.",
+      "UNKNOWN_ERROR": "Ocurrió un error inesperado."
+    },
     "quinielaSwitcherLabel": "Viendo predicciones para",
     "quinielaSwitcherNoQuinielas": "No eres miembro de ninguna quiniela.",
     "predictionsClosedForQuiniela": "Las predicciones están cerradas para esta quiniela.",

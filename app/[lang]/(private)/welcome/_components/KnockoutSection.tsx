@@ -2,6 +2,7 @@ import MatchCard, { type MatchCardData } from './MatchCard'
 import KnockoutPlaceholderCard from './KnockoutPlaceholderCard'
 import type { Dictionary } from '@/i18n/getDictionary'
 import type { Locale } from '@/i18n/i18n.types'
+import type { SyncRegulationResultsResult } from '@/competitions/competitions.types'
 
 type KnockoutSectionProps = {
   knockoutMatches: MatchCardData[]
@@ -9,6 +10,8 @@ type KnockoutSectionProps = {
   lang: Locale
   isApproved: boolean
   onSaveScore?: (matchId: string, home: number, away: number) => Promise<unknown>
+  userRole?: 'admin' | 'player'
+  onSyncResult?: (matchId: string, home: number, away: number) => Promise<SyncRegulationResultsResult>
 }
 
 const KNOCKOUT_ROUNDS = [
@@ -26,6 +29,8 @@ export default function KnockoutSection({
   lang,
   isApproved,
   onSaveScore,
+  userRole,
+  onSyncResult,
 }: KnockoutSectionProps) {
   return (
     <div className="mt-8 border-t border-gray-200 pt-8">
@@ -48,6 +53,8 @@ export default function KnockoutSection({
                       isApproved={isApproved}
                       showDate={true}
                       onSaveScore={onSaveScore}
+                      userRole={userRole}
+                      onSyncResult={onSyncResult}
                     />
                   ))
                 ) : (

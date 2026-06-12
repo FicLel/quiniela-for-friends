@@ -20,7 +20,7 @@ import EmptyState from './_components/EmptyState'
 import QuinielaSwitcher from './_components/QuinielaSwitcher'
 import type { MatchCardData } from './_components/MatchCard'
 import type { Locale } from '@/i18n/i18n.types'
-import { saveExpectedResult } from './actions'
+import { saveExpectedResult, syncMatchResult } from './actions'
 
 type PageProps = {
   params: Promise<{ lang: string }>
@@ -255,6 +255,8 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
             lang={locale}
             isApproved={isApproved}
             onSaveScore={saveExpectedResult.bind(null, activeQuinielaId)}
+            userRole={userRole}
+            onSyncResult={syncMatchResult}
           />
         )}
       </div>

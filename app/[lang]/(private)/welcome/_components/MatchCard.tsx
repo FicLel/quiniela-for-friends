@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Dictionary } from '@/i18n/getDictionary'
 import type { Locale } from '@/i18n/i18n.types'
+import type { SyncRegulationResultsResult } from '@/competitions/competitions.types'
 
 export type MatchCardData = {
   id: string
@@ -36,6 +38,8 @@ type MatchCardProps = MatchCardData & {
   isApproved: boolean
   showDate?: boolean
   onSaveScore?: (matchId: string, home: number, away: number) => Promise<unknown>
+  userRole?: 'admin' | 'player'
+  onSyncResult?: (matchId: string, home: number, away: number) => Promise<SyncRegulationResultsResult>
 }
 
 // ---------------------------------------------------------------------------
@@ -286,6 +290,109 @@ function WinBadge({ label, pct }: { label: string; pct: number }) {
 }
 
 // ---------------------------------------------------------------------------
+// AdminResultEditor — official result entry, visible to admins only
+// ---------------------------------------------------------------------------
+
+type AdminResultEditorProps = {
+  matchId: string
+  homeTeamName: string
+  awayTeamName: string
+  regulationHomeGoals?: number | null
+  regulationAwayGoals?: number | null
+  isFinal: boolean
+  dict: Dictionary['welcome']
+  onSyncResult: (matchId: string, home: number, away: number) => Promise<SyncRegulationResultsResult>
+}
+
+function AdminResultEditor({
+  matchId,
+  homeTeamName,
+  awayTeamName,
+  regulationHomeGoals,
+  regulationAwayGoals,
+  isFinal,
+  dict,
+  onSyncResult,
+}: AdminResultEditorProps) {
+  const router = useRouter()
+  const [homeValue, setHomeValue] = useState(regulationHomeGoals != null ? String(regulationHomeGoals) : '')
+  const [awayValue, setAwayValue] = useState(regulationAwayGoals != null ? String(regulationAwayGoals) : '')
+  const [result, setResult] = useState<SyncRegulationResultsResult | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  const homeNum = Number(homeValue)
+  const awayNum = Number(awayValue)
+  const isValid =
+    homeValue.trim() !== '' &&
+    awayValue.trim() !== '' &&
+    Number.isInteger(homeNum) &&
+    Number.isInteger(awayNum) &&
+    homeNum >= 0 &&
+    awayNum >= 0
+
+  function handleSave() {
+    if (!isValid) return
+    setResult(null)
+    startTransition(async () => {
+      const res = await onSyncResult(matchId, homeNum, awayNum)
+      setResult(res)
+      if (res.success) router.refresh()
+    })
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-2.5">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+        {dict.officialResultLabel}
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="number"
+          min={0}
+          inputMode="numeric"
+          value={homeValue}
+          onChange={(e) => setHomeValue(e.target.value)}
+          disabled={isPending}
+          aria-label={`${homeTeamName} official goals`}
+          className="w-14 rounded-md border border-gray-300 px-2 py-1 text-center text-sm tabular-nums text-gray-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-200 disabled:bg-gray-100"
+        />
+        <span className="text-xs font-bold text-gray-400">:</span>
+        <input
+          type="number"
+          min={0}
+          inputMode="numeric"
+          value={awayValue}
+          onChange={(e) => setAwayValue(e.target.value)}
+          disabled={isPending}
+          aria-label={`${awayTeamName} official goals`}
+          className="w-14 rounded-md border border-gray-300 px-2 py-1 text-center text-sm tabular-nums text-gray-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-200 disabled:bg-gray-100"
+        />
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={isPending || !isValid}
+          className="ml-auto rounded-lg bg-green-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:bg-green-400"
+        >
+          {isPending ? dict.savingResult : isFinal ? dict.updateResultButton : dict.saveResultButton}
+        </button>
+      </div>
+
+      {result !== null && result.success && (
+        <p role="status" className="mt-2 text-xs text-green-700">
+          {dict.resultSaved}
+        </p>
+      )}
+
+      {result !== null && !result.success && (
+        <p role="alert" className="mt-2 text-xs text-red-700">
+          {dict.syncResultErrors[result.error] ?? dict.syncResultErrors.UNKNOWN_ERROR}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // MatchCard
 // ---------------------------------------------------------------------------
 
@@ -314,6 +421,8 @@ export default function MatchCard({
   isApproved,
   showDate = false,
   onSaveScore,
+  userRole,
+  onSyncResult,
 }: MatchCardProps) {
   // Keep latest score values in refs so the onSave callbacks always capture
   // the current value of the other side when both are needed together.
@@ -447,6 +556,20 @@ export default function MatchCard({
             <p className="w-full text-center text-xs text-gray-400">No predictions yet</p>
           )}
         </div>
+      )}
+
+      {/* Admin-only: enter/correct the official result and recalculate points */}
+      {userRole === 'admin' && onSyncResult && (
+        <AdminResultEditor
+          matchId={id}
+          homeTeamName={homeTeamName}
+          awayTeamName={awayTeamName}
+          regulationHomeGoals={regulationHomeGoals}
+          regulationAwayGoals={regulationAwayGoals}
+          isFinal={isFinal}
+          dict={dict}
+          onSyncResult={onSyncResult}
+        />
       )}
 
     </div>

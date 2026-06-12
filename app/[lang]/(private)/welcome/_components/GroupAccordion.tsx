@@ -4,6 +4,7 @@ import { useState } from 'react'
 import MatchCard, { type MatchCardData } from './MatchCard'
 import type { Dictionary } from '@/i18n/getDictionary'
 import type { Locale } from '@/i18n/i18n.types'
+import type { SyncRegulationResultsResult } from '@/competitions/competitions.types'
 
 export type GroupAccordionProps = {
   group: string
@@ -13,6 +14,8 @@ export type GroupAccordionProps = {
   lang: Locale
   isApproved: boolean
   onSaveScore?: (matchId: string, home: number, away: number) => Promise<unknown>
+  userRole?: 'admin' | 'player'
+  onSyncResult?: (matchId: string, home: number, away: number) => Promise<SyncRegulationResultsResult>
 }
 
 function formatGroupLabel(group: string, groupWord: string): string {
@@ -30,6 +33,8 @@ export default function GroupAccordion({
   lang,
   isApproved,
   onSaveScore,
+  userRole,
+  onSyncResult,
 }: GroupAccordionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
 
@@ -81,6 +86,8 @@ export default function GroupAccordion({
             lang={lang}
             isApproved={isApproved}
             onSaveScore={onSaveScore}
+            userRole={userRole}
+            onSyncResult={onSyncResult}
           />
         ))}
       </div>

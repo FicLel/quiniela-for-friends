@@ -82,6 +82,17 @@
       "UNAUTHORIZED": "You are not authorized to perform this action.",
       "UNKNOWN_ERROR": "An unexpected error occurred."
     },
+    "officialResultLabel": "Official result",
+    "saveResultButton": "Save result",
+    "updateResultButton": "Update result",
+    "savingResult": "Saving…",
+    "resultSaved": "Result saved — points updated.",
+    "syncResultErrors": {
+      "UNAUTHORIZED": "You are not authorized to perform this action.",
+      "INVALID_PAYLOAD": "Please enter valid scores for both teams.",
+      "DB_ERROR": "A database error occurred. Please try again.",
+      "UNKNOWN_ERROR": "An unexpected error occurred."
+    },
     "quinielaSwitcherLabel": "Viewing predictions for",
     "quinielaSwitcherNoQuinielas": "You are not a member of any quiniela.",
     "predictionsClosedForQuiniela": "Predictions are closed for this quiniela.",
