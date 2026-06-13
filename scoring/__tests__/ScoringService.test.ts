@@ -70,6 +70,8 @@ function makePredictionScoreRepository(
     aggregateByQuiniela: jest.fn().mockResolvedValue([]),
     findCrowdOutcomes: jest.fn().mockResolvedValue([]),
     findCrowdOutcomesByMatchIds: jest.fn().mockResolvedValue(new Map()),
+    findPlayerPredictionsForViewer: jest.fn().mockResolvedValue([]),
+    invalidatePlayerPredictionsCache: jest.fn(),
     ...overrides,
   } as unknown as IPredictionScoreRepository
 }
@@ -267,6 +269,86 @@ describe('ScoringService.recalculateMatchScores', () => {
     expect(upsertCalls[1]).toMatchObject({ predictionId: 'pred-2', totalPoints: 1 })
     // pred-3: home goal correct (1 matches 1), away goal wrong (0 vs 1), outcome wrong (HOME_WIN vs DRAW) → 1pt
     expect(upsertCalls[2]).toMatchObject({ predictionId: 'pred-3', totalPoints: 1 })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// ScoringService.recalculateMatchScores — cache invalidation (admin
+// impersonation Decision B: PredictionScoreRepository.invalidatePlayerPredictionsCache)
+// ---------------------------------------------------------------------------
+
+describe('ScoringService.recalculateMatchScores – cache invalidation', () => {
+  it('invalidates the player predictions cache for each unique (quinielaId, userId) pair after upsertBatch', async () => {
+    const match = makeMatch({ regulationHomeGoals: 1, regulationAwayGoals: 1 })
+    const predictions: PredictionWithQuiniela[] = [
+      makePrediction({ predictionId: 'pred-1', quinielaId: 'q-1', userId: 'user-A', homeScore: 1, awayScore: 1 }),
+      makePrediction({ predictionId: 'pred-2', quinielaId: 'q-2', userId: 'user-B', homeScore: 2, awayScore: 2 }),
+    ]
+
+    const repo = makePredictionScoreRepository({
+      findPredictionsWithQuinielas: jest.fn().mockResolvedValue(predictions),
+      upsertBatch: jest.fn().mockResolvedValue(undefined),
+    })
+    const compRepo = makeCompetitionsRepository({
+      findById: jest.fn().mockResolvedValue(match),
+    })
+
+    const service = new ScoringService(repo, compRepo)
+    await service.recalculateMatchScores('match-uuid')
+
+    expect(repo.invalidatePlayerPredictionsCache).toHaveBeenCalledTimes(2)
+    expect(repo.invalidatePlayerPredictionsCache).toHaveBeenCalledWith('q-1', 'user-A')
+    expect(repo.invalidatePlayerPredictionsCache).toHaveBeenCalledWith('q-2', 'user-B')
+  })
+
+  it('de-duplicates invalidation when multiple predictions share the same (quinielaId, userId) pair', async () => {
+    const match = makeMatch({ regulationHomeGoals: 1, regulationAwayGoals: 1 })
+    const predictions: PredictionWithQuiniela[] = [
+      makePrediction({ predictionId: 'pred-1', quinielaId: 'q-1', userId: 'user-A', homeScore: 1, awayScore: 1 }),
+      makePrediction({ predictionId: 'pred-2', quinielaId: 'q-1', userId: 'user-A', homeScore: 2, awayScore: 2 }),
+    ]
+
+    const repo = makePredictionScoreRepository({
+      findPredictionsWithQuinielas: jest.fn().mockResolvedValue(predictions),
+      upsertBatch: jest.fn().mockResolvedValue(undefined),
+    })
+    const compRepo = makeCompetitionsRepository({
+      findById: jest.fn().mockResolvedValue(match),
+    })
+
+    const service = new ScoringService(repo, compRepo)
+    await service.recalculateMatchScores('match-uuid')
+
+    expect(repo.invalidatePlayerPredictionsCache).toHaveBeenCalledTimes(1)
+    expect(repo.invalidatePlayerPredictionsCache).toHaveBeenCalledWith('q-1', 'user-A')
+  })
+
+  it('does not call invalidatePlayerPredictionsCache when there are no predictions', async () => {
+    const match = makeMatch({ regulationHomeGoals: 1, regulationAwayGoals: 0 })
+    const repo = makePredictionScoreRepository({
+      findPredictionsWithQuinielas: jest.fn().mockResolvedValue([]),
+      upsertBatch: jest.fn().mockResolvedValue(undefined),
+    })
+    const compRepo = makeCompetitionsRepository({
+      findById: jest.fn().mockResolvedValue(match),
+    })
+
+    const service = new ScoringService(repo, compRepo)
+    await service.recalculateMatchScores('match-uuid')
+
+    expect(repo.invalidatePlayerPredictionsCache).not.toHaveBeenCalled()
+  })
+
+  it('does not call invalidatePlayerPredictionsCache when the match is not found (early return)', async () => {
+    const repo = makePredictionScoreRepository()
+    const compRepo = makeCompetitionsRepository({
+      findById: jest.fn().mockResolvedValue(null),
+    })
+
+    const service = new ScoringService(repo, compRepo)
+    await service.recalculateMatchScores('match-uuid')
+
+    expect(repo.invalidatePlayerPredictionsCache).not.toHaveBeenCalled()
   })
 })
 

@@ -36,6 +36,9 @@ export async function createQuiniela(
     return { success: false, error: 'UNKNOWN_ERROR' }
   }
 
+  const writable = authClient.requireWritableSession(session)
+  if (!writable.allowed) return { success: false, error: writable.error }
+
   const service = new QuinielasService(new QuinielasRepository())
   const result = await service.createQuiniela({
     name: parsed.data.name,

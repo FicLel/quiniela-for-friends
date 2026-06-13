@@ -25,15 +25,15 @@ export type ListMembersResult =
 
 export type RemoveMemberResult =
   | { success: true }
-  | { success: false; error: 'MEMBERSHIP_NOT_FOUND' | 'CANNOT_REMOVE_ADMIN' | 'CALLER_NOT_QUINIELA_ADMIN' | 'UNKNOWN_ERROR' }
+  | { success: false; error: 'MEMBERSHIP_NOT_FOUND' | 'CANNOT_REMOVE_ADMIN' | 'CALLER_NOT_QUINIELA_ADMIN' | 'IMPERSONATING_READ_ONLY' | 'UNKNOWN_ERROR' }
 
 export type ApproveMemberResult =
   | { ok: true }
-  | { ok: false; error: 'CALLER_NOT_ADMIN' | 'MEMBERSHIP_NOT_FOUND' | 'UNKNOWN_ERROR' }
+  | { ok: false; error: 'CALLER_NOT_ADMIN' | 'MEMBERSHIP_NOT_FOUND' | 'IMPERSONATING_READ_ONLY' | 'UNKNOWN_ERROR' }
 
 export type LeaveQuinielaResult =
   | { success: true }
-  | { success: false; error: 'MEMBERSHIP_NOT_FOUND' | 'LAST_ADMIN_CANNOT_LEAVE' | 'NOT_A_MEMBER' | 'UNKNOWN_ERROR' }
+  | { success: false; error: 'MEMBERSHIP_NOT_FOUND' | 'LAST_ADMIN_CANNOT_LEAVE' | 'NOT_A_MEMBER' | 'IMPERSONATING_READ_ONLY' | 'UNKNOWN_ERROR' }
 
 export interface IMembershipsRepository {
   create(input: { quinielaId: string; userId: string; role: MembershipRole }): Promise<Membership>

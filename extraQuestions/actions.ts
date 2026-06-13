@@ -39,6 +39,11 @@ export async function submitAnswer(
   try {
     const session = await getCallerSession()
     if (!session) return { success: false, error: 'UNAUTHORIZED' }
+
+    const authClient = new AuthClient()
+    const writable = authClient.requireWritableSession(session)
+    if (!writable.allowed) return { success: false, error: writable.error }
+
     const service = makeService()
     return service.submitAnswer(quinielaId, questionId, session.sub, answerText)
   } catch (err) {
@@ -58,6 +63,11 @@ export async function createQuestion(
   try {
     const session = await getCallerSession()
     if (!session) return { success: false, error: 'UNAUTHORIZED' }
+
+    const authClient = new AuthClient()
+    const writable = authClient.requireWritableSession(session)
+    if (!writable.allowed) return { success: false, error: writable.error }
+
     const service = makeService()
     return service.createQuestion(quinielaId, input, session.sub)
   } catch (err) {
@@ -78,6 +88,11 @@ export async function resolveQuestion(
   try {
     const session = await getCallerSession()
     if (!session) return { success: false, error: 'UNAUTHORIZED' }
+
+    const authClient = new AuthClient()
+    const writable = authClient.requireWritableSession(session)
+    if (!writable.allowed) return { success: false, error: writable.error }
+
     const service = makeService()
     return service.resolveQuestion(quinielaId, questionId, correctAnswer, session.sub)
   } catch (err) {

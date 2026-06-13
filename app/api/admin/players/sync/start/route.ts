@@ -29,6 +29,12 @@ export async function POST(): Promise<Response> {
     return Response.json(result, { status: 403 })
   }
 
+  const writable = authClient.requireWritableSession(session)
+  if (!writable.allowed) {
+    const result: SyncStartResponse = { success: false, error: writable.error }
+    return Response.json(result, { status: 403 })
+  }
+
   const repo = new PlayersRepository()
   let syncRunId: string | undefined
 

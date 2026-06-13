@@ -29,8 +29,10 @@ export default async function LeaderboardPage({ params }: PageProps) {
     redirect(`/${locale}/login`)
   }
 
+  const effectiveUserId = authClient.getEffectiveUserId(session)
+
   const membershipsRepository = new MembershipsRepository()
-  const isMember = await membershipsRepository.isApprovedMember(quinielaId, session.sub)
+  const isMember = await membershipsRepository.isApprovedMember(quinielaId, effectiveUserId)
 
   if (!isMember) {
     redirect(`/${locale}/quinielas`)
@@ -56,7 +58,7 @@ export default async function LeaderboardPage({ params }: PageProps) {
       <div className="mx-auto w-full max-w-4xl">
         <LeaderboardClient
           rows={rows}
-          callerUserId={session.sub}
+          callerUserId={effectiveUserId}
           lang={locale}
           quinielaId={quinielaId}
           dict={dict.leaderboard}

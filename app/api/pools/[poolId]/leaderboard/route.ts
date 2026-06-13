@@ -43,10 +43,11 @@ export async function GET(
   // 2. Resolve poolId from dynamic route
   const { poolId } = await params
 
-  // 3. Verify membership — caller must be an approved member of the pool
+  // 3. Verify membership — the effective viewer (impersonated user, if any,
+  // otherwise the real session user) must be an approved member of the pool
   try {
     const membershipsRepo = new MembershipsRepository()
-    const isMember = await membershipsRepo.isApprovedMember(poolId, session.sub)
+    const isMember = await membershipsRepo.isApprovedMember(poolId, authClient.getEffectiveUserId(session))
     if (!isMember) {
       const result: LeaderboardResponse = { success: false, error: 'NOT_A_MEMBER' }
       return Response.json(result, { status: 403 })

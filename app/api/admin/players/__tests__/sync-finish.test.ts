@@ -8,11 +8,13 @@
 
 const mockGetTokenFromServerAction = jest.fn()
 const mockVerifyToken = jest.fn()
+const mockRequireWritableSession = jest.fn()
 
 jest.mock('@/auth/AuthClient', () => ({
   AuthClient: jest.fn().mockImplementation(() => ({
     getTokenFromServerAction: mockGetTokenFromServerAction,
     verifyToken: mockVerifyToken,
+    requireWritableSession: mockRequireWritableSession,
   })),
 }))
 
@@ -56,6 +58,14 @@ function makeUnauthAuth() {
   mockVerifyToken.mockResolvedValue(null)
 }
 
+function makeImpersonatingAdminAuth() {
+  mockGetTokenFromServerAction.mockResolvedValue('mock-token')
+  mockVerifyToken.mockResolvedValue({
+    ...ADMIN_SESSION,
+    impersonating: { userId: 'player-user-id', email: 'player@example.com' },
+  })
+}
+
 function makeRequest(body: unknown) {
   return new Request('http://localhost/api/admin/players/sync/finish', {
     method: 'POST',
@@ -69,6 +79,7 @@ const VALID_FAILED_BODY = { syncRunId: 'sync-run-uuid-1', status: 'failed' }
 
 beforeEach(() => {
   jest.clearAllMocks()
+  mockRequireWritableSession.mockReturnValue({ allowed: true })
 })
 
 // ---------------------------------------------------------------------------
@@ -84,6 +95,18 @@ describe('POST /api/admin/players/sync/finish', () => {
 
     expect(response.status).toBe(403)
     expect(body).toEqual({ success: false, error: 'UNAUTHORIZED' })
+  })
+
+  it('returns 403 IMPERSONATING_READ_ONLY when the caller is an admin impersonating another user', async () => {
+    makeImpersonatingAdminAuth()
+    mockRequireWritableSession.mockReturnValue({ allowed: false, error: 'IMPERSONATING_READ_ONLY' })
+
+    const response = await POST(makeRequest(VALID_COMPLETED_BODY))
+    const body = await response.json()
+
+    expect(response.status).toBe(403)
+    expect(body).toEqual({ success: false, error: 'IMPERSONATING_READ_ONLY' })
+    expect(mockUpdateSyncRun).not.toHaveBeenCalled()
   })
 
   it('returns 400 INVALID_PAYLOAD when body is not valid JSON', async () => {

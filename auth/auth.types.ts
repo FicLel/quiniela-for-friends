@@ -4,7 +4,7 @@ export type LoginResult =
 
 export type ChangePasswordResult =
   | { success: true; token: string }
-  | { success: false; error: 'POLICY_VIOLATION' | 'PASSWORDS_DO_NOT_MATCH' | 'FLAG_UPDATE_FAILED' | 'UNAUTHORIZED' | 'UNKNOWN_ERROR' }
+  | { success: false; error: 'POLICY_VIOLATION' | 'PASSWORDS_DO_NOT_MATCH' | 'FLAG_UPDATE_FAILED' | 'UNAUTHORIZED' | 'IMPERSONATING_READ_ONLY' | 'UNKNOWN_ERROR' }
 
 export type CreateFirstAdminResult =
   | { success: true; token: string }

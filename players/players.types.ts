@@ -109,7 +109,7 @@ export interface IPlayersRepository {
 
 export type SyncStartResponse =
   | { success: true; syncRunId: string; teamIds: number[] }
-  | { success: false; error: 'SYNC_IN_PROGRESS' | 'DB_ERROR' | 'UNAUTHORIZED' }
+  | { success: false; error: 'SYNC_IN_PROGRESS' | 'DB_ERROR' | 'UNAUTHORIZED' | 'IMPERSONATING_READ_ONLY' }
 
 export type TeamDetailResponse =
   | { success: true; squad: ProviderSquadMember[] }
@@ -123,7 +123,7 @@ export type SaveTeamBody = {
 
 export type SaveTeamResponse =
   | { success: true; playersUpserted: number }
-  | { success: false; error: 'DB_ERROR' | 'INVALID_PAYLOAD' | 'UNAUTHORIZED' }
+  | { success: false; error: 'DB_ERROR' | 'INVALID_PAYLOAD' | 'UNAUTHORIZED' | 'IMPERSONATING_READ_ONLY' }
 
 export type SyncFinishBody = {
   syncRunId: string
@@ -132,7 +132,7 @@ export type SyncFinishBody = {
 
 export type SyncFinishResponse =
   | { success: true }
-  | { success: false; error: 'DB_ERROR' | 'INVALID_PAYLOAD' | 'UNAUTHORIZED' }
+  | { success: false; error: 'DB_ERROR' | 'INVALID_PAYLOAD' | 'UNAUTHORIZED' | 'IMPERSONATING_READ_ONLY' }
 
 export type SyncItemErrorBody = {
   syncRunId: string
@@ -142,4 +142,4 @@ export type SyncItemErrorBody = {
 
 export type SyncItemErrorResponse =
   | { success: true }
-  | { success: false; error: 'DB_ERROR' | 'INVALID_PAYLOAD' | 'UNAUTHORIZED' }
+  | { success: false; error: 'DB_ERROR' | 'INVALID_PAYLOAD' | 'UNAUTHORIZED' | 'IMPERSONATING_READ_ONLY' }

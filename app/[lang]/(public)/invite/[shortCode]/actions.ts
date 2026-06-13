@@ -40,6 +40,9 @@ export async function acceptInviteAsExistingUser(
     return { success: false, error: 'UNKNOWN_ERROR' }
   }
 
+  const writable = authClient.requireWritableSession(session)
+  if (!writable.allowed) return { success: false, error: writable.error }
+
   // Look up the invitation by short code to get the token hash for acceptInvite
   const invitationsRepo = new InvitationsRepository()
   const invitation = await invitationsRepo.findByShortCode(shortCode)

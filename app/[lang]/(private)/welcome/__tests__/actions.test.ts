@@ -8,10 +8,12 @@
 
 // Mock AuthClient — overridden per-test via mockVerifyToken's resolved value
 const mockVerifyToken = jest.fn()
+const mockRequireWritableSession = jest.fn().mockReturnValue({ allowed: true })
 jest.mock('@/auth/AuthClient', () => ({
   AuthClient: jest.fn().mockImplementation(() => ({
     getTokenFromServerAction: jest.fn().mockResolvedValue('mock-token'),
     verifyToken: mockVerifyToken,
+    requireWritableSession: mockRequireWritableSession,
   })),
 }))
 
@@ -57,6 +59,7 @@ import { syncMatchResult } from '../actions'
 describe('syncMatchResult action', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockRequireWritableSession.mockReturnValue({ allowed: true })
   })
 
   it('returns UNAUTHORIZED when there is no session', async () => {
@@ -80,6 +83,15 @@ describe('syncMatchResult action', () => {
   describe('as an admin', () => {
     beforeEach(() => {
       mockVerifyToken.mockResolvedValue({ sub: 'admin-1', role: 'admin' })
+    })
+
+    it('returns IMPERSONATING_READ_ONLY when the admin session is impersonating', async () => {
+      mockRequireWritableSession.mockReturnValue({ allowed: false, error: 'IMPERSONATING_READ_ONLY' })
+
+      const result = await syncMatchResult('match-1', 2, 1)
+
+      expect(result).toEqual({ success: false, error: 'IMPERSONATING_READ_ONLY' })
+      expect(mockSyncRegulationResults).not.toHaveBeenCalled()
     })
 
     it('returns INVALID_PAYLOAD for negative goals', async () => {

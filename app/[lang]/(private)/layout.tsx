@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { getDictionary, hasLocale } from '@/i18n/getDictionary'
 import { AuthClient } from '@/auth/AuthClient'
 import { Navbar } from '@/app/_components/Navbar'
+import { ImpersonationBanner } from '@/app/_components/ImpersonationBanner'
 import type { Locale } from '@/i18n/i18n.types'
 import { QuinielasService } from '@/quinielas/QuinielasService'
 import { QuinielasRepository } from '@/quinielas/QuinielasRepository'
@@ -42,6 +43,13 @@ export default async function PrivateLayout({ children, params }: LayoutProps) {
   return (
     <>
       <Navbar lang={lang as Locale} dict={dict.navbar} isAdmin={isAdmin} quinielas={quinielas} />
+      {session.impersonating && (
+        <ImpersonationBanner
+          lang={lang as Locale}
+          email={session.impersonating.email}
+          dict={dict.impersonation}
+        />
+      )}
       {children}
     </>
   )

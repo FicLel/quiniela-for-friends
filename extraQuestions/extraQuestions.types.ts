@@ -57,15 +57,15 @@ export type ExtraQuestionAuditEntry = {
 
 export type CreateQuestionResult =
   | { success: true; question: ExtraQuestion }
-  | { success: false; error: 'UNAUTHORIZED' | 'NO_COMPETITION_DATA' | 'INVALID_INPUT' | 'DB_ERROR' }
+  | { success: false; error: 'UNAUTHORIZED' | 'NO_COMPETITION_DATA' | 'INVALID_INPUT' | 'IMPERSONATING_READ_ONLY' | 'DB_ERROR' }
 
 export type SubmitAnswerResult =
   | { success: true }
-  | { success: false; error: 'UNAUTHORIZED' | 'QUESTION_NOT_FOUND' | 'QUESTION_RESOLVED' | 'INVALID_INPUT' | 'DB_ERROR' }
+  | { success: false; error: 'UNAUTHORIZED' | 'QUESTION_NOT_FOUND' | 'QUESTION_RESOLVED' | 'INVALID_INPUT' | 'IMPERSONATING_READ_ONLY' | 'DB_ERROR' }
 
 export type ResolveQuestionResult =
   | { success: true; membersRescored: number }
-  | { success: false; error: 'UNAUTHORIZED' | 'QUESTION_NOT_FOUND' | 'INVALID_INPUT' | 'AUDIT_FAILED' | 'DB_ERROR' }
+  | { success: false; error: 'UNAUTHORIZED' | 'QUESTION_NOT_FOUND' | 'INVALID_INPUT' | 'AUDIT_FAILED' | 'IMPERSONATING_READ_ONLY' | 'DB_ERROR' }
 
 export type ListQuestionsResult =
   | { success: true; questions: ExtraQuestion[]; userAnswers: Record<string, string> }

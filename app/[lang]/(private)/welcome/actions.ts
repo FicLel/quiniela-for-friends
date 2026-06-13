@@ -29,6 +29,11 @@ async function getSession() {
 export async function importWorldCupMatches(): Promise<ImportMatchesResult> {
   const session = await getSession()
   if (session?.role !== 'admin') return { success: false, error: 'FETCH_FAILED' }
+
+  const authClient = new AuthClient()
+  const writable = authClient.requireWritableSession(session)
+  if (!writable.allowed) return { success: false, error: writable.error }
+
   const service = new CompetitionsService(new CompetitionsClient(), new CompetitionsRepository())
   return service.importGroupStageMatches()
 }
@@ -56,6 +61,9 @@ export async function saveExpectedResult(
     return { success: false, error: 'NOT_APPROVED' }
   }
 
+  const writable = authClient.requireWritableSession(session)
+  if (!writable.allowed) return { success: false, error: writable.error }
+
   const service = new ExpectedResultsService(
     new ExpectedResultsRepository(),
     new MembershipsRepository(),
@@ -71,6 +79,11 @@ export async function saveExpectedResult(
 export async function seedKnockoutPlaceholders(): Promise<SeedPlaceholdersResult> {
   const session = await getSession()
   if (session?.role !== 'admin') return { success: false, error: 'UNKNOWN_ERROR' }
+
+  const authClient = new AuthClient()
+  const writable = authClient.requireWritableSession(session)
+  if (!writable.allowed) return { success: false, error: writable.error }
+
   const service = new CompetitionsService(new CompetitionsClient(), new CompetitionsRepository())
   return service.seedKnockoutPlaceholders()
 }
@@ -81,6 +94,11 @@ export async function seedKnockoutPlaceholders(): Promise<SeedPlaceholdersResult
 export async function syncKnockoutMatches(): Promise<ImportMatchesResult> {
   const session = await getSession()
   if (session?.role !== 'admin') return { success: false, error: 'FETCH_FAILED' }
+
+  const authClient = new AuthClient()
+  const writable = authClient.requireWritableSession(session)
+  if (!writable.allowed) return { success: false, error: writable.error }
+
   const service = new CompetitionsService(new CompetitionsClient(), new CompetitionsRepository())
   return service.syncKnockoutMatches()
 }
@@ -96,6 +114,10 @@ export async function syncMatchResult(
 ): Promise<SyncRegulationResultsResult> {
   const session = await getSession()
   if (session?.role !== 'admin') return { success: false, error: 'UNAUTHORIZED' }
+
+  const authClient = new AuthClient()
+  const writable = authClient.requireWritableSession(session)
+  if (!writable.allowed) return { success: false, error: writable.error }
 
   if (!isNonNegativeInteger(regulationHomeGoals) || !isNonNegativeInteger(regulationAwayGoals)) {
     return { success: false, error: 'INVALID_PAYLOAD' }

@@ -44,14 +44,14 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
   const authClient = new AuthClient()
   const token = await authClient.getTokenFromServerAction()
   const session = token ? await authClient.verifyToken(token) : null
-  const userRole = session?.role ?? 'player'
+  const userRole = session?.impersonating ? 'player' : (session?.role ?? 'player')
 
   // Derive view mode from URL param — default to 'date'
   const viewParam = resolvedSearchParams.view
   const viewMode: 'date' | 'group' =
     viewParam === 'group' ? 'group' : 'date'
 
-  const userId = session?.sub ?? null
+  const userId = session ? authClient.getEffectiveUserId(session) : null
 
   const competitionsRepository = new CompetitionsRepository()
   const competitionsService = new CompetitionsService(

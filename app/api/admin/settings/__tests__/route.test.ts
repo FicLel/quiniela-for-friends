@@ -12,10 +12,13 @@
 const mockGetTokenFromServerAction = jest.fn()
 const mockVerifyToken = jest.fn()
 
+const mockRequireWritableSession = jest.fn()
+
 jest.mock('@/auth/AuthClient', () => ({
   AuthClient: jest.fn().mockImplementation(() => ({
     getTokenFromServerAction: mockGetTokenFromServerAction,
     verifyToken: mockVerifyToken,
+    requireWritableSession: mockRequireWritableSession,
   })),
 }))
 
@@ -61,6 +64,11 @@ const PLAYER_SESSION = {
   role: 'player' as const,
 }
 
+const IMPERSONATING_ADMIN_SESSION = {
+  ...ADMIN_SESSION,
+  impersonating: { userId: 'player-user-id', email: 'player@example.com' },
+}
+
 function makeAdminRequest() {
   mockGetTokenFromServerAction.mockResolvedValue('mock-token')
   mockVerifyToken.mockResolvedValue(ADMIN_SESSION)
@@ -74,6 +82,11 @@ function makePlayerRequest() {
 function makeUnauthRequest() {
   mockGetTokenFromServerAction.mockResolvedValue(null)
   mockVerifyToken.mockResolvedValue(null)
+}
+
+function makeImpersonatingAdminRequest() {
+  mockGetTokenFromServerAction.mockResolvedValue('mock-token')
+  mockVerifyToken.mockResolvedValue(IMPERSONATING_ADMIN_SESSION)
 }
 
 function makePutRequest(body: unknown): Request {
@@ -101,6 +114,7 @@ const APP_SETTINGS = {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  mockRequireWritableSession.mockReturnValue({ allowed: true })
 })
 
 // ---------------------------------------------------------------------------
@@ -277,6 +291,18 @@ describe('PUT /api/admin/settings', () => {
 
     expect(response.status).toBe(500)
     expect(body).toEqual({ success: false, error: 'UNKNOWN_ERROR' })
+  })
+
+  it('returns 403 IMPERSONATING_READ_ONLY when the caller is an admin impersonating another user', async () => {
+    makeImpersonatingAdminRequest()
+    mockRequireWritableSession.mockReturnValue({ allowed: false, error: 'IMPERSONATING_READ_ONLY' })
+
+    const response = await PUT(makePutRequest({ predictionMode: 'shared' }))
+    const body = await response.json()
+
+    expect(response.status).toBe(403)
+    expect(body).toEqual({ success: false, error: 'IMPERSONATING_READ_ONLY' })
+    expect(mockSetPredictionMode).not.toHaveBeenCalled()
   })
 
   it('returns 400 INVALID_MODE (mapped from service) when service returns INVALID_MODE', async () => {

@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { z } from 'zod'
-import { AuthClient } from '@/auth/AuthClient'
+import { AuthClient, type SessionPayload, type WritableSessionCheck } from '@/auth/AuthClient'
 import { InvitationsService } from '@/invitations/InvitationsService'
 import { InvitationsRepository } from '@/invitations/InvitationsRepository'
 import { MembershipsService } from '@/memberships/MembershipsService'
@@ -28,11 +28,22 @@ async function getBaseUrl(): Promise<string> {
   return `${proto}://${host}`
 }
 
-async function getCallerUserId(): Promise<string | null> {
+/**
+ * Resolve the current session and check it permits writes.
+ *
+ * Returns `null` if there is no session (caller should map this to its own
+ * "not authenticated" error), or a WritableSessionCheck describing whether
+ * writes are allowed (impersonating sessions are always read-only).
+ */
+async function getWritableSessionCheck(): Promise<
+  | { session: null }
+  | { session: SessionPayload; writable: WritableSessionCheck }
+> {
   const authClient = new AuthClient()
   const token = await authClient.getTokenFromServerAction()
   const session = token ? await authClient.verifyToken(token) : null
-  return session?.sub ?? null
+  if (!session) return { session: null }
+  return { session, writable: authClient.requireWritableSession(session) }
 }
 
 /**
@@ -57,10 +68,14 @@ export async function inviteMember(
     return { success: false, error: 'UNKNOWN_ERROR' }
   }
 
-  const callerUserId = await getCallerUserId()
-  if (!callerUserId) {
+  const check = await getWritableSessionCheck()
+  if (!check.session) {
     return { success: false, error: 'CALLER_NOT_QUINIELA_ADMIN' }
   }
+  if (!check.writable.allowed) {
+    return { success: false, error: check.writable.error }
+  }
+  const callerUserId = check.session.sub
 
   const baseUrl = await getBaseUrl()
 
@@ -89,10 +104,14 @@ export async function removeMember(
   quinielaId: string,
   targetMembershipId: string,
 ): Promise<RemoveMemberResult> {
-  const callerUserId = await getCallerUserId()
-  if (!callerUserId) {
+  const check = await getWritableSessionCheck()
+  if (!check.session) {
     return { success: false, error: 'CALLER_NOT_QUINIELA_ADMIN' }
   }
+  if (!check.writable.allowed) {
+    return { success: false, error: check.writable.error }
+  }
+  const callerUserId = check.session.sub
 
   const membershipsRepository = new MembershipsRepository()
 
@@ -122,10 +141,14 @@ export async function revokeInvite(
   quinielaId: string,
   invitationId: string,
 ): Promise<RevokeInviteResult> {
-  const callerUserId = await getCallerUserId()
-  if (!callerUserId) {
+  const check = await getWritableSessionCheck()
+  if (!check.session) {
     return { success: false, error: 'CALLER_NOT_QUINIELA_ADMIN' }
   }
+  if (!check.writable.allowed) {
+    return { success: false, error: check.writable.error }
+  }
+  const callerUserId = check.session.sub
 
   const service = new InvitationsService(
     new InvitationsRepository(),
@@ -151,6 +174,9 @@ export async function approveMember(
     return { ok: false, error: 'CALLER_NOT_ADMIN' }
   }
 
+  const writable = authClient.requireWritableSession(session)
+  if (!writable.allowed) return { ok: false, error: writable.error }
+
   const service = new MembershipsService(new MembershipsRepository())
   return service.approveMember(session.sub, membershipId)
 }
@@ -167,10 +193,14 @@ export async function leaveQuiniela(
   lang: Locale,
   quinielaId: string,
 ): Promise<LeaveQuinielaResult> {
-  const callerUserId = await getCallerUserId()
-  if (!callerUserId) {
+  const check = await getWritableSessionCheck()
+  if (!check.session) {
     return { success: false, error: 'UNKNOWN_ERROR' }
   }
+  if (!check.writable.allowed) {
+    return { success: false, error: check.writable.error }
+  }
+  const callerUserId = check.session.sub
 
   const membershipsRepository = new MembershipsRepository()
   const membershipsService = new MembershipsService(membershipsRepository)

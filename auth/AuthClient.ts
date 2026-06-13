@@ -19,12 +19,29 @@
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose'
 
 export type SessionPayload = {
-  sub: string           // user.id (UUID)
+  sub: string           // user.id (UUID) — the REAL, authenticated user. Never overwritten.
   email: string
   role: 'admin' | 'player'
   mustChangePassword: boolean
   tokenVersion: number
+  /**
+   * Set when an admin is using "View as User" (read-only impersonation).
+   * `sub` / `email` / `role` / `tokenVersion` above continue to represent the
+   * real admin — they are never overwritten by impersonation.
+   *
+   * `undefined` for normal sessions (including tokens issued before this
+   * field existed — verifyToken defaults to `undefined` for back-compat).
+   */
+  impersonating?: {
+    userId: string   // impersonated user's id (= effective "viewing as" subject)
+    email: string    // impersonated user's email, for the banner
+  }
 }
+
+/** Result of requireWritableSession — see AuthClient.requireWritableSession. */
+export type WritableSessionCheck =
+  | { allowed: true }
+  | { allowed: false; error: 'IMPERSONATING_READ_ONLY' }
 
 const SESSION_COOKIE_NAME = 'session'
 const TOKEN_EXPIRY = '7d'
@@ -72,16 +89,58 @@ export class AuthClient {
     try {
       const secret = getSecretKey()
       const { payload } = await jwtVerify(token, secret)
+
+      const rawImpersonating = payload['impersonating'] as
+        | { userId: string; email: string }
+        | undefined
+        | null
+
       return {
         sub: payload.sub as string,
         email: payload['email'] as string,
         role: payload['role'] as 'admin' | 'player',
         mustChangePassword: payload['mustChangePassword'] as boolean,
         tokenVersion: (payload['tokenVersion'] as number) ?? 1,
+        // Tokens issued before this field existed lack `impersonating` —
+        // default to undefined for back-compat.
+        impersonating: rawImpersonating ?? undefined,
       }
     } catch {
       return null
     }
+  }
+
+  /**
+   * Return the user ID whose data should be read.
+   *
+   * When the session is impersonating another user, returns the impersonated
+   * user's ID — this is the single place "which user's data are we reading"
+   * is computed. Used by every read path that represents "the viewer's own
+   * data" (predictions, membership checks, etc.).
+   *
+   * Otherwise returns the real authenticated user's ID (`session.sub`).
+   */
+  getEffectiveUserId(session: SessionPayload): string {
+    return session.impersonating?.userId ?? session.sub
+  }
+
+  /**
+   * Guard for mutation Server Actions / API routes.
+   *
+   * Blocks ALL writes whenever `session.impersonating` is set — including
+   * self-impersonation (admin "viewing as" themselves). This is a single,
+   * simple, absolute check with no exceptions: the admin must call
+   * `endImpersonation()` to regain write access.
+   *
+   * Returns `{ allowed: true }` for normal (non-impersonating) sessions, and
+   * `{ allowed: false; error: 'IMPERSONATING_READ_ONLY' }` otherwise. Callers
+   * map this onto their existing error-result shape (or a 403 for API routes).
+   */
+  requireWritableSession(session: SessionPayload): WritableSessionCheck {
+    if (session.impersonating) {
+      return { allowed: false, error: 'IMPERSONATING_READ_ONLY' }
+    }
+    return { allowed: true }
   }
 
   /**

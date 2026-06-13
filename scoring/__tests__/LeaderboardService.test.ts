@@ -238,6 +238,75 @@ describe('LeaderboardService – getLeaderboard (point breakdown fields)', () =>
     expect(leaderboard[0].email).toBe('user-missing')
   })
 
+  it('includes an approved member with no scored predictions as a zero row alongside scored members', async () => {
+    const agg = makeAggregateRow({ userId: 'user-scored', totalPoints: 5, exactScoreHits: 1, correctOutcomeHits: 1 })
+    const repo = makePredictionScoreRepository({
+      aggregateByQuiniela: jest.fn().mockResolvedValue([agg]),
+    })
+    const scoredMember = makeMemberWithUser({ userId: 'user-scored', email: 'scored@example.com' })
+    const newMember = makeMemberWithUser({ userId: 'user-new', email: 'newcomer@example.com' })
+    const membershipsRepo = makeMembershipsRepository({
+      findAllByQuiniela: jest.fn().mockResolvedValue([scoredMember, newMember]),
+    })
+
+    const service = new LeaderboardService(repo, makeUsersRepository(), membershipsRepo)
+    const leaderboard = await service.getLeaderboard('quiniela-uuid')
+
+    expect(leaderboard).toHaveLength(2)
+
+    const newcomerRow = leaderboard.find((r) => r.userId === 'user-new')
+    expect(newcomerRow).toBeDefined()
+    expect(newcomerRow?.email).toBe('newcomer@example.com')
+    expect(newcomerRow?.totalPoints).toBe(0)
+    expect(newcomerRow?.exactScoreHits).toBe(0)
+    expect(newcomerRow?.correctOutcomeHits).toBe(0)
+    expect(newcomerRow?.predictedMatchCount).toBe(0)
+    expect(newcomerRow?.homeGoalPoints).toBe(0)
+    expect(newcomerRow?.awayGoalPoints).toBe(0)
+    expect(newcomerRow?.outcomePoints).toBe(0)
+    expect(newcomerRow?.extraQuestionPoints).toBe(0)
+
+    // Scored member still ranks above the zero-score newcomer
+    expect(leaderboard[0].userId).toBe('user-scored')
+    expect(leaderboard[1].userId).toBe('user-new')
+  })
+
+  it('does not add a zero row for unapproved members', async () => {
+    const agg = makeAggregateRow({ userId: 'user-scored' })
+    const repo = makePredictionScoreRepository({
+      aggregateByQuiniela: jest.fn().mockResolvedValue([agg]),
+    })
+    const scoredMember = makeMemberWithUser({ userId: 'user-scored', email: 'scored@example.com' })
+    const pendingMember = makeMemberWithUser({ userId: 'user-pending', email: 'pending@example.com', approvedAt: null })
+    const membershipsRepo = makeMembershipsRepository({
+      findAllByQuiniela: jest.fn().mockResolvedValue([scoredMember, pendingMember]),
+    })
+
+    const service = new LeaderboardService(repo, makeUsersRepository(), membershipsRepo)
+    const leaderboard = await service.getLeaderboard('quiniela-uuid')
+
+    expect(leaderboard).toHaveLength(1)
+    expect(leaderboard[0].userId).toBe('user-scored')
+  })
+
+  it('does not duplicate a member present in both aggregates and the membership list', async () => {
+    const agg = makeAggregateRow({ userId: 'user-scored' })
+    const repo = makePredictionScoreRepository({
+      aggregateByQuiniela: jest.fn().mockResolvedValue([agg]),
+    })
+    const scoredMember = makeMemberWithUser({ userId: 'user-scored', email: 'scored@example.com' })
+    const membershipsRepo = makeMembershipsRepository({
+      findAllByQuiniela: jest.fn().mockResolvedValue([scoredMember]),
+    })
+
+    const service = new LeaderboardService(repo, makeUsersRepository(), membershipsRepo)
+    const leaderboard = await service.getLeaderboard('quiniela-uuid')
+
+    expect(leaderboard).toHaveLength(1)
+    expect(leaderboard[0].userId).toBe('user-scored')
+    expect(leaderboard[0].totalPoints).toBe(agg.totalPoints)
+  })
+
   it('sorts multiple users and passes 4 breakdown fields for each', async () => {
     const aggHigh = makeAggregateRow({ userId: 'user-high', totalPoints: 10, homeGoalPoints: 3, awayGoalPoints: 3, outcomePoints: 3, extraQuestionPoints: 1 })
     const aggLow = makeAggregateRow({ userId: 'user-low', totalPoints: 2, homeGoalPoints: 0, awayGoalPoints: 1, outcomePoints: 1, extraQuestionPoints: 0 })
@@ -275,7 +344,20 @@ describe('LeaderboardService – getPlayerPredictions', () => {
     const service = new LeaderboardService(repo, makeUsersRepository(), makeMembershipsRepository())
     const result = await service.getPlayerPredictions('quiniela-uuid', 'user-uuid-1')
 
-    expect(mockFindPlayerPredictions).toHaveBeenCalledWith('quiniela-uuid', 'user-uuid-1')
+    expect(mockFindPlayerPredictions).toHaveBeenCalledWith('quiniela-uuid', 'user-uuid-1', undefined)
+    expect(result).toEqual([PLAYER_PREDICTION])
+  })
+
+  it('forwards options.isImpersonating to repo.findPlayerPredictionsForViewer (Decision B)', async () => {
+    const mockFindPlayerPredictions = jest.fn().mockResolvedValue([PLAYER_PREDICTION])
+    const repo = makePredictionScoreRepository({
+      findPlayerPredictionsForViewer: mockFindPlayerPredictions,
+    })
+
+    const service = new LeaderboardService(repo, makeUsersRepository(), makeMembershipsRepository())
+    const result = await service.getPlayerPredictions('quiniela-uuid', 'user-uuid-1', { isImpersonating: true })
+
+    expect(mockFindPlayerPredictions).toHaveBeenCalledWith('quiniela-uuid', 'user-uuid-1', { isImpersonating: true })
     expect(result).toEqual([PLAYER_PREDICTION])
   })
 
@@ -313,6 +395,6 @@ describe('LeaderboardService – getPlayerPredictions', () => {
     const service = new LeaderboardService(repo, makeUsersRepository(), makeMembershipsRepository())
     await service.getPlayerPredictions('quiniela-X', 'user-Y')
 
-    expect(mockFindPlayerPredictions).toHaveBeenCalledWith('quiniela-X', 'user-Y')
+    expect(mockFindPlayerPredictions).toHaveBeenCalledWith('quiniela-X', 'user-Y', undefined)
   })
 })

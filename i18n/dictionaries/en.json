@@ -90,6 +90,7 @@
     "syncResultErrors": {
       "UNAUTHORIZED": "You are not authorized to perform this action.",
       "INVALID_PAYLOAD": "Please enter valid scores for both teams.",
+      "IMPERSONATING_READ_ONLY": "This action is unavailable while viewing as another user.",
       "DB_ERROR": "A database error occurred. Please try again.",
       "UNKNOWN_ERROR": "An unexpected error occurred."
     },
@@ -133,6 +134,7 @@
       "PASSWORDS_DO_NOT_MATCH": "Passwords do not match.",
       "FLAG_UPDATE_FAILED": "Your password was changed but we could not update your account. Please contact support.",
       "UNAUTHORIZED": "Your session has expired. Please log in again.",
+      "IMPERSONATING_READ_ONLY": "This action is unavailable while viewing as another user.",
       "UNKNOWN_ERROR": "Something went wrong. Please try again."
     }
   },
@@ -143,7 +145,8 @@
     "users": "Users",
     "leaderboard": "Leaderboard",
     "selectQuiniela": "Select quiniela",
-    "settings": "Settings"
+    "settings": "Settings",
+    "impersonateLink": "View as user"
   },
   "quinielas": {
     "heading": "My Quinielas",
@@ -298,5 +301,20 @@
       "DB_ERROR": "Something went wrong. Please try again.",
       "UNKNOWN_ERROR": "An unexpected error occurred."
     }
+  },
+  "impersonation": {
+    "viewingAs": "Viewing as {email}",
+    "exit": "Exit",
+    "entryTitle": "View as user",
+    "entrySubtitle": "Enter a member's email to view the app exactly as they see it. This is read-only — you won't be able to make changes on their behalf.",
+    "emailLabel": "User email",
+    "emailPlaceholder": "friend@example.com",
+    "submit": "Start viewing",
+    "starting": "Starting…",
+    "currentlyViewingAs": "You are currently viewing as {email}.",
+    "errorNotAdmin": "You are not authorized to perform this action.",
+    "errorUserNotFound": "No user found with that email.",
+    "errorCannotImpersonateAdmin": "Cannot view as another admin.",
+    "errorUnknown": "Something went wrong. Please try again."
   }
 }

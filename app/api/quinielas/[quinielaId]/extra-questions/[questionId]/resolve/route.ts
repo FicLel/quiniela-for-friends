@@ -45,6 +45,12 @@ export async function POST(
     return Response.json(result, { status: 403 })
   }
 
+  const writable = authClient.requireWritableSession(session)
+  if (!writable.allowed) {
+    const result: ResolveQuestionResult = { success: false, error: writable.error }
+    return Response.json(result, { status: 403 })
+  }
+
   const { quinielaId, questionId } = await params
 
   // 2. Parse and validate body

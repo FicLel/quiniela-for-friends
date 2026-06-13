@@ -43,21 +43,28 @@ export async function GET(
   const { quinielaId, userId } = await params
 
   try {
-    // 3. isApprovedMember check — caller (session.sub) must be an approved member
+    // 3. isApprovedMember check — the effective viewer (impersonated user, if
+    // any, otherwise the real session user) must be an approved member
+    const effectiveUserId = authClient.getEffectiveUserId(session)
     const membershipsRepo = new MembershipsRepository()
-    const isApproved = await membershipsRepo.isApprovedMember(quinielaId, session.sub)
+    const isApproved = await membershipsRepo.isApprovedMember(quinielaId, effectiveUserId)
     if (!isApproved) {
       const result: PredictionsResponse = { success: false, error: 'UNAUTHORIZED' }
       return Response.json(result, { status: 403 })
     }
 
-    // 4. Fetch the target player's predictions
+    // 4. Fetch the target player's predictions. Route impersonated reads of
+    // the impersonated user's own predictions through the shorter-TTL cache
+    // (Decision B) so an admin debugging "View as User" sees fresh data.
     const leaderboardService = new LeaderboardService(
       new PredictionScoreRepository(),
       new UsersRepository(),
       membershipsRepo,
     )
-    const predictions = await leaderboardService.getPlayerPredictions(quinielaId, userId)
+    const isImpersonating = Boolean(session.impersonating) && userId === effectiveUserId
+    const predictions = await leaderboardService.getPlayerPredictions(quinielaId, userId, {
+      isImpersonating,
+    })
 
     const result: PredictionsResponse = { success: true, predictions }
     return Response.json(result, { status: 200 })

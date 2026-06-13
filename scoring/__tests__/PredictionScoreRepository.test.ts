@@ -17,7 +17,7 @@
  *   from('user_expected_results').select('home_score, away_score').eq('match_id', matchId)
  */
 
-import { PredictionScoreRepository } from '../PredictionScoreRepository'
+import { PredictionScoreRepository, resetPlayerPredictionsCache } from '../PredictionScoreRepository'
 import { resetSupabaseServerClient } from '@/lib/supabaseServerClient'
 import { resetSchemaCheckCache } from '@/lib/schemaCheckCache'
 
@@ -222,6 +222,7 @@ beforeEach(() => {
   jest.clearAllMocks()
   resetSupabaseServerClient()
   resetSchemaCheckCache()
+  resetPlayerPredictionsCache()
 })
 
 // ---------------------------------------------------------------------------
@@ -1043,5 +1044,251 @@ describe('PredictionScoreRepository – findPlayerPredictionsForViewer', () => {
     await expect(repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)).rejects.toThrow(
       'findPlayerPredictionsForViewer matches fetch failed: matches fetch failed',
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// findPlayerPredictionsForViewer — caching (admin impersonation Decision B)
+//
+// Two TtlCache instances, both keyed `${quinielaId}:${userId}`:
+//   - playerPredictionsCache             (30s) — default / isImpersonating: false
+//   - impersonatedPlayerPredictionsCache (5s)  — isImpersonating: true
+//
+// resetPlayerPredictionsCache() clears both and is called in beforeEach.
+// ---------------------------------------------------------------------------
+
+describe('PredictionScoreRepository – findPlayerPredictionsForViewer (caching)', () => {
+  const QUINIELA_ID = 'quiniela-uuid'
+  const USER_ID = 'user-uuid-1'
+
+  const PRED_ROW = {
+    home_goal_point: 1,
+    away_goal_point: 1,
+    outcome_point: 1,
+    total_points: 3,
+    user_expected_results: {
+      home_score: 2,
+      away_score: 1,
+      match_id: 'match-uuid-1',
+      user_id: USER_ID,
+    },
+  }
+
+  const FINISHED_MATCH = {
+    id: 'match-uuid-1',
+    home_team_name: 'Germany',
+    away_team_name: 'Scotland',
+    scheduled_at: '2026-06-14T16:00:00Z',
+    status: 'FINISHED',
+    regulation_home_goals: 2,
+    regulation_away_goals: 1,
+  }
+
+  it('caches results on the normal cache for a second identical call (no re-query)', async () => {
+    const repo = makeRepo()
+
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({
+      data: [PRED_ROW],
+      error: null,
+    })
+    mockMatchesIn.mockResolvedValueOnce({
+      data: [FINISHED_MATCH],
+      error: null,
+    })
+
+    const first = await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)
+    expect(first).toHaveLength(1)
+
+    // Second call: no mocks queued — would throw/return undefined if it hit Supabase again.
+    const second = await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)
+
+    expect(second).toEqual(first)
+    expect(mockPlayerPredictionsUserEq).toHaveBeenCalledTimes(1)
+    expect(mockMatchesIn).toHaveBeenCalledTimes(1)
+  })
+
+  it('caches empty results too (no re-query when step 1 yields no rows)', async () => {
+    const repo = makeRepo()
+
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({ data: [], error: null })
+
+    const first = await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)
+    const second = await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)
+
+    expect(first).toEqual([])
+    expect(second).toEqual([])
+    expect(mockPlayerPredictionsUserEq).toHaveBeenCalledTimes(1)
+  })
+
+  it('isolates cache entries by (quinielaId, userId) — different user triggers a fresh query', async () => {
+    const repo = makeRepo()
+
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({
+      data: [PRED_ROW],
+      error: null,
+    })
+    mockMatchesIn.mockResolvedValueOnce({
+      data: [FINISHED_MATCH],
+      error: null,
+    })
+
+    await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)
+
+    // Different userId → cache miss → second query
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({
+      data: [{ ...PRED_ROW, user_expected_results: { ...PRED_ROW.user_expected_results, user_id: 'user-uuid-2' } }],
+      error: null,
+    })
+    mockMatchesIn.mockResolvedValueOnce({
+      data: [FINISHED_MATCH],
+      error: null,
+    })
+
+    await repo.findPlayerPredictionsForViewer(QUINIELA_ID, 'user-uuid-2')
+
+    expect(mockPlayerPredictionsUserEq).toHaveBeenCalledTimes(2)
+  })
+
+  it('isImpersonating: true and the default (false/undefined) reads use separate caches', async () => {
+    const repo = makeRepo()
+
+    // First call: normal (non-impersonating) read — populates playerPredictionsCache
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({
+      data: [PRED_ROW],
+      error: null,
+    })
+    mockMatchesIn.mockResolvedValueOnce({
+      data: [FINISHED_MATCH],
+      error: null,
+    })
+
+    const normalResult = await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)
+    expect(normalResult).toHaveLength(1)
+
+    // Second call: same (quinielaId, userId) but isImpersonating: true — should be a
+    // cache MISS on impersonatedPlayerPredictionsCache, triggering a fresh query.
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({
+      data: [PRED_ROW],
+      error: null,
+    })
+    mockMatchesIn.mockResolvedValueOnce({
+      data: [FINISHED_MATCH],
+      error: null,
+    })
+
+    const impersonatedResult = await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID, {
+      isImpersonating: true,
+    })
+    expect(impersonatedResult).toHaveLength(1)
+
+    // Both queries actually ran (one per cache)
+    expect(mockPlayerPredictionsUserEq).toHaveBeenCalledTimes(2)
+
+    // A third call with isImpersonating: true again should hit the impersonated cache
+    const impersonatedSecond = await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID, {
+      isImpersonating: true,
+    })
+    expect(impersonatedSecond).toEqual(impersonatedResult)
+    expect(mockPlayerPredictionsUserEq).toHaveBeenCalledTimes(2)
+
+    // And a fourth call without isImpersonating should still hit the normal cache
+    const normalSecond = await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)
+    expect(normalSecond).toEqual(normalResult)
+    expect(mockPlayerPredictionsUserEq).toHaveBeenCalledTimes(2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// invalidatePlayerPredictionsCache
+// ---------------------------------------------------------------------------
+
+describe('PredictionScoreRepository – invalidatePlayerPredictionsCache', () => {
+  const QUINIELA_ID = 'quiniela-uuid'
+  const USER_ID = 'user-uuid-1'
+
+  const PRED_ROW = {
+    home_goal_point: 1,
+    away_goal_point: 1,
+    outcome_point: 1,
+    total_points: 3,
+    user_expected_results: {
+      home_score: 2,
+      away_score: 1,
+      match_id: 'match-uuid-1',
+      user_id: USER_ID,
+    },
+  }
+
+  const FINISHED_MATCH = {
+    id: 'match-uuid-1',
+    home_team_name: 'Germany',
+    away_team_name: 'Scotland',
+    scheduled_at: '2026-06-14T16:00:00Z',
+    status: 'FINISHED',
+    regulation_home_goals: 2,
+    regulation_away_goals: 1,
+  }
+
+  it('clears both the normal and impersonated cache entries for the given key', async () => {
+    const repo = makeRepo()
+
+    // Populate normal cache
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({ data: [PRED_ROW], error: null })
+    mockMatchesIn.mockResolvedValueOnce({ data: [FINISHED_MATCH], error: null })
+    await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)
+
+    // Populate impersonated cache
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({ data: [PRED_ROW], error: null })
+    mockMatchesIn.mockResolvedValueOnce({ data: [FINISHED_MATCH], error: null })
+    await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID, { isImpersonating: true })
+
+    expect(mockPlayerPredictionsUserEq).toHaveBeenCalledTimes(2)
+
+    // Invalidate both
+    repo.invalidatePlayerPredictionsCache(QUINIELA_ID, USER_ID)
+
+    // Both reads should re-query now
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({ data: [PRED_ROW], error: null })
+    mockMatchesIn.mockResolvedValueOnce({ data: [FINISHED_MATCH], error: null })
+    await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)
+
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({ data: [PRED_ROW], error: null })
+    mockMatchesIn.mockResolvedValueOnce({ data: [FINISHED_MATCH], error: null })
+    await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID, { isImpersonating: true })
+
+    expect(mockPlayerPredictionsUserEq).toHaveBeenCalledTimes(4)
+  })
+
+  it('does not affect cache entries for other (quinielaId, userId) keys', async () => {
+    const repo = makeRepo()
+
+    // Populate cache for USER_ID
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({ data: [PRED_ROW], error: null })
+    mockMatchesIn.mockResolvedValueOnce({ data: [FINISHED_MATCH], error: null })
+    await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)
+
+    // Populate cache for a different user
+    const otherUserPredRow = {
+      ...PRED_ROW,
+      user_expected_results: { ...PRED_ROW.user_expected_results, user_id: 'user-uuid-2' },
+    }
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({ data: [otherUserPredRow], error: null })
+    mockMatchesIn.mockResolvedValueOnce({ data: [FINISHED_MATCH], error: null })
+    await repo.findPlayerPredictionsForViewer(QUINIELA_ID, 'user-uuid-2')
+
+    expect(mockPlayerPredictionsUserEq).toHaveBeenCalledTimes(2)
+
+    // Invalidate only USER_ID's entry
+    repo.invalidatePlayerPredictionsCache(QUINIELA_ID, USER_ID)
+
+    // USER_ID re-queries
+    mockPlayerPredictionsUserEq.mockResolvedValueOnce({ data: [PRED_ROW], error: null })
+    mockMatchesIn.mockResolvedValueOnce({ data: [FINISHED_MATCH], error: null })
+    await repo.findPlayerPredictionsForViewer(QUINIELA_ID, USER_ID)
+    expect(mockPlayerPredictionsUserEq).toHaveBeenCalledTimes(3)
+
+    // user-uuid-2 still cached — no additional query
+    await repo.findPlayerPredictionsForViewer(QUINIELA_ID, 'user-uuid-2')
+    expect(mockPlayerPredictionsUserEq).toHaveBeenCalledTimes(3)
   })
 })

@@ -62,9 +62,10 @@ export async function GET(
 
   const { quinielaId } = await params
 
-  // 2. Delegate to service
+  // 2. Delegate to service — use the effective viewer (impersonated user, if
+  // any) so "my answers" reflects the impersonated user's own answers.
   const service = makeService()
-  const result = await service.listQuestions(quinielaId, session.sub)
+  const result = await service.listQuestions(quinielaId, authClient.getEffectiveUserId(session))
 
   if (!result.success) {
     const status = result.error === 'UNAUTHORIZED' ? 403 : 500
@@ -89,6 +90,12 @@ export async function POST(
 
   if (!session) {
     const result: CreateQuestionResult = { success: false, error: 'UNAUTHORIZED' }
+    return Response.json(result, { status: 403 })
+  }
+
+  const writable = authClient.requireWritableSession(session)
+  if (!writable.allowed) {
+    const result: CreateQuestionResult = { success: false, error: writable.error }
     return Response.json(result, { status: 403 })
   }
 

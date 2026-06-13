@@ -77,6 +77,15 @@ export function MobileMenuClient({
               {dict.settings}
             </Link>
           )}
+          {isAdmin && (
+            <Link
+              href={`/${lang}/admin/impersonate`}
+              onClick={close}
+              className="block px-4 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-800"
+            >
+              {dict.impersonateLink}
+            </Link>
+          )}
           {quinielas.length === 1 && (
             <Link
               href={`/${lang}/quinielas/${quinielas[0].id}/leaderboard`}

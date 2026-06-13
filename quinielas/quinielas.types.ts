@@ -7,7 +7,7 @@ export type Quiniela = {
 
 export type CreateQuinielaResult =
   | { success: true; quiniela: Quiniela }
-  | { success: false; error: 'NAME_EMPTY' | 'DB_ERROR' | 'UNKNOWN_ERROR' }
+  | { success: false; error: 'NAME_EMPTY' | 'DB_ERROR' | 'IMPERSONATING_READ_ONLY' | 'UNKNOWN_ERROR' }
 
 export type GetQuinielaResult =
   | { success: true; quiniela: Quiniela }

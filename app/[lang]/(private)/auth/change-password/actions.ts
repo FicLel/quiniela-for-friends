@@ -63,6 +63,9 @@ export async function changePassword(
     return { success: false, error: 'UNAUTHORIZED' }
   }
 
+  const writable = authClient.requireWritableSession(session)
+  if (!writable.allowed) return { success: false, error: writable.error }
+
   const usersRepository = new UsersRepository()
   const authService = new AuthService(authClient, usersRepository)
 

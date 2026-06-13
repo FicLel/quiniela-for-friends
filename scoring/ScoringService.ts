@@ -97,6 +97,17 @@ export class ScoringService implements IScoringService {
     })
 
     await this.repo.upsertBatch(rows)
+
+    // Invalidate cached findPlayerPredictionsForViewer entries for every
+    // (quinielaId, userId) pair affected by this recalculation, so viewers
+    // (including impersonated admins) see fresh totals on next read.
+    const invalidatedKeys = new Set<string>()
+    for (const p of predictions) {
+      const key = `${p.quinielaId}:${p.userId}`
+      if (invalidatedKeys.has(key)) continue
+      invalidatedKeys.add(key)
+      this.repo.invalidatePlayerPredictionsCache(p.quinielaId, p.userId)
+    }
   }
 
   /**

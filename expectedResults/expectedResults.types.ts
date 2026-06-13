@@ -37,7 +37,7 @@ export type UpsertExpectedResultInput = {
 
 export type SaveExpectedResultResult =
   | { success: true }
-  | { success: false; error: 'NOT_APPROVED' | 'INVALID_SCORE' | 'LOCKED' | 'UNKNOWN_ERROR' }
+  | { success: false; error: 'NOT_APPROVED' | 'INVALID_SCORE' | 'LOCKED' | 'IMPERSONATING_READ_ONLY' | 'UNKNOWN_ERROR' }
 
 // ---------------------------------------------------------------------------
 // Port interfaces

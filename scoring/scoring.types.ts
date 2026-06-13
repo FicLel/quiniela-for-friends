@@ -132,8 +132,26 @@ export interface IPredictionScoreRepository {
   /**
    * Return all scored match predictions for a specific player in a quiniela.
    * Only returns entries for FINISHED matches with non-null regulation goals.
+   *
+   * Results are cached (process-scoped, TTL-based) keyed by
+   * `${quinielaId}:${userId}`. Pass `options.isImpersonating: true` when the
+   * caller's session is an admin "View as User" session — this routes the
+   * read through a shorter-TTL cache so impersonated reads reflect recent
+   * writes sooner (Decision B).
    */
-  findPlayerPredictionsForViewer(quinielaId: string, userId: string): Promise<PlayerPredictionEntry[]>
+  findPlayerPredictionsForViewer(
+    quinielaId: string,
+    userId: string,
+    options?: { isImpersonating?: boolean },
+  ): Promise<PlayerPredictionEntry[]>
+
+  /**
+   * Invalidate the cached findPlayerPredictionsForViewer entry (both the
+   * normal and impersonated caches) for the given (quinielaId, userId) pair.
+   * Called after prediction_scores are recalculated for a match so viewers
+   * see fresh data.
+   */
+  invalidatePlayerPredictionsCache(quinielaId: string, userId: string): void
 }
 
 export interface IScoringService {
@@ -144,5 +162,9 @@ export interface IScoringService {
 
 export interface ILeaderboardService {
   getLeaderboard(quinielaId: string): Promise<LeaderboardRow[]>
-  getPlayerPredictions(quinielaId: string, userId: string): Promise<PlayerPredictionEntry[]>
+  getPlayerPredictions(
+    quinielaId: string,
+    userId: string,
+    options?: { isImpersonating?: boolean },
+  ): Promise<PlayerPredictionEntry[]>
 }

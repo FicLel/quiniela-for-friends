@@ -90,6 +90,7 @@
     "syncResultErrors": {
       "UNAUTHORIZED": "No tienes permiso para realizar esta acción.",
       "INVALID_PAYLOAD": "Ingresa marcadores válidos para ambos equipos.",
+      "IMPERSONATING_READ_ONLY": "Esta acción no está disponible mientras ves la app como otro usuario.",
       "DB_ERROR": "Ocurrió un error de base de datos. Inténtalo de nuevo.",
       "UNKNOWN_ERROR": "Ocurrió un error inesperado."
     },
@@ -133,6 +134,7 @@
       "PASSWORDS_DO_NOT_MATCH": "Las contraseñas no coinciden.",
       "FLAG_UPDATE_FAILED": "Tu contraseña fue cambiada pero no pudimos actualizar tu cuenta. Contacta al soporte.",
       "UNAUTHORIZED": "Tu sesión ha expirado. Por favor inicia sesión de nuevo.",
+      "IMPERSONATING_READ_ONLY": "Esta acción no está disponible mientras ves la app como otro usuario.",
       "UNKNOWN_ERROR": "Algo salió mal. Inténtalo de nuevo."
     }
   },
@@ -143,7 +145,8 @@
     "users": "Usuarios",
     "leaderboard": "Marcador",
     "selectQuiniela": "Seleccionar quiniela",
-    "settings": "Configuración"
+    "settings": "Configuración",
+    "impersonateLink": "Ver como usuario"
   },
   "quinielas": {
     "heading": "Mis Quinielas",
@@ -298,5 +301,20 @@
       "DB_ERROR": "Algo salió mal. Inténtalo de nuevo.",
       "UNKNOWN_ERROR": "Ocurrió un error inesperado."
     }
+  },
+  "impersonation": {
+    "viewingAs": "Viendo como {email}",
+    "exit": "Salir",
+    "entryTitle": "Ver como usuario",
+    "entrySubtitle": "Ingresa el correo de un miembro para ver la app exactamente como él la ve. Esto es de solo lectura — no podrás hacer cambios en su nombre.",
+    "emailLabel": "Correo del usuario",
+    "emailPlaceholder": "amigo@ejemplo.com",
+    "submit": "Comenzar a ver",
+    "starting": "Comenzando…",
+    "currentlyViewingAs": "Actualmente estás viendo como {email}.",
+    "errorNotAdmin": "No tienes permiso para realizar esta acción.",
+    "errorUserNotFound": "No se encontró ningún usuario con ese correo.",
+    "errorCannotImpersonateAdmin": "No puedes ver como otro administrador.",
+    "errorUnknown": "Algo salió mal. Inténtalo de nuevo."
   }
 }

@@ -10,12 +10,40 @@
 
 import { getSupabaseServerClient } from '@/lib/supabaseServerClient'
 import { verifyTableOnce } from '@/lib/schemaCheckCache'
+import { TtlCache } from '@/lib/ttlCache'
 import type {
   IPredictionScoreRepository,
   PlayerPredictionEntry,
   PredictionScore,
   PredictionWithQuiniela,
 } from '@/scoring/scoring.types'
+
+/**
+ * Process-scoped caches for findPlayerPredictionsForViewer, keyed by
+ * `${quinielaId}:${viewerUserId}` — viewerUserId is always the subject whose
+ * data is being read (the impersonated user's ID when an admin is
+ * impersonating, or the caller's own session.sub otherwise). Because the key
+ * is keyed by the subject (not the caller), admin-own-reads and
+ * impersonated-reads naturally land in different keys with zero
+ * special-casing, and a regular session for user A and an impersonated
+ * session for user A share the same (correct) cache entry.
+ *
+ * Two instances, per Decision B:
+ * - `playerPredictionsCache`             — 30s TTL for normal reads.
+ * - `impersonatedPlayerPredictionsCache` — 5s TTL for impersonated reads, so
+ *   an admin debugging "my picks didn't save" sees near-real-time data.
+ *
+ * TtlCache's TTL is fixed at construction (no per-call override), hence two
+ * instances rather than one.
+ */
+const playerPredictionsCache = new TtlCache<PlayerPredictionEntry[]>(30_000, 200)
+const impersonatedPlayerPredictionsCache = new TtlCache<PlayerPredictionEntry[]>(5_000, 200)
+
+/** Clear both player-predictions caches — intended for tests only. */
+export function resetPlayerPredictionsCache(): void {
+  playerPredictionsCache.clear()
+  impersonatedPlayerPredictionsCache.clear()
+}
 
 export class PredictionScoreRepository implements IPredictionScoreRepository {
   private readonly supabase
@@ -309,7 +337,19 @@ export class PredictionScoreRepository implements IPredictionScoreRepository {
    *
    * Throws on Supabase error.
    */
-  async findPlayerPredictionsForViewer(quinielaId: string, userId: string): Promise<PlayerPredictionEntry[]> {
+  async findPlayerPredictionsForViewer(
+    quinielaId: string,
+    userId: string,
+    options?: { isImpersonating?: boolean },
+  ): Promise<PlayerPredictionEntry[]> {
+    const cache = options?.isImpersonating
+      ? impersonatedPlayerPredictionsCache
+      : playerPredictionsCache
+    const cacheKey = `${quinielaId}:${userId}`
+
+    const cached = cache.get(cacheKey)
+    if (cached) return cached
+
     await this.verifySchema()
 
     // Step 1: fetch prediction_scores for the (quiniela_id, user_id) pair
@@ -334,7 +374,10 @@ export class PredictionScoreRepository implements IPredictionScoreRepository {
       throw new Error(`findPlayerPredictionsForViewer failed: ${predError.message}`)
     }
 
-    if (!predictionRows || predictionRows.length === 0) return []
+    if (!predictionRows || predictionRows.length === 0) {
+      cache.set(cacheKey, [])
+      return []
+    }
 
     type PredRow = {
       home_goal_point: number
@@ -402,7 +445,18 @@ export class PredictionScoreRepository implements IPredictionScoreRepository {
       })
     }
 
+    cache.set(cacheKey, results)
     return results
+  }
+
+  /**
+   * Invalidate the cached findPlayerPredictionsForViewer entry (both the
+   * normal and impersonated caches) for the given (quinielaId, userId) pair.
+   */
+  invalidatePlayerPredictionsCache(quinielaId: string, userId: string): void {
+    const cacheKey = `${quinielaId}:${userId}`
+    playerPredictionsCache.invalidate(cacheKey)
+    impersonatedPlayerPredictionsCache.invalidate(cacheKey)
   }
 
   /**

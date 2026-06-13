@@ -8,3 +8,5 @@
 - [Competition scope](competition-scope.md) — ONE global matches table for all quinielas (2026 WC). No competition_id on quinielas; team/player lookups are always global.
 - [Quiniela admin role](quiniela-admin-role.md) — Quiniela-level admin = role='admin' in quiniela_memberships. Session role ('admin'|'player') is a global app role, distinct from quiniela role.
 - [Migration naming](migration-naming.md) — Pattern: YYYYMMDDHHMMSS_description.sql; latest is 20260609000000. Next one should be 20260610000000.
+- [TtlCache usage](ttlcache-usage.md) — Only 2 singleton TtlCache instances exist (matches, settings); scoring module has none yet.
+- [Proxy API exclusion](proxy-api-exclusion.md) — proxy.ts matcher excludes /api/*; cross-cutting guards need a shared helper, not middleware.

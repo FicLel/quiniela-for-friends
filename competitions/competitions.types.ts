@@ -85,11 +85,11 @@ export type KnockoutPlaceholderRecord = {
 
 export type ImportMatchesResult =
   | { success: true; count: number }
-  | { success: false; error: 'FETCH_FAILED' | 'DB_ERROR' | 'UNKNOWN_ERROR' }
+  | { success: false; error: 'FETCH_FAILED' | 'DB_ERROR' | 'IMPERSONATING_READ_ONLY' | 'UNKNOWN_ERROR' }
 
 export type SeedPlaceholdersResult =
   | { success: true; count: number }
-  | { success: false; error: 'DB_ERROR' | 'UNKNOWN_ERROR' }
+  | { success: false; error: 'DB_ERROR' | 'IMPERSONATING_READ_ONLY' | 'UNKNOWN_ERROR' }
 
 export type SyncResultPayload = {
   matchId: string
@@ -99,7 +99,7 @@ export type SyncResultPayload = {
 
 export type SyncRegulationResultsResult =
   | { success: true; matchesUpdated: number; scoresUpdated: number }
-  | { success: false; error: 'UNAUTHORIZED' | 'INVALID_PAYLOAD' | 'DB_ERROR' }
+  | { success: false; error: 'UNAUTHORIZED' | 'INVALID_PAYLOAD' | 'IMPERSONATING_READ_ONLY' | 'DB_ERROR' }
 
 // ---------------------------------------------------------------------------
 // Port interfaces

@@ -47,10 +47,12 @@ export async function GET(
     return Response.json(result, { status: 401 })
   }
 
-  // 2. Quiniela-level admin check
+  // 2. Quiniela-level admin check — use the effective viewer (impersonated
+  // user, if any) so a read-only "View as User" session sees exactly what
+  // that user would see.
   const { quinielaId } = await params
   const membershipsRepo = new MembershipsRepository()
-  const membership = await membershipsRepo.findByQuinielaAndUser(quinielaId, session.sub)
+  const membership = await membershipsRepo.findByQuinielaAndUser(quinielaId, authClient.getEffectiveUserId(session))
 
   if (!membership || membership.role !== 'admin' || membership.approvedAt === null) {
     const result: PlayersResponse = { success: false, error: 'UNAUTHORIZED' }

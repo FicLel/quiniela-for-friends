@@ -11,6 +11,7 @@ jest.mock('next/navigation', () => ({
 }))
 
 // Mock AuthClient
+const mockRequireWritableSession = jest.fn().mockReturnValue({ allowed: true })
 jest.mock('@/auth/AuthClient', () => ({
   AuthClient: jest.fn().mockImplementation(() => ({
     getTokenFromServerAction: jest.fn().mockResolvedValue('mock-token'),
@@ -20,6 +21,7 @@ jest.mock('@/auth/AuthClient', () => ({
       role: 'player',
       mustChangePassword: false,
     }),
+    requireWritableSession: mockRequireWritableSession,
   })),
 }))
 
@@ -42,6 +44,16 @@ import { redirect } from 'next/navigation'
 describe('createQuiniela action', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockRequireWritableSession.mockReturnValue({ allowed: true })
+  })
+
+  it('returns IMPERSONATING_READ_ONLY when the session is impersonating', async () => {
+    mockRequireWritableSession.mockReturnValue({ allowed: false, error: 'IMPERSONATING_READ_ONLY' })
+
+    const result = await createQuiniela('en', 'My Quiniela')
+
+    expect(result).toEqual({ success: false, error: 'IMPERSONATING_READ_ONLY' })
+    expect(mockCreateQuiniela).not.toHaveBeenCalled()
   })
 
   it('returns NAME_EMPTY for a blank name', async () => {

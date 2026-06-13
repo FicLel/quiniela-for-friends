@@ -17,15 +17,15 @@ export type InvitationWithStatus = Invitation & { status: InvitationStatus }
 
 export type SendInviteResult =
   | { success: true; invitationId: string; inviteUrl: string }
-  | { success: false; error: 'CALLER_NOT_QUINIELA_ADMIN' | 'DB_ERROR' | 'UNKNOWN_ERROR' }
+  | { success: false; error: 'CALLER_NOT_QUINIELA_ADMIN' | 'DB_ERROR' | 'IMPERSONATING_READ_ONLY' | 'UNKNOWN_ERROR' }
 
 export type AcceptInviteResult =
   | { success: true; quinielaId: string; wasNewUser?: boolean; alreadyMember?: boolean; pendingApproval?: boolean }
-  | { success: false; error: 'TOKEN_NOT_FOUND' | 'TOKEN_EXPIRED' | 'TOKEN_REVOKED' | 'TOKEN_ALREADY_ACCEPTED' | 'EMAIL_ALREADY_EXISTS' | 'PASSWORD_REQUIRED' | 'WEAK_PASSWORD' | 'DB_ERROR' | 'UNKNOWN_ERROR' }
+  | { success: false; error: 'TOKEN_NOT_FOUND' | 'TOKEN_EXPIRED' | 'TOKEN_REVOKED' | 'TOKEN_ALREADY_ACCEPTED' | 'EMAIL_ALREADY_EXISTS' | 'PASSWORD_REQUIRED' | 'WEAK_PASSWORD' | 'DB_ERROR' | 'IMPERSONATING_READ_ONLY' | 'UNKNOWN_ERROR' }
 
 export type RevokeInviteResult =
   | { success: true }
-  | { success: false; error: 'INVITATION_NOT_FOUND' | 'CALLER_NOT_QUINIELA_ADMIN' | 'ALREADY_ACCEPTED' | 'ALREADY_REVOKED' | 'UNKNOWN_ERROR' }
+  | { success: false; error: 'INVITATION_NOT_FOUND' | 'CALLER_NOT_QUINIELA_ADMIN' | 'ALREADY_ACCEPTED' | 'ALREADY_REVOKED' | 'IMPERSONATING_READ_ONLY' | 'UNKNOWN_ERROR' }
 
 export type ListInvitationsResult =
   | { success: true; invitations: InvitationWithStatus[] }

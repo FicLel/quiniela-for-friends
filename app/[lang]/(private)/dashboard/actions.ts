@@ -48,6 +48,10 @@ export async function approveMember(
     return { ok: false, error: 'CALLER_NOT_ADMIN' }
   }
 
+  const authClient = new AuthClient()
+  const writable = authClient.requireWritableSession(session)
+  if (!writable.allowed) return { ok: false, error: writable.error }
+
   const service = new MembershipsService(new MembershipsRepository())
   return service.approveMember(session.sub, membershipId)
 }

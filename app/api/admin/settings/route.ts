@@ -90,6 +90,12 @@ export async function PUT(request: Request): Promise<Response> {
     return Response.json(result, { status: 403 })
   }
 
+  const writable = authClient.requireWritableSession(session)
+  if (!writable.allowed) {
+    const result: PutSettingsResponse = { success: false, error: writable.error }
+    return Response.json(result, { status: 403 })
+  }
+
   // 2. Parse and validate body
   let body: unknown
   try {

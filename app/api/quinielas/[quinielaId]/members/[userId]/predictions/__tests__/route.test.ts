@@ -23,6 +23,8 @@ jest.mock('@/auth/AuthClient', () => ({
   AuthClient: jest.fn().mockImplementation(() => ({
     getTokenFromServerAction: mockGetTokenFromServerAction,
     verifyToken: mockVerifyToken,
+    getEffectiveUserId: (session: { sub: string; impersonating?: { userId: string } } | null) =>
+      session?.impersonating?.userId ?? session?.sub,
   })),
 }))
 
@@ -78,6 +80,15 @@ const SESSION = {
   tokenVersion: 1,
 }
 
+const ADMIN_IMPERSONATING_SESSION = {
+  sub: 'admin-user-id',
+  email: 'admin@example.com',
+  role: 'admin' as const,
+  mustChangePassword: false,
+  tokenVersion: 1,
+  impersonating: { userId: 'target-user-id', email: 'target@example.com' },
+}
+
 const QUINIELA_ID = 'quiniela-uuid'
 const TARGET_USER_ID = 'target-user-id'
 
@@ -111,7 +122,7 @@ function makeParams(quinielaId = QUINIELA_ID, userId = TARGET_USER_ID) {
   return { params: Promise.resolve({ quinielaId, userId }) }
 }
 
-function setupAuth(session: typeof SESSION | null) {
+function setupAuth(session: typeof SESSION | typeof ADMIN_IMPERSONATING_SESSION | null) {
   mockGetTokenFromServerAction.mockResolvedValue(session ? 'mock-token' : null)
   mockVerifyToken.mockResolvedValue(session)
 }
@@ -136,7 +147,7 @@ describe('GET /api/quinielas/[quinielaId]/members/[userId]/predictions', () => {
     expect(response.status).toBe(200)
     expect(body).toEqual({ success: true, predictions: [PREDICTION] })
     expect(mockIsApprovedMember).toHaveBeenCalledWith(QUINIELA_ID, SESSION.sub)
-    expect(mockGetPlayerPredictions).toHaveBeenCalledWith(QUINIELA_ID, TARGET_USER_ID)
+    expect(mockGetPlayerPredictions).toHaveBeenCalledWith(QUINIELA_ID, TARGET_USER_ID, { isImpersonating: false })
   })
 
   it('returns 200 when caller views their own predictions (userId === session.sub)', async () => {
@@ -164,7 +175,7 @@ describe('GET /api/quinielas/[quinielaId]/members/[userId]/predictions', () => {
     expect(body.success).toBe(true)
     // isApprovedMember is called with caller's userId, not target's
     expect(mockIsApprovedMember).toHaveBeenCalledWith(QUINIELA_ID, SESSION.sub)
-    expect(mockGetPlayerPredictions).toHaveBeenCalledWith(QUINIELA_ID, 'other-user-id')
+    expect(mockGetPlayerPredictions).toHaveBeenCalledWith(QUINIELA_ID, 'other-user-id', { isImpersonating: false })
   })
 
   it('returns 200 with empty predictions array when no predictions exist', async () => {
@@ -224,5 +235,41 @@ describe('GET /api/quinielas/[quinielaId]/members/[userId]/predictions', () => {
 
     expect(response.status).toBe(500)
     expect(body).toEqual({ success: false, error: 'UNKNOWN_ERROR' })
+  })
+
+  it('passes isImpersonating: true when an admin views the impersonated user\'s own predictions', async () => {
+    // session.impersonating.userId === route param userId === effectiveUserId
+    setupAuth(ADMIN_IMPERSONATING_SESSION)
+    mockIsApprovedMember.mockResolvedValue(true)
+    mockGetPlayerPredictions.mockResolvedValue([PREDICTION])
+
+    const response = await GET(
+      makeRequest(QUINIELA_ID, ADMIN_IMPERSONATING_SESSION.impersonating.userId),
+      makeParams(QUINIELA_ID, ADMIN_IMPERSONATING_SESSION.impersonating.userId),
+    )
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body).toEqual({ success: true, predictions: [PREDICTION] })
+    // isApprovedMember is checked against the effective (impersonated) user
+    expect(mockIsApprovedMember).toHaveBeenCalledWith(QUINIELA_ID, ADMIN_IMPERSONATING_SESSION.impersonating.userId)
+    expect(mockGetPlayerPredictions).toHaveBeenCalledWith(
+      QUINIELA_ID,
+      ADMIN_IMPERSONATING_SESSION.impersonating.userId,
+      { isImpersonating: true },
+    )
+  })
+
+  it('passes isImpersonating: false when an impersonating admin views a different member\'s predictions', async () => {
+    // route param userId !== effectiveUserId (admin viewing someone else while impersonating)
+    setupAuth(ADMIN_IMPERSONATING_SESSION)
+    mockIsApprovedMember.mockResolvedValue(true)
+    mockGetPlayerPredictions.mockResolvedValue([PREDICTION])
+
+    const response = await GET(makeRequest(QUINIELA_ID, 'some-other-user-id'), makeParams(QUINIELA_ID, 'some-other-user-id'))
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(mockGetPlayerPredictions).toHaveBeenCalledWith(QUINIELA_ID, 'some-other-user-id', { isImpersonating: false })
   })
 })
