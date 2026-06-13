@@ -24,6 +24,8 @@ function getErrorMessage(code: ChangePasswordErrorCode): string {
       return 'Your password was changed but we could not update your account. Please contact support.'
     case 'UNAUTHORIZED':
       return 'Your session has expired. Please log in again.'
+    case 'IMPERSONATING_READ_ONLY':
+      return 'This action is unavailable while viewing as another user.'
     case 'UNKNOWN_ERROR':
       return 'Something went wrong. Please try again.'
   }
