@@ -71,6 +71,11 @@ const mockApproveAction = jest.fn(
   async (_membershipId: string): Promise<ApproveMemberResult> => ({ ok: true }),
 )
 
+const mockGenerateResetLinkAction = jest.fn(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async (_userId: string) => ({ success: true as const, resetUrl: 'http://localhost/en/reset-password/abc123' }),
+)
+
 const defaultProps = {
   initialUsers: [activeUser, pendingUser],
   initialTotal: 2,
@@ -79,6 +84,7 @@ const defaultProps = {
   dict,
   listUsersAction: mockListUsersAction,
   approveAction: mockApproveAction,
+  generateResetLinkAction: mockGenerateResetLinkAction,
 }
 
 // ---------------------------------------------------------------------------

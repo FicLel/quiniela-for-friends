@@ -218,7 +218,26 @@
     "detailHeading": "User detail",
     "detailQuinielaRole": "Role",
     "detailJoinedAt": "Joined",
-    "detailApproval": "Approval"
+    "detailApproval": "Approval",
+    "resetLinkButton": "Copy reset link",
+    "generatingResetLink": "Generating…",
+    "resetLinkCopied": "Link copied!",
+    "resetLinkError": "Could not generate reset link. Please try again."
+  },
+  "resetPassword": {
+    "heading": "Set a new password",
+    "subtitle": "Choose a password you'll remember. It must have at least 8 characters, one uppercase, one lowercase, and one digit.",
+    "newPasswordLabel": "New password",
+    "confirmPasswordLabel": "Confirm new password",
+    "passwordPlaceholder": "••••••••",
+    "setPassword": "Set new password",
+    "saving": "Saving…",
+    "errors": {
+      "TOKEN_INVALID": "This reset link is invalid or has already been used.",
+      "POLICY_VIOLATION": "Password must be at least 8 characters and contain an uppercase letter, a lowercase letter, and a digit.",
+      "PASSWORDS_DO_NOT_MATCH": "Passwords do not match.",
+      "UNKNOWN_ERROR": "Something went wrong. Please try again."
+    }
   },
   "pendingApproval": {
     "heading": "Approval pending",

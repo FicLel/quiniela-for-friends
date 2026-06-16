@@ -218,7 +218,26 @@
     "detailHeading": "Detalle de usuario",
     "detailQuinielaRole": "Rol",
     "detailJoinedAt": "Se unió",
-    "detailApproval": "Aprobación"
+    "detailApproval": "Aprobación",
+    "resetLinkButton": "Copiar enlace de recuperación",
+    "generatingResetLink": "Generando…",
+    "resetLinkCopied": "¡Enlace copiado!",
+    "resetLinkError": "No se pudo generar el enlace. Inténtalo de nuevo."
+  },
+  "resetPassword": {
+    "heading": "Establece una nueva contraseña",
+    "subtitle": "Elige una contraseña que recuerdes. Debe tener al menos 8 caracteres, una mayúscula, una minúscula y un dígito.",
+    "newPasswordLabel": "Nueva contraseña",
+    "confirmPasswordLabel": "Confirmar nueva contraseña",
+    "passwordPlaceholder": "••••••••",
+    "setPassword": "Establecer nueva contraseña",
+    "saving": "Guardando…",
+    "errors": {
+      "TOKEN_INVALID": "Este enlace de recuperación es inválido o ya fue utilizado.",
+      "POLICY_VIOLATION": "La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un dígito.",
+      "PASSWORDS_DO_NOT_MATCH": "Las contraseñas no coinciden.",
+      "UNKNOWN_ERROR": "Algo salió mal. Inténtalo de nuevo."
+    }
   },
   "pendingApproval": {
     "heading": "Aprobación pendiente",

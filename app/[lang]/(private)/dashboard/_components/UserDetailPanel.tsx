@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import type { Dictionary } from '@/i18n/getDictionary'
 import type { UserWithMemberships } from '@/users/users.types'
 import type { ApproveMemberResult } from '@/memberships/memberships.types'
+import type { CreateResetTokenResult } from '@/auth/auth.types'
 
 type Membership = UserWithMemberships['memberships'][number]
 
@@ -11,6 +12,7 @@ type Props = {
   user: UserWithMemberships
   dict: Dictionary['users']
   approveAction: (membershipId: string) => Promise<ApproveMemberResult>
+  generateResetLinkAction: (userId: string) => Promise<CreateResetTokenResult>
   onClose: () => void
 }
 
@@ -18,11 +20,28 @@ type Props = {
  * Slide-in panel showing user details: email, list of quinielas with role,
  * joined date, and approval status. Admins can approve pending memberships.
  */
-export default function UserDetailPanel({ user, dict, approveAction, onClose }: Props) {
+export default function UserDetailPanel({ user, dict, approveAction, generateResetLinkAction, onClose }: Props) {
   const [memberships, setMemberships] = useState<Membership[]>(user.memberships)
   const [approvingId, setApprovingId] = useState<string | undefined>(undefined)
   const [approveError, setApproveError] = useState<string | undefined>(undefined)
   const [isPending, startTransition] = useTransition()
+
+  const [resetLinkState, setResetLinkState] = useState<'idle' | 'pending' | 'copied' | 'error'>('idle')
+
+  function handleGenerateResetLink() {
+    setResetLinkState('pending')
+    startTransition(async () => {
+      const result = await generateResetLinkAction(user.id)
+      if (result.success) {
+        await navigator.clipboard.writeText(result.resetUrl)
+        setResetLinkState('copied')
+        setTimeout(() => setResetLinkState('idle'), 3000)
+      } else {
+        setResetLinkState('error')
+        setTimeout(() => setResetLinkState('idle'), 4000)
+      }
+    })
+  }
 
   function handleApprove(membership: Membership) {
     setApproveError(undefined)
@@ -83,7 +102,25 @@ export default function UserDetailPanel({ user, dict, approveAction, onClose }: 
         {/* Body */}
         <div className="px-6 py-5">
           {/* Email */}
-          <p className="mb-6 text-base font-medium text-gray-900">{user.email}</p>
+          <p className="mb-4 text-base font-medium text-gray-900">{user.email}</p>
+
+          {/* Reset link */}
+          <div className="mb-6">
+            <button
+              type="button"
+              disabled={resetLinkState === 'pending'}
+              onClick={handleGenerateResetLink}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {resetLinkState === 'pending' ? dict.generatingResetLink : dict.resetLinkButton}
+            </button>
+            {resetLinkState === 'copied' && (
+              <span className="ml-3 text-xs font-medium text-green-700">{dict.resetLinkCopied}</span>
+            )}
+            {resetLinkState === 'error' && (
+              <span className="ml-3 text-xs text-red-600">{dict.resetLinkError}</span>
+            )}
+          </div>
 
           {approveError && (
             <p role="alert" className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">

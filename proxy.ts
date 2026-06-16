@@ -70,6 +70,7 @@ export async function proxy(request: NextRequest) {
   const isLoginRoute = barePath === '/login'
   const isChangePasswordRoute = barePath.startsWith('/auth/change-password')
   const isInviteRoute = barePath.startsWith('/invite/')
+  const isResetPasswordRoute = barePath.startsWith('/reset-password/')
 
   const authClient = new AuthClient()
   const token = authClient.getTokenFromRequest(request)
@@ -78,12 +79,17 @@ export async function proxy(request: NextRequest) {
   const session = token ? await authClient.verifyToken(token) : null
 
   // Unauthenticated: redirect all private routes to /{locale}/login.
-  if (!session && !isLoginRoute && !isInviteRoute) {
+  if (!session && !isLoginRoute && !isInviteRoute && !isResetPasswordRoute) {
     return NextResponse.redirect(new URL(`/${locale}/login`, request.url))
   }
 
   // Authenticated: determine mustChangePassword for routing decisions.
   if (session) {
+    // Already logged in — no need for password reset.
+    if (isResetPasswordRoute) {
+      return NextResponse.redirect(new URL(`/${locale}/welcome`, request.url))
+    }
+
     const mustChange = session.mustChangePassword
 
     if (isLoginRoute) {

@@ -4,7 +4,7 @@ import { AuthClient } from '@/auth/AuthClient'
 import { QuinielasService } from '@/quinielas/QuinielasService'
 import { QuinielasRepository } from '@/quinielas/QuinielasRepository'
 import type { Locale } from '@/i18n/i18n.types'
-import { listUsers, approveMember } from './actions'
+import { listUsers, approveMember, generatePasswordResetLink } from './actions'
 import UsersClient from './_components/UsersClient'
 
 type PageProps = { params: Promise<{ lang: string }> }
@@ -43,6 +43,7 @@ export default async function DashboardPage({ params }: PageProps) {
   // Bind actions so lang is pre-filled
   const boundListUsers = listUsers.bind(null, locale)
   const boundApproveMember = approveMember.bind(null, locale)
+  const boundGenerateResetLink = generatePasswordResetLink.bind(null, locale)
 
   return (
     <main className="min-h-screen w-full bg-white">
@@ -57,6 +58,7 @@ export default async function DashboardPage({ params }: PageProps) {
         dict={dict.users}
         listUsersAction={boundListUsers}
         approveAction={boundApproveMember}
+        generateResetLinkAction={boundGenerateResetLink}
       />
     </main>
   )

@@ -6,6 +6,7 @@ import type { Locale } from '@/i18n/i18n.types'
 import type { UserWithMemberships, UserListFilters, UserListSort, UserListResult } from '@/users/users.types'
 import type { ApproveMemberResult } from '@/memberships/memberships.types'
 import type { Quiniela } from '@/quinielas/quinielas.types'
+import type { CreateResetTokenResult } from '@/auth/auth.types'
 import UserDetailPanel from './UserDetailPanel'
 
 const PAGE_SIZE = 20
@@ -25,6 +26,7 @@ type Props = {
     sort: UserListSort,
   ) => Promise<UserListResult>
   approveAction: (membershipId: string) => Promise<ApproveMemberResult>
+  generateResetLinkAction: (userId: string) => Promise<CreateResetTokenResult>
 }
 
 function StatusBadge({ isPending, dict }: { isPending: boolean; dict: Dictionary['users'] }) {
@@ -120,6 +122,7 @@ export default function UsersClient({
   dict,
   listUsersAction,
   approveAction,
+  generateResetLinkAction,
 }: Props) {
   // Table data state
   const [users, setUsers] = useState<UserWithMemberships[]>(initialUsers)
@@ -380,6 +383,7 @@ export default function UsersClient({
           user={selectedUser}
           dict={dict}
           approveAction={approveAction}
+          generateResetLinkAction={generateResetLinkAction}
           onClose={() => setSelectedUser(null)}
         />
       )}

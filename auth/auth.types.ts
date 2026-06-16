@@ -16,3 +16,13 @@ export type LoginErrorCode =
   | 'UNKNOWN_ERROR'
 
 export type ChangePasswordErrorCode = NonNullable<Extract<ChangePasswordResult, { success: false }>['error']>
+
+export type CreateResetTokenResult =
+  | { success: true; resetUrl: string }
+  | { success: false; error: 'NOT_ADMIN' | 'USER_NOT_FOUND' | 'UNKNOWN_ERROR' }
+
+export type ConsumeResetTokenResult =
+  | { success: true; token: string }
+  | { success: false; error: 'TOKEN_INVALID' | 'POLICY_VIOLATION' | 'PASSWORDS_DO_NOT_MATCH' | 'UNKNOWN_ERROR' }
+
+export type ConsumeResetTokenErrorCode = NonNullable<Extract<ConsumeResetTokenResult, { success: false }>['error']>
