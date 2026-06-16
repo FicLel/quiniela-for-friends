@@ -156,7 +156,7 @@ function StatusBadge({ status, dict }: { status: string; dict: Dictionary['welco
 type ScoreCounterProps = {
   incrementLabel: string
   decrementLabel: string
-  initialValue?: number
+  initialValue?: number | null
   disabled?: boolean
   onSave?: (value: number) => void
 }
@@ -168,7 +168,7 @@ function ScoreCounter({
   disabled = false,
   onSave,
 }: ScoreCounterProps) {
-  const [count, setCount] = useState(initialValue ?? 0)
+  const [count, setCount] = useState<number | null>(initialValue ?? null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function fireOnSave(value: number) {
@@ -186,14 +186,14 @@ function ScoreCounter({
 
   function handleIncrement() {
     if (disabled) return
-    const next = count + 1
+    const next = count === null ? 1 : count + 1
     setCount(next)
     scheduleDebounce(next)
   }
 
   function handleDecrement() {
-    if (disabled || count === 0) return
-    const next = Math.max(0, count - 1)
+    if (disabled || count === null || count === 0) return
+    const next = count - 1
     setCount(next)
     scheduleDebounce(next)
   }
@@ -205,7 +205,7 @@ function ScoreCounter({
       clearTimeout(debounceRef.current)
       debounceRef.current = null
     }
-    fireOnSave(count)
+    if (count !== null) fireOnSave(count)
   }
 
   const disabledButtonClasses = disabled ? 'opacity-50 cursor-not-allowed' : ''
@@ -241,7 +241,7 @@ function ScoreCounter({
       {/* Score display */}
       <div className="flex h-8 w-full items-center justify-center border-y border-gray-200 bg-white sm:h-9 lg:h-10">
         <span className="text-base font-bold tabular-nums text-gray-800 sm:text-lg lg:text-xl">
-          {count}
+          {count === null ? '-' : count}
         </span>
       </div>
 
@@ -250,7 +250,7 @@ function ScoreCounter({
         type="button"
         aria-label={decrementLabel}
         onClick={handleDecrement}
-        disabled={disabled || count === 0}
+        disabled={disabled || count === null || count === 0}
         className={`flex h-7 w-full items-center justify-center bg-gray-50 text-gray-500 transition hover:bg-green-50 hover:text-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-400 disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 ${disabledButtonClasses}`}
       >
         <svg

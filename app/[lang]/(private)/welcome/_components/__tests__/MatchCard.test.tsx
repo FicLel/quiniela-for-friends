@@ -80,10 +80,10 @@ describe('MatchCard', () => {
   // Score counters — vertical box widget
   // -------------------------------------------------------------------------
 
-  it('renders two counters starting at 0', () => {
+  it('renders two counters showing "-" when no prediction exists', () => {
     render(<MatchCard {...baseMatch} dict={enWelcome} lang="en" isApproved={true} />)
-    const zeros = screen.getAllByText('0')
-    expect(zeros.length).toBe(2)
+    const dashes = screen.getAllByText('-')
+    expect(dashes.length).toBe(2)
   })
 
   it('increment button increases the home counter', () => {
@@ -101,7 +101,7 @@ describe('MatchCard', () => {
     expect(screen.getByText('2')).toBeInTheDocument()
   })
 
-  it('decrement button is disabled when counter is 0', () => {
+  it('decrement button is disabled when counter is unset or 0', () => {
     render(<MatchCard {...baseMatch} dict={enWelcome} lang="en" isApproved={true} />)
     const decrement = screen.getByLabelText('Decrease Germany score')
     expect(decrement).toBeDisabled()
@@ -109,10 +109,12 @@ describe('MatchCard', () => {
 
   it('decrement does not go below 0', () => {
     render(<MatchCard {...baseMatch} dict={enWelcome} lang="en" isApproved={true} />)
+    const increment = screen.getByLabelText('Increase Germany score')
     const decrement = screen.getByLabelText('Decrease Germany score')
-    fireEvent.click(decrement) // no-op — disabled
-    const zeros = screen.getAllByText('0')
-    expect(zeros.length).toBe(2)
+    fireEvent.click(increment) // unset → 1
+    fireEvent.click(decrement) // 1 → 0
+    fireEvent.click(decrement) // no-op — disabled at 0
+    expect(screen.getByText('0')).toBeInTheDocument()
   })
 
   it('decrement button becomes enabled after incrementing', () => {
@@ -204,7 +206,7 @@ describe('MatchCard', () => {
     expect(screen.getByText('1')).toBeInTheDocument()
   })
 
-  it('initialValue = 0 behaves identically to no initialValue', () => {
+  it('initialValue = 0 shows "0", not "-"', () => {
     render(
       <MatchCard
         {...baseMatch}
@@ -217,6 +219,12 @@ describe('MatchCard', () => {
     )
     const zeros = screen.getAllByText('0')
     expect(zeros.length).toBe(2)
+  })
+
+  it('no initialValue shows "-", not "0"', () => {
+    render(<MatchCard {...baseMatch} dict={enWelcome} lang="en" isApproved={true} />)
+    expect(screen.queryByText('0')).toBeNull()
+    expect(screen.getAllByText('-')).toHaveLength(2)
   })
 
   // -------------------------------------------------------------------------
