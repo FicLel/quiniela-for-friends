@@ -150,4 +150,51 @@ describe('DateGroupedView', () => {
       germanyCard.compareDocumentPosition(franceCard) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
   })
+
+  describe('lastFinishedMatchId / setTargetElement', () => {
+    it('invokes setTargetElement only for the wrapper of the matching match id', () => {
+      const setTargetElement = jest.fn()
+      render(
+        <DateGroupedView
+          matches={[matchA, matchB]}
+          dict={dict}
+          lang="en"
+          isApproved={true}
+          lastFinishedMatchId="match-b"
+          setTargetElement={setTargetElement}
+        />,
+      )
+
+      // setTargetElement is called as a ref callback exactly once, with an HTMLElement
+      expect(setTargetElement).toHaveBeenCalledTimes(1)
+      expect(setTargetElement.mock.calls[0][0]).toBeInstanceOf(HTMLElement)
+
+      // The wrapper passed should be an ancestor of France (matchB's team), not Germany (matchA's)
+      const wrapperEl = setTargetElement.mock.calls[0][0] as HTMLElement
+      expect(wrapperEl.contains(screen.getByText('France'))).toBe(true)
+      expect(wrapperEl.contains(screen.getByText('Germany'))).toBe(false)
+    })
+
+    it('does not call setTargetElement when lastFinishedMatchId matches no match', () => {
+      const setTargetElement = jest.fn()
+      render(
+        <DateGroupedView
+          matches={[matchA, matchB]}
+          dict={dict}
+          lang="en"
+          isApproved={true}
+          lastFinishedMatchId="non-existent-id"
+          setTargetElement={setTargetElement}
+        />,
+      )
+
+      expect(setTargetElement).not.toHaveBeenCalled()
+    })
+
+    it('does not throw when lastFinishedMatchId and setTargetElement are omitted', () => {
+      expect(() => {
+        render(<DateGroupedView matches={[matchA, matchB]} dict={dict} lang="en" isApproved={true} />)
+      }).not.toThrow()
+    })
+  })
 })

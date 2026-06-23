@@ -13,6 +13,8 @@ type DateGroupedViewProps = {
   onSaveScore?: (matchId: string, home: number, away: number) => Promise<unknown>
   userRole?: 'admin' | 'player'
   onSyncResult?: (matchId: string, home: number, away: number) => Promise<SyncRegulationResultsResult>
+  lastFinishedMatchId?: string | null
+  setTargetElement?: (el: HTMLElement | null) => void
 }
 
 function toLocalDateKey(scheduledAt: string): string {
@@ -28,6 +30,8 @@ export default function DateGroupedView({
   onSaveScore,
   userRole,
   onSyncResult,
+  lastFinishedMatchId = null,
+  setTargetElement,
 }: DateGroupedViewProps) {
   if (matches.length === 0) return null
 
@@ -63,16 +67,20 @@ export default function DateGroupedView({
               {[...dayMatches]
                 .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))
                 .map((match) => (
-                  <MatchCard
+                  <div
                     key={match.id}
-                    {...match}
-                    dict={dict}
-                    lang={lang}
-                    isApproved={isApproved}
-                    onSaveScore={onSaveScore}
-                    userRole={userRole}
-                    onSyncResult={onSyncResult}
-                  />
+                    ref={match.id === lastFinishedMatchId ? setTargetElement : undefined}
+                  >
+                    <MatchCard
+                      {...match}
+                      dict={dict}
+                      lang={lang}
+                      isApproved={isApproved}
+                      onSaveScore={onSaveScore}
+                      userRole={userRole}
+                      onSyncResult={onSyncResult}
+                    />
+                  </div>
                 ))}
             </div>
           </div>

@@ -97,6 +97,7 @@
     "quinielaSwitcherLabel": "Viendo predicciones para",
     "quinielaSwitcherNoQuinielas": "No eres miembro de ninguna quiniela.",
     "predictionsClosedForQuiniela": "Las predicciones están cerradas para esta quiniela.",
+    "scrollToLastFinishedLabel": "Ir al último partido finalizado",
     "status": {
       "FINISHED": "FINALIZADO",
       "IN_PLAY": "EN JUEGO",

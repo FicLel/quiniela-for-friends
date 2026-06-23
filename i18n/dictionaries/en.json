@@ -97,6 +97,7 @@
     "quinielaSwitcherLabel": "Viewing predictions for",
     "quinielaSwitcherNoQuinielas": "You are not a member of any quiniela.",
     "predictionsClosedForQuiniela": "Predictions are closed for this quiniela.",
+    "scrollToLastFinishedLabel": "Go to last finished match",
     "status": {
       "FINISHED": "FINISHED",
       "IN_PLAY": "IN PLAY",
