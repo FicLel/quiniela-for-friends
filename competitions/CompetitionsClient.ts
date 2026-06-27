@@ -48,8 +48,14 @@ type RawMatch = {
   stage: string
   group: string
   matchday: number
-  homeTeam: RawTeam
-  awayTeam: RawTeam
+  homeTeam: RawTeam | null
+  awayTeam: RawTeam | null
+}
+
+// football-data.org uses LAST_32 / LAST_16; our domain uses ROUND_OF_32 / ROUND_OF_16
+const STAGE_TRANSLATION: Record<string, string> = {
+  LAST_32: 'ROUND_OF_32',
+  LAST_16: 'ROUND_OF_16',
 }
 
 type RawApiResponse = {
@@ -61,8 +67,8 @@ type RawApiResponse = {
 // ---------------------------------------------------------------------------
 
 const KNOCKOUT_STAGES = [
-  'ROUND_OF_32',
-  'ROUND_OF_16',
+  'LAST_32',
+  'LAST_16',
   'QUARTER_FINALS',
   'SEMI_FINALS',
   'THIRD_PLACE',
@@ -150,20 +156,20 @@ export class CompetitionsClient implements ICompetitionsClient {
 function mapToImportRecord(m: RawMatch): MatchImportRecord {
   return {
     externalId: m.id,
-    stage: m.stage,
+    stage: STAGE_TRANSLATION[m.stage] ?? m.stage,
     group: m.group,
     matchday: m.matchday,
     status: m.status,
     scheduledAt: m.utcDate,
-    homeTeamExternalId: m.homeTeam.id,
-    homeTeamName: m.homeTeam.name,
-    homeTeamShortName: m.homeTeam.shortName,
-    homeTeamTla: m.homeTeam.tla,
-    homeTeamCrest: m.homeTeam.crest ?? null,
-    awayTeamExternalId: m.awayTeam.id,
-    awayTeamName: m.awayTeam.name,
-    awayTeamShortName: m.awayTeam.shortName,
-    awayTeamTla: m.awayTeam.tla,
-    awayTeamCrest: m.awayTeam.crest ?? null,
+    homeTeamExternalId: m.homeTeam?.id ?? null,
+    homeTeamName: m.homeTeam?.name ?? 'TBD',
+    homeTeamShortName: m.homeTeam?.shortName ?? 'TBD',
+    homeTeamTla: m.homeTeam?.tla ?? 'TBD',
+    homeTeamCrest: m.homeTeam?.crest ?? null,
+    awayTeamExternalId: m.awayTeam?.id ?? null,
+    awayTeamName: m.awayTeam?.name ?? 'TBD',
+    awayTeamShortName: m.awayTeam?.shortName ?? 'TBD',
+    awayTeamTla: m.awayTeam?.tla ?? 'TBD',
+    awayTeamCrest: m.awayTeam?.crest ?? null,
   }
 }

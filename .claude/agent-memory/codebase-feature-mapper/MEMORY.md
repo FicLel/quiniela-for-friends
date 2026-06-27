@@ -2,3 +2,4 @@
 - [Scoring & Leaderboard Status](scoring-leaderboard-status.md) — current state vs. feature request gaps, data model additions, service architecture needed
 - [Squad Sync Module](squad-sync-module.md) — API client, repository, service patterns; existing infrastructure to leverage; migration structure; next steps
 - [Leaderboard Structure](leaderboard-structure.md) — complete data model, scoring flow, prediction types, match closure detection, i18n keys
+- [Tournament Brackets Feature Map](tournament-brackets-mapping.md) — complete mapping of Tournament Brackets feature request to codebase; domain models, services, repositories, gaps, mobile patterns, test scenarios

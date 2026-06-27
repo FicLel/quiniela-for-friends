@@ -29,15 +29,8 @@ const mockSchemaLimit = jest.fn()
 // Single-row terminator (findByTokenHash, findByShortCode, create.single, findActiveOpenByQuiniela)
 const mockSingle = jest.fn()
 
-// eq chained from select('*')
-const mockDataSelectEq = jest.fn(() => ({ single: mockSingle }))
-
 // select routing: 'id' → schema check path, '*' → data path
 const mockLimit = jest.fn(() => mockSchemaLimit())
-const mockDataSelect = jest.fn((arg: string) => {
-  if (arg === 'id') return { limit: mockLimit }
-  return { eq: mockDataSelectEq }
-})
 
 // insert chain: .insert({}).select('*').single()
 const mockInsertSingle = jest.fn()

@@ -3,3 +3,4 @@
 - [Squad Sync Feature](project_squad_sync.md) — WC squad sync backend module; idempotent, throttled, soft-deactivation; story written 2026-06-02; 4 open questions raised
 - [Extra Questions Feature](project_extra_questions.md) — admin creates team/player questions per quiniela, members answer, 1 pt each, merged into leaderboard; story written 2026-06-02; 6 open questions raised
 - [Admin Impersonation Feature](project_admin_impersonation.md) — read-only "view as user" via email lookup, TtlCache-backed predictions; story written 2026-06-12; 6 open questions raised
+- [Tournament Brackets Feature](project_tournament_brackets.md) — mobile bracket view per quiniela, prediction vs actual, switcher, cached reads; story written 2026-06-24; split into primary + 2 follow-ons; 6 open questions raised

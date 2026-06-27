@@ -3,6 +3,7 @@ import type { Locale } from '@/i18n/i18n.types'
 import type { Dictionary } from '@/i18n/getDictionary'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { QuinielaLeaderboardNav } from './QuinielaLeaderboardNav'
+import { QuinielaBracketNav } from './QuinielaBracketNav'
 import { MobileMenuClient } from './MobileMenuClient'
 
 type NavbarProps = {
@@ -14,7 +15,7 @@ type NavbarProps = {
 
 export function Navbar({ lang, dict, isAdmin = false, quinielas = [] }: NavbarProps) {
   return (
-    <header className="sticky top-0 z-10 flex items-center justify-between border-b border-green-800 bg-green-900 px-6 py-3">
+    <header className="sticky top-0 z-10 flex items-center justify-between border-b border-green-800 bg-green-900 px-6 h-14">
       <div className="flex items-center gap-6">
         <Link
           href={`/${lang}/welcome`}
@@ -59,6 +60,11 @@ export function Navbar({ lang, dict, isAdmin = false, quinielas = [] }: NavbarPr
             lang={lang}
             quinielas={quinielas}
             dict={{ leaderboard: dict.leaderboard, selectQuiniela: dict.selectQuiniela }}
+          />
+          <QuinielaBracketNav
+            lang={lang}
+            quinielas={quinielas}
+            dict={{ bracket: dict.bracket }}
           />
         </nav>
       </div>

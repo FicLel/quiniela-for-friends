@@ -20,6 +20,8 @@ import EmptyState from './_components/EmptyState'
 import QuinielaSwitcher from './_components/QuinielaSwitcher'
 import type { MatchCardData } from './_components/MatchCard'
 import type { Locale } from '@/i18n/i18n.types'
+import { GroupProjectionService } from '@/tournaments/GroupProjectionService'
+import { BracketCascadeService } from '@/tournaments/BracketCascadeService'
 import { saveExpectedResult, syncMatchResult } from './actions'
 
 type PageProps = {
@@ -134,6 +136,9 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
     // Crowd percentages are decorative — render without them on failure
   }
 
+  const groupProjections = new GroupProjectionService().projectGroups(allMatches)
+  const cascadeResolved = new BracketCascadeService().resolveCascade(allMatches, groupProjections)
+
   const now = new Date()
   const knockoutStages = new Set(['ROUND_OF_32', 'ROUND_OF_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'THIRD_PLACE', 'FINAL'])
 
@@ -181,7 +186,12 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
     }
 
     if (knockoutStages.has(match.stage)) {
-      knockoutMatches.push(cardData)
+      const cascadeNames = cascadeResolved.get(match.id)
+      knockoutMatches.push(
+        cascadeNames
+          ? { ...cardData, homeTeamName: cascadeNames.homeTeamName, awayTeamName: cascadeNames.awayTeamName }
+          : cardData,
+      )
     } else if (match.stage === 'GROUP_STAGE') {
       groupStageMatches.push(cardData)
       // Build group map using the domain object's group field

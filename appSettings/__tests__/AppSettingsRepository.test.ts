@@ -55,7 +55,7 @@ const mockInsert = jest.fn()
 
 // Combined select: routes on argument
 // Both 'id' and '*' share the same limit chain (limit(0) = schema check, limit(1) = data)
-const mockSelect = jest.fn((_arg: string) => ({ limit: mockFindLimit }))
+const mockSelect = jest.fn(() => ({ limit: mockFindLimit }))
 
 // ---------------------------------------------------------------------------
 // Mock plumbing — quiniela_memberships table

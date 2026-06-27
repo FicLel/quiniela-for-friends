@@ -145,9 +145,11 @@
     "quinielas": "Quinielas",
     "users": "Users",
     "leaderboard": "Leaderboard",
+    "bracket": "Bracket",
     "selectQuiniela": "Select quiniela",
     "settings": "Settings",
-    "impersonateLink": "View as user"
+    "impersonateLink": "View as user",
+    "menuHeading": "Menu"
   },
   "quinielas": {
     "heading": "My Quinielas",
@@ -321,6 +323,25 @@
       "DB_ERROR": "Something went wrong. Please try again.",
       "UNKNOWN_ERROR": "An unexpected error occurred."
     }
+  },
+  "bracket": {
+    "title": "Tournament Bracket",
+    "quinielaSwitcherLabel": "Viewing bracket for",
+    "roundNavLabel": "Knockout rounds",
+    "stageRoundOf32": "Round of 32",
+    "stageRoundOf16": "Round of 16",
+    "stageQuarterFinals": "Quarter-finals",
+    "stageSemiFinals": "Semi-finals",
+    "stageThirdPlace": "Third-place play-off",
+    "stageFinal": "Final",
+    "statusPlayed": "Played",
+    "statusUnplayed": "Upcoming",
+    "predictionLabel": "Your prediction",
+    "resultLabel": "Result",
+    "noPrediction": "No prediction submitted",
+    "vsSeparator": "vs",
+    "notYetAvailable": "The knockout bracket is not yet available for this quiniela.",
+    "errorState": "Could not load the bracket. Please try again."
   },
   "impersonation": {
     "viewingAs": "Viewing as {email}",

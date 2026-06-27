@@ -267,7 +267,6 @@ describe('GET /api/quinielas/[quinielaId]/members/[userId]/predictions', () => {
     mockGetPlayerPredictions.mockResolvedValue([PREDICTION])
 
     const response = await GET(makeRequest(QUINIELA_ID, 'some-other-user-id'), makeParams(QUINIELA_ID, 'some-other-user-id'))
-    const body = await response.json()
 
     expect(response.status).toBe(200)
     expect(mockGetPlayerPredictions).toHaveBeenCalledWith(QUINIELA_ID, 'some-other-user-id', { isImpersonating: false })

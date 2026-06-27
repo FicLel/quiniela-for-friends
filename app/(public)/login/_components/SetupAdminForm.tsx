@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { createFirstAdmin } from '@/app/(public)/login/actions'
 
 // Basic email regex — defence-in-depth; the real check is server-side.
@@ -189,9 +190,9 @@ export default function SetupAdminForm() {
             <p role="alert" className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
               {formError}{' '}
               {formError.includes('already complete') && (
-                <a href="/login" className="underline">
+                <Link href="/login" className="underline">
                   Log in
-                </a>
+                </Link>
               )}
             </p>
           )}

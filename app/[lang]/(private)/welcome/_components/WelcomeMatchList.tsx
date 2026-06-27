@@ -58,7 +58,7 @@ export default function WelcomeMatchList({
   return (
     <div className="flex flex-col gap-4">
       {/* View toggle — sticky at top */}
-      <div className="sticky top-0 z-10">
+      <div className="sticky top-14 z-10">
         <ViewToggle activeView={viewMode} dict={dict} />
       </div>
 

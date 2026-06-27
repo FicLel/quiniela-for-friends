@@ -11,6 +11,7 @@
 
 import { getSupabaseServerClient } from '@/lib/supabaseServerClient'
 import { verifyTableOnce } from '@/lib/schemaCheckCache'
+import { tournamentBracketCache } from '@/tournaments/TournamentBracketCache'
 import type {
   IExpectedResultsRepository,
   ExpectedResult,
@@ -127,6 +128,41 @@ export class ExpectedResultsRepository implements IExpectedResultsRepository {
       if (error) {
         throw new Error(`upsert expected result failed: ${error.message}`)
       }
+    }
+
+    await this.invalidateBracketCacheForWrite(input.userId, input.quinielaId ?? null)
+  }
+
+  /**
+   * Targeted Layer-2 invalidation for the tournament bracket cache after a
+   * prediction write, per the brief: "invalidation by targeted single-key
+   * invalidation when that specific user writes/updates a prediction."
+   *
+   * - per_quiniela mode (quinielaId set): invalidate just that one key.
+   * - shared mode (quinielaId null): the prediction fans out across every
+   *   quiniela the user is an approved member of (same fan-out rule used by
+   *   PredictionScoreRepository.findPredictionsWithQuinielas), so invalidate
+   *   one key per approved membership.
+   */
+  private async invalidateBracketCacheForWrite(
+    userId: string,
+    quinielaId: string | null,
+  ): Promise<void> {
+    if (quinielaId !== null) {
+      tournamentBracketCache.invalidateLayer2(quinielaId, userId)
+      return
+    }
+
+    const { data, error } = await this.supabase
+      .from('quiniela_memberships')
+      .select('quiniela_id')
+      .eq('user_id', userId)
+      .not('approved_at', 'is', null)
+
+    if (error || !data) return
+
+    for (const row of data as { quiniela_id: string }[]) {
+      tournamentBracketCache.invalidateLayer2(row.quiniela_id, userId)
     }
   }
 

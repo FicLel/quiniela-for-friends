@@ -7,8 +7,6 @@ metadata:
 
 Migration files live in `supabase/migrations/` and follow the pattern `YYYYMMDDHHMMSS_description.sql`.
 
-The latest existing migration is `20260611000000_fix_extra_questions_fk.sql`.
+As of 2026-06-24, the latest existing migration is `20260616000000_password_reset_tokens.sql` (sequence also includes `20260610000000_extra_questions.sql` and `20260611000000_fix_extra_questions_fk.sql` before it). Always re-glob `supabase/migrations/*.sql` to confirm the current latest before naming a new one — this list moves fast.
 
-The next migration should use a timestamp of `20260612000000` or later to maintain order.
-
-**How to apply:** When creating a new migration, use `20260612000000_<description>.sql` as the filename. If multiple migrations land on the same day, use `20260612000001_<description>.sql` for the second, etc.
+**How to apply:** When creating a new migration, take the latest timestamp found via Glob and add at least one day/second to it to maintain order. If multiple migrations land on the same day, increment the seconds segment.

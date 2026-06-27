@@ -15,14 +15,6 @@ function jsonOk(body: unknown) {
   } as unknown as Response)
 }
 
-function jsonError(body: unknown, status = 500) {
-  return Promise.resolve({
-    ok: false,
-    status,
-    json: () => Promise.resolve(body),
-  } as unknown as Response)
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

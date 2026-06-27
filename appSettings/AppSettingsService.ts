@@ -23,7 +23,6 @@
 import type {
   IAppSettingsRepository,
   IAppSettingsService,
-  AppSettings,
   PredictionMode,
   GetSettingsResult,
   SetPredictionModeResult,

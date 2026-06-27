@@ -11,6 +11,7 @@
 import { getSupabaseServerClient } from '@/lib/supabaseServerClient'
 import { verifyTableOnce } from '@/lib/schemaCheckCache'
 import { TtlCache } from '@/lib/ttlCache'
+import { tournamentBracketCache } from '@/tournaments/TournamentBracketCache'
 import type {
   ICompetitionsRepository,
   KnockoutPlaceholderRecord,
@@ -138,6 +139,8 @@ export class CompetitionsRepository implements ICompetitionsRepository {
     }
 
     matchesCache.invalidate(ALL_MATCHES_CACHE_KEY)
+    tournamentBracketCache.invalidateLayer1()
+    tournamentBracketCache.clearLayer2()
     return rows.length
   }
 
@@ -219,7 +222,8 @@ export class CompetitionsRepository implements ICompetitionsRepository {
       away_team_tla: r.awayTeamTla,
       home_team_crest: null,
       away_team_crest: null,
-      external_id: null,
+      // external_id deliberately omitted: seeded via migration and must not be
+      // overwritten with null if an admin re-runs seedKnockoutPlaceholders.
       home_team_external_id: null,
       away_team_external_id: null,
     }))
@@ -233,6 +237,8 @@ export class CompetitionsRepository implements ICompetitionsRepository {
     }
 
     matchesCache.invalidate(ALL_MATCHES_CACHE_KEY)
+    tournamentBracketCache.invalidateLayer1()
+    tournamentBracketCache.clearLayer2()
     return rows.length
   }
 
@@ -276,6 +282,8 @@ export class CompetitionsRepository implements ICompetitionsRepository {
     }
 
     matchesCache.invalidate(ALL_MATCHES_CACHE_KEY)
+    tournamentBracketCache.invalidateLayer1()
+    tournamentBracketCache.clearLayer2()
   }
 
   /**
@@ -418,6 +426,7 @@ export class CompetitionsRepository implements ICompetitionsRepository {
           .from('matches')
           .update({
             external_id: record.externalId ?? null,
+            scheduled_at: record.scheduledAt,
             home_team_external_id: record.homeTeamExternalId ?? null,
             home_team_name: record.homeTeamName,
             home_team_short_name: record.homeTeamShortName,
@@ -439,7 +448,11 @@ export class CompetitionsRepository implements ICompetitionsRepository {
       }
     }
 
-    if (updated > 0) matchesCache.invalidate(ALL_MATCHES_CACHE_KEY)
+    if (updated > 0) {
+      matchesCache.invalidate(ALL_MATCHES_CACHE_KEY)
+      tournamentBracketCache.invalidateLayer1()
+      tournamentBracketCache.clearLayer2()
+    }
     return updated
   }
 }

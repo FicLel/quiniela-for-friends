@@ -37,6 +37,7 @@
 import { ExpectedResultsRepository } from '../ExpectedResultsRepository'
 import { resetSupabaseServerClient } from '@/lib/supabaseServerClient'
 import { resetSchemaCheckCache } from '@/lib/schemaCheckCache'
+import { tournamentBracketCache, resetTournamentBracketCache } from '@/tournaments/TournamentBracketCache'
 
 // ---------------------------------------------------------------------------
 // Mock plumbing
@@ -98,6 +99,16 @@ const mockDataQuinielaFilter = jest.fn() // terminal for findByUserIdAndQuiniela
 // We'll use a factory function that returns a resolved-promise-like object with .eq/.is.
 const mockDataEq = jest.fn()
 
+// Post-write Layer-2 cache invalidation fan-out (shared/null-quinielaId mode only):
+//   from('quiniela_memberships').select('quiniela_id').eq('user_id', id).not('approved_at', 'is', null)
+//   → Promise<{ data, error }>
+// Defaults to an empty-memberships result so existing tests that don't care
+// about this fan-out (per-quiniela writes, or tests that never reach it)
+// keep working without modification.
+const mockMembershipsNot = jest.fn().mockResolvedValue({ data: [], error: null })
+const mockMembershipsEq = jest.fn(() => ({ not: mockMembershipsNot }))
+const mockMembershipsSelect = jest.fn(() => ({ eq: mockMembershipsEq }))
+
 // Schema-check select: .select('id').limit(0)
 const mockSchemaSelectLimit = jest.fn((n: number) => {
   if (n === 0) return mockSchemaLimit()
@@ -111,16 +122,24 @@ const mockSelect = jest.fn((arg: string) => {
   if (arg === 'id, submitted_at') {
     return { eq: mockPreCheckEq1 }
   }
+  if (arg === 'quiniela_id') {
+    return mockMembershipsSelect()
+  }
   // '*' → data path
   return { eq: mockDataEq }
 })
 
-const mockFrom = jest.fn(() => ({
-  select: mockSelect,
-  insert: mockInsert,
-  update: mockUpdate,
-  delete: mockDelete,
-}))
+const mockFrom = jest.fn((table: string) => {
+  if (table === 'quiniela_memberships') {
+    return { select: mockSelect }
+  }
+  return {
+    select: mockSelect,
+    insert: mockInsert,
+    update: mockUpdate,
+    delete: mockDelete,
+  }
+})
 
 jest.mock('@supabase/supabase-js', () => ({
   createClient: jest.fn(() => ({ from: mockFrom })),
@@ -182,6 +201,8 @@ beforeEach(() => {
   jest.clearAllMocks()
   resetSupabaseServerClient()
   resetSchemaCheckCache()
+  resetTournamentBracketCache()
+  mockMembershipsNot.mockResolvedValue({ data: [], error: null })
 })
 
 // ---------------------------------------------------------------------------
@@ -392,6 +413,64 @@ describe('ExpectedResultsRepository – upsert (update / idempotent)', () => {
     await expect(
       repo.upsert({ userId: 'user-uuid', matchId: 'match-uuid', homeScore: 1, awayScore: 1 }),
     ).rejects.toThrow('upsert expected result failed: update constraint')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// upsert — tournament bracket Layer-2 cache invalidation
+// ---------------------------------------------------------------------------
+
+describe('ExpectedResultsRepository – upsert (bracket cache invalidation)', () => {
+  it('invalidates only the targeted (quinielaId, userId) key when quinielaId is set', async () => {
+    const repo = makeRepo()
+    mockPreCheckMaybeSingle.mockResolvedValueOnce({ data: null, error: null })
+    mockInsert.mockResolvedValueOnce({ error: null })
+
+    tournamentBracketCache.setLayer2('quiniela-a', 'user-uuid', { quinielaId: 'quiniela-a', stages: [] })
+    tournamentBracketCache.setLayer2('quiniela-b', 'user-uuid', { quinielaId: 'quiniela-b', stages: [] })
+
+    await repo.upsert({
+      userId: 'user-uuid',
+      matchId: 'match-uuid',
+      homeScore: 2,
+      awayScore: 1,
+      quinielaId: 'quiniela-a',
+    })
+
+    expect(tournamentBracketCache.getLayer2('quiniela-a', 'user-uuid')).toBeUndefined()
+    expect(tournamentBracketCache.getLayer2('quiniela-b', 'user-uuid')).toEqual({
+      quinielaId: 'quiniela-b',
+      stages: [],
+    })
+  })
+
+  it('invalidates every approved-membership quiniela key when quinielaId is null (shared prediction)', async () => {
+    const repo = makeRepo()
+    mockPreCheckMaybeSingle.mockResolvedValueOnce({ data: null, error: null })
+    mockInsert.mockResolvedValueOnce({ error: null })
+    mockMembershipsNot.mockResolvedValueOnce({
+      data: [{ quiniela_id: 'quiniela-a' }, { quiniela_id: 'quiniela-b' }],
+      error: null,
+    })
+
+    tournamentBracketCache.setLayer2('quiniela-a', 'user-uuid', { quinielaId: 'quiniela-a', stages: [] })
+    tournamentBracketCache.setLayer2('quiniela-b', 'user-uuid', { quinielaId: 'quiniela-b', stages: [] })
+    tournamentBracketCache.setLayer2('quiniela-c', 'other-user', { quinielaId: 'quiniela-c', stages: [] })
+
+    await repo.upsert({
+      userId: 'user-uuid',
+      matchId: 'match-uuid',
+      homeScore: 2,
+      awayScore: 1,
+    })
+
+    expect(tournamentBracketCache.getLayer2('quiniela-a', 'user-uuid')).toBeUndefined()
+    expect(tournamentBracketCache.getLayer2('quiniela-b', 'user-uuid')).toBeUndefined()
+    // Unrelated user's cache entry must never be touched by another user's write.
+    expect(tournamentBracketCache.getLayer2('quiniela-c', 'other-user')).toEqual({
+      quinielaId: 'quiniela-c',
+      stages: [],
+    })
   })
 })
 

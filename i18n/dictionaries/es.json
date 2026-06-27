@@ -145,9 +145,11 @@
     "quinielas": "Quinielas",
     "users": "Usuarios",
     "leaderboard": "Marcador",
+    "bracket": "Cuadro",
     "selectQuiniela": "Seleccionar quiniela",
     "settings": "Configuración",
-    "impersonateLink": "Ver como usuario"
+    "impersonateLink": "Ver como usuario",
+    "menuHeading": "Menú"
   },
   "quinielas": {
     "heading": "Mis Quinielas",
@@ -321,6 +323,25 @@
       "DB_ERROR": "Algo salió mal. Inténtalo de nuevo.",
       "UNKNOWN_ERROR": "Ocurrió un error inesperado."
     }
+  },
+  "bracket": {
+    "title": "Cuadro del torneo",
+    "quinielaSwitcherLabel": "Viendo el cuadro de",
+    "roundNavLabel": "Rondas eliminatorias",
+    "stageRoundOf32": "Dieciseisavos de final",
+    "stageRoundOf16": "Octavos de final",
+    "stageQuarterFinals": "Cuartos de final",
+    "stageSemiFinals": "Semifinales",
+    "stageThirdPlace": "Tercer y cuarto lugar",
+    "stageFinal": "Final",
+    "statusPlayed": "Jugado",
+    "statusUnplayed": "Próximo",
+    "predictionLabel": "Tu predicción",
+    "resultLabel": "Resultado",
+    "noPrediction": "No enviaste una predicción",
+    "vsSeparator": "vs",
+    "notYetAvailable": "El cuadro eliminatorio aún no está disponible para esta quiniela.",
+    "errorState": "No se pudo cargar el cuadro. Inténtalo de nuevo."
   },
   "impersonation": {
     "viewingAs": "Viendo como {email}",
