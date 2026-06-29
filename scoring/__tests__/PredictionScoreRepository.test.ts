@@ -59,9 +59,10 @@ const mockSchemaSelectLimit = jest.fn((n: number) => {
 
 // --------------------------------------------------------------------------
 // findCrowdOutcomesByMatchIds chain:
-//   select('match_id, home_score, away_score').in('match_id', ids) — terminal
+//   select('match_id, home_score, away_score').in('match_id', ids).limit(n) — terminal
 // --------------------------------------------------------------------------
-const mockUerIn = jest.fn()
+const mockUerInLimit = jest.fn()
+const mockUerIn = jest.fn(() => ({ limit: mockUerInLimit }))
 
 // --------------------------------------------------------------------------
 // Combined select router
@@ -585,7 +586,7 @@ describe('PredictionScoreRepository – findCrowdOutcomesByMatchIds', () => {
   it('groups rows by match id with a single query', async () => {
     const repo = makeRepo()
 
-    mockUerIn.mockResolvedValueOnce({
+    mockUerInLimit.mockResolvedValueOnce({
       data: [
         { match_id: 'match-1', home_score: 2, away_score: 1 },
         { match_id: 'match-2', home_score: 0, away_score: 0 },
@@ -598,6 +599,7 @@ describe('PredictionScoreRepository – findCrowdOutcomesByMatchIds', () => {
 
     expect(mockUerIn).toHaveBeenCalledTimes(1)
     expect(mockUerIn).toHaveBeenCalledWith('match_id', ['match-1', 'match-2'])
+    expect(mockUerInLimit).toHaveBeenCalledWith(100_000)
     expect(grouped.get('match-1')).toEqual([
       { homeScore: 2, awayScore: 1 },
       { homeScore: 1, awayScore: 1 },
@@ -608,7 +610,7 @@ describe('PredictionScoreRepository – findCrowdOutcomesByMatchIds', () => {
   it('omits matches that have no predictions', async () => {
     const repo = makeRepo()
 
-    mockUerIn.mockResolvedValueOnce({
+    mockUerInLimit.mockResolvedValueOnce({
       data: [{ match_id: 'match-1', home_score: 2, away_score: 1 }],
       error: null,
     })
@@ -632,7 +634,7 @@ describe('PredictionScoreRepository – findCrowdOutcomesByMatchIds', () => {
   it('throws "findCrowdOutcomesByMatchIds failed: <msg>" on Supabase error', async () => {
     const repo = makeRepo()
 
-    mockUerIn.mockResolvedValueOnce({ data: null, error: { message: 'permission denied' } })
+    mockUerInLimit.mockResolvedValueOnce({ data: null, error: { message: 'permission denied' } })
 
     await expect(repo.findCrowdOutcomesByMatchIds(['match-1'])).rejects.toThrow(
       'findCrowdOutcomesByMatchIds failed: permission denied',

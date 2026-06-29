@@ -11,3 +11,4 @@
 - [Server action void wrapper](feedback_server_action_void_wrapper.md) — When passing a server action as a prop typed Promise<void>, wrap it in an arrow function to discard the return value
 - [Pre-existing test failures](feedback_preexisting_test_failures.md) — ImportMatchesButton 5 tests fail pre-existing (useRouter without app router mock); not a regression
 - [React hooks lint rules](feedback_react_hooks_lint.md) — No Math.random/ref.current in render, no setState at top of useEffect; use useId() for stable IDs
+- [IntersectionObserver mock](feedback_intersectionobserver_mock.md) — Class-based mock captures callback and exposes simulateEntries(); assign to window.IntersectionObserver in beforeEach

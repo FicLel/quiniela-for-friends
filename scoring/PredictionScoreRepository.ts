@@ -503,6 +503,7 @@ export class PredictionScoreRepository implements IPredictionScoreRepository {
       .from('user_expected_results')
       .select('match_id, home_score, away_score')
       .in('match_id', matchIds)
+      .limit(100_000)
 
     if (error) {
       throw new Error(`findCrowdOutcomesByMatchIds failed: ${error.message}`)

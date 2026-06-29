@@ -12,6 +12,7 @@ type KnockoutSectionProps = {
   onSaveScore?: (matchId: string, home: number, away: number) => Promise<unknown>
   userRole?: 'admin' | 'player'
   onSyncResult?: (matchId: string, home: number, away: number) => Promise<SyncRegulationResultsResult>
+  registerRef?: (matchId: string) => (el: HTMLElement | null) => void
 }
 
 const KNOCKOUT_ROUNDS = [
@@ -31,6 +32,7 @@ export default function KnockoutSection({
   onSaveScore,
   userRole,
   onSyncResult,
+  registerRef,
 }: KnockoutSectionProps) {
   return (
     <div className="mt-8 border-t border-gray-200 pt-8">
@@ -45,17 +47,22 @@ export default function KnockoutSection({
               <div className="flex flex-col gap-3">
                 {roundMatches.length > 0 ? (
                   roundMatches.map((m) => (
-                    <MatchCard
+                    <div
                       key={m.id}
-                      {...m}
-                      dict={dict}
-                      lang={lang}
-                      isApproved={isApproved}
-                      showDate={true}
-                      onSaveScore={onSaveScore}
-                      userRole={userRole}
-                      onSyncResult={onSyncResult}
-                    />
+                      ref={registerRef?.(m.id)}
+                      data-match-id={m.id}
+                    >
+                      <MatchCard
+                        {...m}
+                        dict={dict}
+                        lang={lang}
+                        isApproved={isApproved}
+                        showDate={true}
+                        onSaveScore={onSaveScore}
+                        userRole={userRole}
+                        onSyncResult={onSyncResult}
+                      />
+                    </div>
                   ))
                 ) : (
                   <KnockoutPlaceholderCard roundLabel={roundLabel} />

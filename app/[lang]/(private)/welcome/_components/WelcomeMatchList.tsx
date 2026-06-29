@@ -7,6 +7,7 @@ import DateGroupedView from './DateGroupedView'
 import KnockoutSection from './KnockoutSection'
 import ScrollToLastFinishedButton from './ScrollToLastFinishedButton'
 import { useLastFinishedMatchVisibility } from '../_hooks/useLastFinishedMatchVisibility'
+import { useLazyCrowdPercentages } from '../_hooks/useLazyCrowdPercentages'
 import type { MatchCardData } from './MatchCard'
 import type { Dictionary } from '@/i18n/getDictionary'
 import type { Locale } from '@/i18n/i18n.types'
@@ -55,6 +56,64 @@ export default function WelcomeMatchList({
 
   const { setTargetElement, showButton, scrollToTarget } = useLastFinishedMatchVisibility()
 
+  // Lazy crowd percentages — fetched as cards scroll into view
+  const allMatchIds = useMemo(() => allMatches.map((m) => m.id), [allMatches])
+  const { crowdMap, registerRef } = useLazyCrowdPercentages(allMatchIds)
+
+  // Enrich each match with crowd data from the lazily-loaded map
+  const enrichedGroupStageMatches = useMemo(
+    () =>
+      groupStageMatches.map((m) => {
+        const crowd = crowdMap.get(m.id)
+        return {
+          ...m,
+          crowdHomeWinPct: crowd?.homeWinPct ?? null,
+          crowdDrawPct: crowd?.drawPct ?? null,
+          crowdAwayWinPct: crowd?.awayWinPct ?? null,
+        }
+      }),
+    [groupStageMatches, crowdMap],
+  )
+
+  const enrichedKnockoutMatches = useMemo(
+    () =>
+      knockoutMatches.map((m) => {
+        const crowd = crowdMap.get(m.id)
+        return {
+          ...m,
+          crowdHomeWinPct: crowd?.homeWinPct ?? null,
+          crowdDrawPct: crowd?.drawPct ?? null,
+          crowdAwayWinPct: crowd?.awayWinPct ?? null,
+        }
+      }),
+    [knockoutMatches, crowdMap],
+  )
+
+  const enrichedSortedGroups = useMemo(
+    () =>
+      sortedGroups.map(
+        ([group, matches]) =>
+          [
+            group,
+            matches.map((m) => {
+              const crowd = crowdMap.get(m.id)
+              return {
+                ...m,
+                crowdHomeWinPct: crowd?.homeWinPct ?? null,
+                crowdDrawPct: crowd?.drawPct ?? null,
+                crowdAwayWinPct: crowd?.awayWinPct ?? null,
+              }
+            }),
+          ] as [string, MatchCardData[]],
+      ),
+    [sortedGroups, crowdMap],
+  )
+
+  const enrichedAllMatches = useMemo(
+    () => [...enrichedGroupStageMatches, ...enrichedKnockoutMatches],
+    [enrichedGroupStageMatches, enrichedKnockoutMatches],
+  )
+
   return (
     <div className="flex flex-col gap-4">
       {/* View toggle — sticky at top */}
@@ -66,7 +125,7 @@ export default function WelcomeMatchList({
         // Date view: ALL matches (group stage + knockout) in one chronological flow
         <>
           <DateGroupedView
-            matches={allMatches}
+            matches={enrichedAllMatches}
             dict={dict}
             lang={lang}
             isApproved={isApproved}
@@ -75,6 +134,7 @@ export default function WelcomeMatchList({
             onSyncResult={onSyncResult}
             lastFinishedMatchId={lastFinishedMatchId}
             setTargetElement={setTargetElement}
+            registerRef={registerRef}
           />
           <ScrollToLastFinishedButton
             visible={lastFinishedMatchId !== null && showButton}
@@ -86,7 +146,7 @@ export default function WelcomeMatchList({
         // Group view: group stage in accordions + knockout rounds by bracket stage
         <>
           <div className="flex flex-col gap-4">
-            {sortedGroups.map(([group, groupMatches]) => (
+            {enrichedSortedGroups.map(([group, groupMatches]) => (
               <GroupAccordion
                 key={group}
                 group={group}
@@ -97,17 +157,19 @@ export default function WelcomeMatchList({
                 onSaveScore={onSaveScore}
                 userRole={userRole}
                 onSyncResult={onSyncResult}
+                registerRef={registerRef}
               />
             ))}
           </div>
           <KnockoutSection
-            knockoutMatches={knockoutMatches}
+            knockoutMatches={enrichedKnockoutMatches}
             dict={dict}
             lang={lang}
             isApproved={isApproved}
             onSaveScore={onSaveScore}
             userRole={userRole}
             onSyncResult={onSyncResult}
+            registerRef={registerRef}
           />
         </>
       )}

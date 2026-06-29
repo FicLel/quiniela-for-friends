@@ -401,8 +401,9 @@ describe('ScoringService.getCrowdPercentages', () => {
     expect(result).toEqual({ homeWinPct: 100, drawPct: 0, awayWinPct: 0 })
   })
 
-  it('rounds percentages to the nearest integer', async () => {
+  it('distributes remainder so percentages always sum to 100', async () => {
     // 1 home win, 1 draw, 1 away win → each 33.33…%
+    // largest remainder assigns the +1 to the first slot (home), giving 34/33/33
     const outcomes = [
       { homeScore: 1, awayScore: 0 },
       { homeScore: 0, awayScore: 0 },
@@ -415,9 +416,29 @@ describe('ScoringService.getCrowdPercentages', () => {
     const service = new ScoringService(repo, makeCompetitionsRepository())
     const result = await service.getCrowdPercentages('match-uuid')
 
-    expect(result.homeWinPct).toBe(33)
+    expect(result.homeWinPct + result.drawPct + result.awayWinPct).toBe(100)
+    expect(result.homeWinPct).toBe(34)
     expect(result.drawPct).toBe(33)
     expect(result.awayWinPct).toBe(33)
+  })
+
+  it('sums to 100 for non-divisible sample (2 home wins, 1 draw)', async () => {
+    const outcomes = [
+      { homeScore: 1, awayScore: 0 },
+      { homeScore: 2, awayScore: 1 },
+      { homeScore: 0, awayScore: 0 },
+    ]
+    const repo = makePredictionScoreRepository({
+      findCrowdOutcomes: jest.fn().mockResolvedValue(outcomes),
+    })
+
+    const service = new ScoringService(repo, makeCompetitionsRepository())
+    const result = await service.getCrowdPercentages('match-uuid')
+
+    expect(result.homeWinPct + result.drawPct + result.awayWinPct).toBe(100)
+    expect(result.homeWinPct).toBe(67)
+    expect(result.drawPct).toBe(33)
+    expect(result.awayWinPct).toBe(0)
   })
 })
 

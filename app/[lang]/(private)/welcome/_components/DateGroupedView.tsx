@@ -15,6 +15,7 @@ type DateGroupedViewProps = {
   onSyncResult?: (matchId: string, home: number, away: number) => Promise<SyncRegulationResultsResult>
   lastFinishedMatchId?: string | null
   setTargetElement?: (el: HTMLElement | null) => void
+  registerRef?: (matchId: string) => (el: HTMLElement | null) => void
 }
 
 function toLocalDateKey(scheduledAt: string): string {
@@ -32,6 +33,7 @@ export default function DateGroupedView({
   onSyncResult,
   lastFinishedMatchId = null,
   setTargetElement,
+  registerRef,
 }: DateGroupedViewProps) {
   if (matches.length === 0) return null
 
@@ -69,7 +71,15 @@ export default function DateGroupedView({
                 .map((match) => (
                   <div
                     key={match.id}
-                    ref={match.id === lastFinishedMatchId ? setTargetElement : undefined}
+                    data-match-id={match.id}
+                    ref={
+                      match.id === lastFinishedMatchId
+                        ? (el) => {
+                            setTargetElement?.(el)
+                            registerRef?.(match.id)?.(el)
+                          }
+                        : registerRef?.(match.id)
+                    }
                   >
                     <MatchCard
                       {...match}

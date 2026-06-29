@@ -160,9 +160,30 @@ function computeCrowdPercentages(
   }
 
   const total = outcomes.length
+  const exactHome = (homeWins / total) * 100
+  const exactDraw = (draws    / total) * 100
+  const exactAway = (awayWins / total) * 100
+
+  const floorHome = Math.floor(exactHome)
+  const floorDraw = Math.floor(exactDraw)
+  const floorAway = Math.floor(exactAway)
+
+  const remainder = 100 - (floorHome + floorDraw + floorAway)
+
+  // Distribute any remainder to the outcomes with the largest fractional parts,
+  // so the three values always sum to exactly 100.
+  const slots = [
+    { key: 'home' as const, frac: exactHome - floorHome },
+    { key: 'draw' as const, frac: exactDraw - floorDraw },
+    { key: 'away' as const, frac: exactAway - floorAway },
+  ].sort((a, b) => b.frac - a.frac)
+
+  const bonus = { home: 0, draw: 0, away: 0 }
+  for (let i = 0; i < remainder; i++) bonus[slots[i].key]++
+
   return {
-    homeWinPct: Math.floor((homeWins / total) * 100),
-    drawPct: Math.floor((draws / total) * 100),
-    awayWinPct: Math.floor((awayWins / total) * 100),
+    homeWinPct: floorHome + bonus.home,
+    drawPct:    floorDraw + bonus.draw,
+    awayWinPct: floorAway + bonus.away,
   }
 }

@@ -16,6 +16,7 @@ export type GroupAccordionProps = {
   onSaveScore?: (matchId: string, home: number, away: number) => Promise<unknown>
   userRole?: 'admin' | 'player'
   onSyncResult?: (matchId: string, home: number, away: number) => Promise<SyncRegulationResultsResult>
+  registerRef?: (matchId: string) => (el: HTMLElement | null) => void
 }
 
 function formatGroupLabel(group: string, groupWord: string): string {
@@ -35,6 +36,7 @@ export default function GroupAccordion({
   onSaveScore,
   userRole,
   onSyncResult,
+  registerRef,
 }: GroupAccordionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
 
@@ -79,16 +81,21 @@ export default function GroupAccordion({
         className="flex flex-col gap-2 px-5 pb-4"
       >
         {matches.map((match) => (
-          <MatchCard
+          <div
             key={match.id}
-            {...match}
-            dict={dict}
-            lang={lang}
-            isApproved={isApproved}
-            onSaveScore={onSaveScore}
-            userRole={userRole}
-            onSyncResult={onSyncResult}
-          />
+            ref={registerRef?.(match.id)}
+            data-match-id={match.id}
+          >
+            <MatchCard
+              {...match}
+              dict={dict}
+              lang={lang}
+              isApproved={isApproved}
+              onSaveScore={onSaveScore}
+              userRole={userRole}
+              onSyncResult={onSyncResult}
+            />
+          </div>
         ))}
       </div>
     </div>

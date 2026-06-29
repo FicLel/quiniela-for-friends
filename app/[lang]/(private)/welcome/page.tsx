@@ -7,8 +7,7 @@ import { CompetitionsService } from '@/competitions/CompetitionsService'
 import { ExpectedResultsService } from '@/expectedResults/ExpectedResultsService'
 import { ExpectedResultsRepository } from '@/expectedResults/ExpectedResultsRepository'
 import { MembershipsRepository } from '@/memberships/MembershipsRepository'
-import { ScoringService, calculateScore } from '@/scoring/ScoringService'
-import { PredictionScoreRepository } from '@/scoring/PredictionScoreRepository'
+import { calculateScore } from '@/scoring/ScoringService'
 import { AuthClient } from '@/auth/AuthClient'
 import { AppSettingsService } from '@/appSettings/AppSettingsService'
 import { AppSettingsRepository } from '@/appSettings/AppSettingsRepository'
@@ -67,10 +66,6 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
     new MembershipsRepository(),
     competitionsRepository,
   )
-  const scoringService = new ScoringService(
-    new PredictionScoreRepository(),
-    competitionsRepository,
-  )
   const appSettingsService = new AppSettingsService(new AppSettingsRepository())
 
   // -------------------------------------------------------------------------
@@ -121,20 +116,9 @@ export default async function WelcomePage({ params, searchParams }: PageProps) {
     expectedResults.map((r) => [r.matchId, { homeScore: r.homeScore, awayScore: r.awayScore }]),
   )
 
-  // Fetch crowd percentages for all matches in a single batched query
+  // Crowd percentages are loaded lazily by the client via fetchCrowdPercentages.
+  // All entries start as null; the crowd bar is not rendered on initial SSR.
   const crowdPercentagesMap = new Map<string, { homeWinPct: number; drawPct: number; awayWinPct: number } | null>()
-  try {
-    const percentagesByMatch = await scoringService.getCrowdPercentagesForMatches(
-      allMatches.map((match) => match.id),
-    )
-    for (const [matchId, pct] of percentagesByMatch) {
-      // Treat all-zero (no predictions) as null
-      const hasPredictions = pct.homeWinPct > 0 || pct.drawPct > 0 || pct.awayWinPct > 0
-      crowdPercentagesMap.set(matchId, hasPredictions ? pct : null)
-    }
-  } catch {
-    // Crowd percentages are decorative — render without them on failure
-  }
 
   const groupProjections = new GroupProjectionService().projectGroups(allMatches)
   const cascadeResolved = new BracketCascadeService().resolveCascade(allMatches, groupProjections)

@@ -35,8 +35,11 @@ jest.mock('@/competitions/CompetitionsClient', () => ({
   CompetitionsClient: jest.fn().mockImplementation(() => ({})),
 }))
 
+const mockGetCrowdPercentagesForMatches = jest.fn()
 jest.mock('@/scoring/ScoringService', () => ({
-  ScoringService: jest.fn().mockImplementation(() => ({})),
+  ScoringService: jest.fn().mockImplementation(() => ({
+    getCrowdPercentagesForMatches: mockGetCrowdPercentagesForMatches,
+  })),
 }))
 
 jest.mock('@/scoring/PredictionScoreRepository', () => ({
@@ -54,7 +57,69 @@ jest.mock('@/memberships/MembershipsRepository', () => ({
   MembershipsRepository: jest.fn().mockImplementation(() => ({})),
 }))
 
-import { syncMatchResult } from '../actions'
+import { syncMatchResult, fetchCrowdPercentages } from '../actions'
+
+describe('fetchCrowdPercentages action', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('returns {} when matchIds is an empty array', async () => {
+    const result = await fetchCrowdPercentages([])
+
+    expect(result).toEqual({})
+    expect(mockGetCrowdPercentagesForMatches).not.toHaveBeenCalled()
+  })
+
+  it('returns {} when matchIds is not an array', async () => {
+    // Cast to bypass TypeScript — simulates a bad call from the client
+    const result = await fetchCrowdPercentages(null as unknown as string[])
+
+    expect(result).toEqual({})
+    expect(mockGetCrowdPercentagesForMatches).not.toHaveBeenCalled()
+  })
+
+  it('delegates to ScoringService.getCrowdPercentagesForMatches with the given ids', async () => {
+    mockGetCrowdPercentagesForMatches.mockResolvedValue(
+      new Map([
+        ['match-1', { homeWinPct: 60, drawPct: 20, awayWinPct: 20 }],
+        ['match-2', { homeWinPct: 0, drawPct: 0, awayWinPct: 0 }],
+      ]),
+    )
+
+    const result = await fetchCrowdPercentages(['match-1', 'match-2'])
+
+    expect(mockGetCrowdPercentagesForMatches).toHaveBeenCalledWith(['match-1', 'match-2'])
+    expect(result['match-1']).toEqual({ homeWinPct: 60, drawPct: 20, awayWinPct: 20 })
+  })
+
+  it('normalises all-zero entries to null (no predictions submitted)', async () => {
+    mockGetCrowdPercentagesForMatches.mockResolvedValue(
+      new Map([
+        ['match-1', { homeWinPct: 0, drawPct: 0, awayWinPct: 0 }],
+        ['match-2', { homeWinPct: 50, drawPct: 30, awayWinPct: 20 }],
+      ]),
+    )
+
+    const result = await fetchCrowdPercentages(['match-1', 'match-2'])
+
+    expect(result['match-1']).toBeNull()
+    expect(result['match-2']).toEqual({ homeWinPct: 50, drawPct: 30, awayWinPct: 20 })
+  })
+
+  it('returns a plain Record (JSON-serialisable), not a Map', async () => {
+    mockGetCrowdPercentagesForMatches.mockResolvedValue(
+      new Map([['match-1', { homeWinPct: 40, drawPct: 30, awayWinPct: 30 }]]),
+    )
+
+    const result = await fetchCrowdPercentages(['match-1'])
+
+    // A plain object supports JSON.stringify without losing data
+    expect(typeof result).toBe('object')
+    expect(result).not.toBeInstanceOf(Map)
+    expect(Object.keys(result)).toContain('match-1')
+  })
+})
 
 describe('syncMatchResult action', () => {
   beforeEach(() => {

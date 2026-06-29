@@ -15,6 +15,7 @@ import { MembershipsRepository } from '@/memberships/MembershipsRepository'
 import type { SaveExpectedResultResult } from '@/expectedResults/expectedResults.types'
 import { ScoringService } from '@/scoring/ScoringService'
 import { PredictionScoreRepository } from '@/scoring/PredictionScoreRepository'
+import type { CrowdPercentages } from '@/scoring/scoring.types'
 
 function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0
@@ -128,4 +129,31 @@ export async function syncMatchResult(
   const service = new CompetitionsService(new CompetitionsClient(), competitionsRepo, scoringService)
 
   return service.syncRegulationResults([{ matchId, regulationHomeGoals, regulationAwayGoals }])
+}
+
+/**
+ * Return crowd-prediction percentages for a batch of matches.
+ *
+ * Public — no authentication required (crowd percentages are not sensitive).
+ * Returns an empty object for an empty or invalid input to keep the client
+ * call safe without surfacing server errors.
+ *
+ * All-zero entries (no predictions submitted) are normalised to `null` so the
+ * client can skip rendering the crowd bar when there is no data, matching the
+ * behaviour that previously existed on the server render path.
+ */
+export async function fetchCrowdPercentages(
+  matchIds: string[],
+): Promise<Record<string, CrowdPercentages | null>> {
+  if (!Array.isArray(matchIds) || matchIds.length === 0) return {}
+
+  const service = new ScoringService(new PredictionScoreRepository(), new CompetitionsRepository())
+  const percentagesByMatch = await service.getCrowdPercentagesForMatches(matchIds)
+
+  const result: Record<string, CrowdPercentages | null> = {}
+  for (const [matchId, pct] of percentagesByMatch) {
+    const hasPredictions = pct.homeWinPct > 0 || pct.drawPct > 0 || pct.awayWinPct > 0
+    result[matchId] = hasPredictions ? pct : null
+  }
+  return result
 }
