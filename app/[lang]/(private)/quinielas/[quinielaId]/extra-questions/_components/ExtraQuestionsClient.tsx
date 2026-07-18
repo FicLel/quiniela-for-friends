@@ -55,6 +55,7 @@ function QuestionCard({ question, userAnswer, userResult, quinielaId }: Question
   const [isPending, startTransition] = useTransition()
 
   const isResolved = question.status === 'resolved'
+  const isPastDeadline = question.answerDeadline !== null && question.answerDeadline <= new Date()
 
   function handleSave() {
     setInlineError(null)
@@ -68,6 +69,9 @@ function QuestionCard({ question, userAnswer, userResult, quinielaId }: Question
         router.refresh()
       } else if (result.error === 'QUESTION_RESOLVED') {
         setInlineError('This question has already been resolved and can no longer be answered.')
+        router.refresh()
+      } else if (result.error === 'DEADLINE_PASSED') {
+        setInlineError('The deadline for this question has passed.')
         router.refresh()
       } else if (result.error === 'INVALID_INPUT') {
         setInlineError('Answer cannot be empty.')
@@ -164,11 +168,17 @@ function QuestionCard({ question, userAnswer, userResult, quinielaId }: Question
                 setSaveSuccess(false)
                 setInlineError(null)
               }}
-              disabled={isPending}
+              disabled={isPending || isPastDeadline}
               placeholder="Type your answer…"
               className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-200 disabled:bg-gray-50 disabled:text-gray-400"
             />
           </div>
+
+          {isPastDeadline && (
+            <p role="status" className="text-xs font-medium text-gray-400">
+              Answers closed
+            </p>
+          )}
 
           {inlineError && (
             <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -185,7 +195,7 @@ function QuestionCard({ question, userAnswer, userResult, quinielaId }: Question
           <button
             type="button"
             onClick={handleSave}
-            disabled={isPending || draft.trim() === ''}
+            disabled={isPending || isPastDeadline || draft.trim() === ''}
             className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-green-400"
           >
             {isPending ? 'Saving…' : 'Save'}

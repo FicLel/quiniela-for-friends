@@ -38,6 +38,12 @@ const unresolvedQuestion: ExtraQuestion = {
   answerDeadline: null,
 }
 
+const pastDeadlineQuestion: ExtraQuestion = {
+  ...unresolvedQuestion,
+  id: 'q-3',
+  answerDeadline: new Date('2020-01-01'),
+}
+
 const resolvedQuestion: ExtraQuestion = {
   ...unresolvedQuestion,
   id: 'q-2',
@@ -101,8 +107,41 @@ describe('ExtraQuestionsClient', () => {
     fireEvent.click(screen.getByText('Save'))
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toBeInTheDocument()
+      expect(screen.getByText('The deadline for this question has passed.')).toBeInTheDocument()
     })
+  })
+
+  // -------------------------------------------------------------------------
+  // Past-deadline state — input disabled up front, not just after a failed submit
+  // -------------------------------------------------------------------------
+
+  it('disables the input and Save button when the answer deadline has passed', () => {
+    render(
+      <ExtraQuestionsClient
+        {...defaultProps}
+        questions={[pastDeadlineQuestion]}
+        userAnswers={{}}
+        userResults={{}}
+      />,
+    )
+
+    expect(screen.getByLabelText(/Your answer/i)).toBeDisabled()
+    expect(screen.getByText('Save')).toBeDisabled()
+    expect(screen.getByText('Answers closed')).toBeInTheDocument()
+  })
+
+  it('does not show "Answers closed" when there is no deadline or it has not passed yet', () => {
+    render(
+      <ExtraQuestionsClient
+        {...defaultProps}
+        questions={[unresolvedQuestion]}
+        userAnswers={{}}
+        userResults={{}}
+      />,
+    )
+
+    expect(screen.queryByText('Answers closed')).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/Your answer/i)).not.toBeDisabled()
   })
 
   // -------------------------------------------------------------------------
