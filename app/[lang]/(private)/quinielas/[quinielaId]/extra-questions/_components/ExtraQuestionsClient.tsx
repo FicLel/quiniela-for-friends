@@ -5,9 +5,12 @@ import { useRouter } from 'next/navigation'
 import { submitAnswer } from '@/extraQuestions/actions'
 import type { ExtraQuestion } from '@/extraQuestions/extraQuestions.types'
 
+type UserResult = { points: number; isCorrect: boolean; isOverridden: boolean }
+
 type ExtraQuestionsClientProps = {
   questions: ExtraQuestion[]
   userAnswers: Record<string, string>
+  userResults: Record<string, UserResult>
   quinielaId: string
   lang: string
 }
@@ -15,6 +18,7 @@ type ExtraQuestionsClientProps = {
 export default function ExtraQuestionsClient({
   questions,
   userAnswers,
+  userResults,
   quinielaId,
 }: ExtraQuestionsClientProps) {
   return (
@@ -24,6 +28,7 @@ export default function ExtraQuestionsClient({
           key={question.id}
           question={question}
           userAnswer={userAnswers[question.id] ?? ''}
+          userResult={userResults[question.id]}
           quinielaId={quinielaId}
         />
       ))}
@@ -38,10 +43,11 @@ export default function ExtraQuestionsClient({
 type QuestionCardProps = {
   question: ExtraQuestion
   userAnswer: string
+  userResult: UserResult | undefined
   quinielaId: string
 }
 
-function QuestionCard({ question, userAnswer, quinielaId }: QuestionCardProps) {
+function QuestionCard({ question, userAnswer, userResult, quinielaId }: QuestionCardProps) {
   const router = useRouter()
   const [draft, setDraft] = useState(userAnswer)
   const [inlineError, setInlineError] = useState<string | null>(null)
@@ -73,12 +79,10 @@ function QuestionCard({ question, userAnswer, quinielaId }: QuestionCardProps) {
     })
   }
 
-  // Determine if user earned the point when resolved
-  const earnedPoint =
-    isResolved &&
-    question.correctAnswer !== null &&
-    userAnswer !== '' &&
-    userAnswer.toLowerCase() === question.correctAnswer.toLowerCase()
+  // Points/correctness come from the persisted, admin-reviewable result — never
+  // recomputed client-side from a raw string comparison.
+  const earnedPoints = userResult?.points ?? 0
+  const isCorrect = userResult?.isCorrect ?? false
 
   return (
     <div className="rounded-2xl bg-white p-6 shadow-lg">
@@ -126,9 +130,14 @@ function QuestionCard({ question, userAnswer, quinielaId }: QuestionCardProps) {
 
           {userAnswer !== '' && (
             <p
-              className={`text-sm font-semibold ${earnedPoint ? 'text-green-700' : 'text-red-600'}`}
+              className={`text-sm font-semibold ${isCorrect ? 'text-green-700' : 'text-red-600'}`}
             >
-              {earnedPoint ? '✓ +1 point' : '✗ No point'}
+              {isCorrect
+                ? `✓ +${earnedPoints} ${earnedPoints === 1 ? 'point' : 'points'}`
+                : '✗ No point'}
+              {userResult?.isOverridden && (
+                <span className="ml-1 font-normal text-gray-500">(reviewed by admin)</span>
+              )}
             </p>
           )}
 

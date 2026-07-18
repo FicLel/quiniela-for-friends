@@ -1,11 +1,22 @@
 /**
+ * GET  /api/quinielas/[quinielaId]/extra-questions/[questionId]/answers
  * POST /api/quinielas/[quinielaId]/extra-questions/[questionId]/answers
  *
- * Submit or update the calling user's answer to an extra question.
- * Requires approved membership in the quiniela.
- * The question must exist, belong to this quiniela, and be unresolved.
+ * GET  — List every member's answer to the question merged with its scored
+ *         result, for admin review. Requires admin role within the quiniela.
  *
- * Auth: valid session required.
+ * POST — Submit or update the calling user's answer to an extra question.
+ *         Requires approved membership in the quiniela.
+ *         The question must exist, belong to this quiniela, be unresolved,
+ *         and (if set) its answer deadline must not have passed.
+ *
+ * Auth: valid session required for both methods.
+ *
+ * GET returns:
+ *   200: { success: true; rows: { userId, userEmail, answerText, submittedAt, points, isCorrect, isOverridden, overriddenBy, overriddenAt }[] }
+ *   403: { success: false; error: 'UNAUTHORIZED' }
+ *   404: { success: false; error: 'QUESTION_NOT_FOUND' }
+ *   500: { success: false; error: 'DB_ERROR' }
  *
  * POST body: { answerText: string }
  * POST returns:
@@ -13,7 +24,7 @@
  *   400: { success: false; error: 'INVALID_INPUT' }
  *   403: { success: false; error: 'UNAUTHORIZED' }
  *   404: { success: false; error: 'QUESTION_NOT_FOUND' }
- *   409: { success: false; error: 'QUESTION_RESOLVED' }
+ *   409: { success: false; error: 'QUESTION_RESOLVED' | 'DEADLINE_PASSED' }
  *   500: { success: false; error: 'DB_ERROR' }
  */
 
@@ -22,15 +33,56 @@ import { ExtraQuestionsService } from '@/extraQuestions/ExtraQuestionsService'
 import { ExtraQuestionsRepository } from '@/extraQuestions/ExtraQuestionsRepository'
 import { MembershipsRepository } from '@/memberships/MembershipsRepository'
 import { CompetitionsRepository } from '@/competitions/CompetitionsRepository'
-import type { SubmitAnswerResult } from '@/extraQuestions/extraQuestions.types'
+import { UsersRepository } from '@/users/UsersRepository'
+import type { SubmitAnswerResult, ListAnswersForReviewResult } from '@/extraQuestions/extraQuestions.types'
 
 function makeService(): ExtraQuestionsService {
   return new ExtraQuestionsService(
     new ExtraQuestionsRepository(),
     new MembershipsRepository(),
     new CompetitionsRepository(),
+    new UsersRepository(),
   )
 }
+
+// ---------------------------------------------------------------------------
+// GET /api/quinielas/[quinielaId]/extra-questions/[questionId]/answers
+// ---------------------------------------------------------------------------
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ quinielaId: string; questionId: string }> },
+): Promise<Response> {
+  // 1. Auth check
+  const authClient = new AuthClient()
+  const token = await authClient.getTokenFromServerAction()
+  const session = token ? await authClient.verifyToken(token) : null
+
+  if (!session) {
+    const result: ListAnswersForReviewResult = { success: false, error: 'UNAUTHORIZED' }
+    return Response.json(result, { status: 403 })
+  }
+
+  const { quinielaId, questionId } = await params
+
+  // 2. Delegate to service
+  const service = makeService()
+  const result = await service.listAnswersForReview(quinielaId, questionId, session.sub)
+
+  if (!result.success) {
+    const status =
+      result.error === 'UNAUTHORIZED' ? 403
+      : result.error === 'QUESTION_NOT_FOUND' ? 404
+      : 500
+    return Response.json(result, { status })
+  }
+
+  return Response.json(result, { status: 200 })
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/quinielas/[quinielaId]/extra-questions/[questionId]/answers
+// ---------------------------------------------------------------------------
 
 export async function POST(
   request: Request,
@@ -83,7 +135,7 @@ export async function POST(
     const status =
       result.error === 'UNAUTHORIZED' ? 403
       : result.error === 'QUESTION_NOT_FOUND' ? 404
-      : result.error === 'QUESTION_RESOLVED' ? 409
+      : result.error === 'QUESTION_RESOLVED' || result.error === 'DEADLINE_PASSED' ? 409
       : result.error === 'INVALID_INPUT' ? 400
       : 500
     return Response.json(result, { status })

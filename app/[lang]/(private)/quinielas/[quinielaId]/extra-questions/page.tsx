@@ -6,6 +6,7 @@ import { MembershipsRepository } from '@/memberships/MembershipsRepository'
 import { ExtraQuestionsService } from '@/extraQuestions/ExtraQuestionsService'
 import { ExtraQuestionsRepository } from '@/extraQuestions/ExtraQuestionsRepository'
 import { CompetitionsRepository } from '@/competitions/CompetitionsRepository'
+import { UsersRepository } from '@/users/UsersRepository'
 import type { Locale } from '@/i18n/i18n.types'
 import ExtraQuestionsClient from './_components/ExtraQuestionsClient'
 
@@ -38,6 +39,7 @@ export default async function ExtraQuestionsPage({ params }: PageProps) {
     new ExtraQuestionsRepository(),
     membershipsRepo,
     new CompetitionsRepository(),
+    new UsersRepository(),
   )
 
   const result = await service.listQuestions(quinielaId, session.sub)
@@ -47,7 +49,7 @@ export default async function ExtraQuestionsPage({ params }: PageProps) {
     redirect(`/${locale}/quinielas`)
   }
 
-  const { questions, userAnswers } = result
+  const { questions, userAnswers, userResults } = result
 
   return (
     <main className="min-h-screen bg-green-50 px-4 py-8">
@@ -93,6 +95,7 @@ export default async function ExtraQuestionsPage({ params }: PageProps) {
           <ExtraQuestionsClient
             questions={questions}
             userAnswers={userAnswers}
+            userResults={userResults}
             quinielaId={quinielaId}
             lang={locale}
           />

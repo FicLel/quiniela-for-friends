@@ -1,0 +1,2 @@
+- [Supabase MCP is read-only here](project_supabase_mcp_readonly.md) — agents can't apply migrations; user must, then verify independently before trusting "applied" claims.
+- [Skip to build when brief is pre-approved](feedback_skip_to_build_when_brief_preapproved.md) — user sometimes front-loads a final brief and says skip mapping/story/brief phases.

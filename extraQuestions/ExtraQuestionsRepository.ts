@@ -61,6 +61,26 @@ export class ExtraQuestionsRepository implements IExtraQuestionsRepository {
       createdBy: row.created_by as string,
       createdAt: new Date(row.created_at as string),
       updatedAt: new Date(row.updated_at as string),
+      pointsValue: (row.points_value as number) ?? 1,
+      answerDeadline: row.answer_deadline ? new Date(row.answer_deadline as string) : null,
+    }
+  }
+
+  /**
+   * Map a raw Supabase row (snake_case) to the ExtraQuestionResult domain type.
+   */
+  private toExtraQuestionResult(row: Record<string, unknown>): ExtraQuestionResult {
+    return {
+      id: row.id as string,
+      questionId: row.question_id as string,
+      userId: row.user_id as string,
+      quinielaId: row.quiniela_id as string,
+      points: row.points as number,
+      scoredAt: new Date(row.scored_at as string),
+      isCorrect: (row.is_correct as boolean) ?? false,
+      isOverridden: (row.is_overridden as boolean) ?? false,
+      overriddenBy: (row.overridden_by as string | null) ?? null,
+      overriddenAt: row.overridden_at ? new Date(row.overridden_at as string) : null,
     }
   }
 
@@ -87,6 +107,8 @@ export class ExtraQuestionsRepository implements IExtraQuestionsRepository {
     questionText: string
     questionType: ExtraQuestionType
     createdBy: string
+    pointsValue: number
+    answerDeadline: Date | null
   }): Promise<ExtraQuestion> {
     await this.verifySchema()
 
@@ -97,6 +119,8 @@ export class ExtraQuestionsRepository implements IExtraQuestionsRepository {
         question_text: input.questionText,
         question_type: input.questionType,
         created_by: input.createdBy,
+        points_value: input.pointsValue,
+        answer_deadline: input.answerDeadline?.toISOString() ?? null,
       })
       .select('*')
       .single()
@@ -311,6 +335,32 @@ export class ExtraQuestionsRepository implements IExtraQuestionsRepository {
   }
 
   /**
+   * Update an existing question's answer deadline.
+   * Returns the updated question, or null if the row doesn't exist.
+   * Throws on Supabase error (other than "not found").
+   */
+  async updateQuestionDeadline(
+    questionId: string,
+    answerDeadline: Date | null,
+  ): Promise<ExtraQuestion | null> {
+    await this.verifySchema()
+
+    const { data, error } = await this.supabase
+      .from('extra_questions')
+      .update({
+        answer_deadline: answerDeadline?.toISOString() ?? null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', questionId)
+      .select('*')
+      .single()
+
+    if (error || !data) return null
+
+    return this.toExtraQuestion(data as Record<string, unknown>)
+  }
+
+  /**
    * Upsert result rows keyed on (question_id, user_id).
    * No-op when rows is empty.
    * Throws on Supabase error.
@@ -325,6 +375,10 @@ export class ExtraQuestionsRepository implements IExtraQuestionsRepository {
       user_id: r.userId,
       quiniela_id: r.quinielaId,
       points: r.points,
+      is_correct: r.isCorrect,
+      is_overridden: r.isOverridden,
+      overridden_by: r.overriddenBy,
+      overridden_at: r.overriddenAt ? r.overriddenAt.toISOString() : null,
     }))
 
     const { error } = await this.supabase
@@ -334,6 +388,118 @@ export class ExtraQuestionsRepository implements IExtraQuestionsRepository {
     if (error) {
       throw new Error(`upsertResults extra_question_results failed: ${error.message}`)
     }
+  }
+
+  /**
+   * Return all result rows for a user scoped to questions within a quiniela.
+   * Two-step approach mirroring findAnswersByUserForQuiniela.
+   * Returns [] if the quiniela has no questions or the user has no results.
+   */
+  async findResultsByUserForQuiniela(
+    quinielaId: string,
+    userId: string,
+  ): Promise<ExtraQuestionResult[]> {
+    await this.verifySchema()
+
+    // Step 1: Fetch all question IDs for the quiniela
+    const { data: questionRows, error: questionsError } = await this.supabase
+      .from('extra_questions')
+      .select('id')
+      .eq('quiniela_id', quinielaId)
+
+    if (questionsError) {
+      throw new Error(`findResultsByUserForQuiniela questions fetch failed: ${questionsError.message}`)
+    }
+
+    if (!questionRows || questionRows.length === 0) return []
+
+    const questionIds = (questionRows as { id: string }[]).map((r) => r.id)
+
+    // Step 2: Fetch results by userId for those question IDs
+    const { data: resultRows, error: resultsError } = await this.supabase
+      .from('extra_question_results')
+      .select('*')
+      .eq('user_id', userId)
+      .in('question_id', questionIds)
+
+    if (resultsError) {
+      throw new Error(`findResultsByUserForQuiniela results fetch failed: ${resultsError.message}`)
+    }
+
+    if (!resultRows || resultRows.length === 0) return []
+
+    return (resultRows as Record<string, unknown>[]).map((row) => this.toExtraQuestionResult(row))
+  }
+
+  /**
+   * Return all result rows for a given question.
+   * Returns [] if none.
+   */
+  async findResultsByQuestion(questionId: string): Promise<ExtraQuestionResult[]> {
+    await this.verifySchema()
+
+    const { data, error } = await this.supabase
+      .from('extra_question_results')
+      .select('*')
+      .eq('question_id', questionId)
+
+    if (error) {
+      throw new Error(`findResultsByQuestion failed: ${error.message}`)
+    }
+
+    if (!data || data.length === 0) return []
+
+    return (data as Record<string, unknown>[]).map((row) => this.toExtraQuestionResult(row))
+  }
+
+  /**
+   * Override a single user's result for a question (admin correction after resolve).
+   * Reads the existing row first to capture the previous points/correctness — returns
+   * null when no result row exists yet for this (question, user) pair.
+   * Throws on Supabase error.
+   */
+  async overrideResult(input: {
+    questionId: string
+    userId: string
+    points: number
+    isCorrect: boolean
+    overriddenBy: string
+  }): Promise<{ previousPoints: number; previousIsCorrect: boolean } | null> {
+    await this.verifySchema()
+
+    // Step 1: Read existing row to capture previous state
+    const { data: existing, error: readError } = await this.supabase
+      .from('extra_question_results')
+      .select('points, is_correct')
+      .eq('question_id', input.questionId)
+      .eq('user_id', input.userId)
+      .single()
+
+    if (readError || !existing) return null
+
+    const previousPoints = (existing as Record<string, unknown>).points as number
+    const previousIsCorrect = (existing as Record<string, unknown>).is_correct as boolean
+
+    // Step 2: Update the row with the override
+    const now = new Date().toISOString()
+    const { error: updateError } = await this.supabase
+      .from('extra_question_results')
+      .update({
+        points: input.points,
+        is_correct: input.isCorrect,
+        is_overridden: true,
+        overridden_by: input.overriddenBy,
+        overridden_at: now,
+        scored_at: now,
+      })
+      .eq('question_id', input.questionId)
+      .eq('user_id', input.userId)
+
+    if (updateError) {
+      throw new Error(`overrideResult update failed: ${updateError.message}`)
+    }
+
+    return { previousPoints, previousIsCorrect }
   }
 
   /**
@@ -350,8 +516,12 @@ export class ExtraQuestionsRepository implements IExtraQuestionsRepository {
       quiniela_id: entry.quinielaId,
       changed_by: entry.changedBy,
       previous_answer: entry.previousAnswer ?? null,
-      new_answer: entry.newAnswer,
+      new_answer: entry.newAnswer ?? null,
       members_rescored: entry.membersRescored,
+      entry_type: entry.entryType,
+      target_user_id: entry.targetUserId,
+      previous_points: entry.previousPoints,
+      new_points: entry.newPoints,
     })
 
     if (error) {

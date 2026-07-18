@@ -9,3 +9,5 @@
 - [Extra Points Questions Feature](project-extra-questions.md) — 4 tables, ExtraQuestionsRepository/Service/actions, 5 API routes, scoring aggregation extended
 - [Leaderboard Breakdown + Predictions Viewer](project-leaderboard-breakdown-predictions.md) — 4 breakdown fields on LeaderboardRow, PlayerPredictionEntry type, findPlayerPredictionsForViewer, getPlayerPredictions, new API route
 - [Tournament Brackets Feature](project-tournament-brackets.md) — new tournaments/ module: GroupProjectionService, BracketCascadeService, 2-layer TtlCache, invalidation hooks in CompetitionsRepository + ExpectedResultsRepository
+- [Extra Questions Overrides Feature](project-extra-questions-overrides.md) — per-user answer override, deadlines, configurable points, 4th ctor dep (usersRepo), override API route
+- [Supabase MCP is read-only here](feedback-supabase-mcp-read-only.md) — apply_migration/writes fail; write migration file + tell user to apply manually

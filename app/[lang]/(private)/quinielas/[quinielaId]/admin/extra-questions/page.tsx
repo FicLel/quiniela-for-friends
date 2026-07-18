@@ -6,6 +6,7 @@ import { MembershipsRepository } from '@/memberships/MembershipsRepository'
 import { ExtraQuestionsService } from '@/extraQuestions/ExtraQuestionsService'
 import { ExtraQuestionsRepository } from '@/extraQuestions/ExtraQuestionsRepository'
 import { CompetitionsRepository } from '@/competitions/CompetitionsRepository'
+import { UsersRepository } from '@/users/UsersRepository'
 import type { Locale } from '@/i18n/i18n.types'
 import AdminExtraQuestionsClient from './_components/AdminExtraQuestionsClient'
 
@@ -42,6 +43,7 @@ export default async function AdminExtraQuestionsPage({ params }: PageProps) {
     new ExtraQuestionsRepository(),
     membershipsRepo,
     competitionsRepo,
+    new UsersRepository(),
   )
 
   const result = await service.listQuestions(quinielaId, session.sub)

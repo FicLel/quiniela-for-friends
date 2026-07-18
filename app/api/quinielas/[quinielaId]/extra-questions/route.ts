@@ -15,7 +15,7 @@
  *   403: { success: false; error: 'UNAUTHORIZED' }
  *   500: { success: false; error: 'UNKNOWN_ERROR' }
  *
- * POST body: { questionText: string; questionType: 'team' | 'player' }
+ * POST body: { questionText: string; questionType: 'team' | 'player'; pointsValue: number; answerDeadline: string | null }
  * POST returns:
  *   201: { success: true; question: ExtraQuestion }
  *   400: { success: false; error: 'INVALID_INPUT' | 'NO_COMPETITION_DATA' }
@@ -28,6 +28,7 @@ import { ExtraQuestionsService } from '@/extraQuestions/ExtraQuestionsService'
 import { ExtraQuestionsRepository } from '@/extraQuestions/ExtraQuestionsRepository'
 import { MembershipsRepository } from '@/memberships/MembershipsRepository'
 import { CompetitionsRepository } from '@/competitions/CompetitionsRepository'
+import { UsersRepository } from '@/users/UsersRepository'
 import type { ExtraQuestionType, ListQuestionsResult, CreateQuestionResult } from '@/extraQuestions/extraQuestions.types'
 
 function makeService(): ExtraQuestionsService {
@@ -35,6 +36,7 @@ function makeService(): ExtraQuestionsService {
     new ExtraQuestionsRepository(),
     new MembershipsRepository(),
     new CompetitionsRepository(),
+    new UsersRepository(),
   )
 }
 
@@ -115,16 +117,36 @@ export async function POST(
     return Response.json(result, { status: 400 })
   }
 
-  const { questionText, questionType } = body as Record<string, unknown>
+  const { questionText, questionType, pointsValue, answerDeadline } = body as Record<string, unknown>
 
   if (typeof questionText !== 'string' || !isValidQuestionType(questionType)) {
     const result: CreateQuestionResult = { success: false, error: 'INVALID_INPUT' }
     return Response.json(result, { status: 400 })
   }
 
+  if (!Number.isInteger(pointsValue) || (pointsValue as number) < 1) {
+    const result: CreateQuestionResult = { success: false, error: 'INVALID_INPUT' }
+    return Response.json(result, { status: 400 })
+  }
+
+  if (answerDeadline !== null && answerDeadline !== undefined && typeof answerDeadline !== 'string') {
+    const result: CreateQuestionResult = { success: false, error: 'INVALID_INPUT' }
+    return Response.json(result, { status: 400 })
+  }
+
+  const parsedDeadline = typeof answerDeadline === 'string' ? new Date(answerDeadline) : null
+  if (parsedDeadline !== null && Number.isNaN(parsedDeadline.getTime())) {
+    const result: CreateQuestionResult = { success: false, error: 'INVALID_INPUT' }
+    return Response.json(result, { status: 400 })
+  }
+
   // 3. Delegate to service
   const service = makeService()
-  const result = await service.createQuestion(quinielaId, { questionText, questionType }, session.sub)
+  const result = await service.createQuestion(
+    quinielaId,
+    { questionText, questionType, pointsValue: pointsValue as number, answerDeadline: parsedDeadline },
+    session.sub,
+  )
 
   if (!result.success) {
     const status =

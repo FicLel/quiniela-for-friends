@@ -12,3 +12,4 @@
 - [Pre-existing test failures](feedback_preexisting_test_failures.md) — ImportMatchesButton 5 tests fail pre-existing (useRouter without app router mock); not a regression
 - [React hooks lint rules](feedback_react_hooks_lint.md) — No Math.random/ref.current in render, no setState at top of useEffect; use useId() for stable IDs
 - [IntersectionObserver mock](feedback_intersectionobserver_mock.md) — Class-based mock captures callback and exposes simulateEntries(); assign to window.IntersectionObserver in beforeEach
+- [Numeric input string state](feedback_numeric_input_string_state.md) — Store number inputs as string state, parse/validate at submit, not on every keystroke

@@ -17,10 +17,19 @@ jest.mock('next/navigation', () => ({
 jest.mock('@/extraQuestions/actions', () => ({
   createQuestion: jest.fn(),
   resolveQuestion: jest.fn(),
+  listAnswersForReview: jest.fn(),
+  overrideAnswer: jest.fn(),
+  updateQuestionDeadline: jest.fn(),
 }))
 
 // Import after mocking so we can configure the mock per-test
-import { createQuestion, resolveQuestion } from '@/extraQuestions/actions'
+import {
+  createQuestion,
+  resolveQuestion,
+  listAnswersForReview,
+  overrideAnswer,
+  updateQuestionDeadline,
+} from '@/extraQuestions/actions'
 
 // ---------------------------------------------------------------------------
 // Mock autocomplete children (they do fetch on mount — keep them simple)
@@ -85,6 +94,8 @@ const baseQuestion: ExtraQuestion = {
   createdBy: 'user-admin-1',
   createdAt: new Date('2026-01-01'),
   updatedAt: new Date('2026-01-01'),
+  pointsValue: 1,
+  answerDeadline: null,
 }
 
 const resolvedQuestion: ExtraQuestion = {
@@ -161,7 +172,7 @@ describe('AdminExtraQuestionsClient', () => {
   // Create form submission
   // -------------------------------------------------------------------------
 
-  it('calls createQuestion with correct args on form submit', async () => {
+  it('calls createQuestion with correct args on form submit, defaulting pointsValue to 1 and answerDeadline to null', async () => {
     ;(createQuestion as jest.Mock).mockResolvedValue({ success: true, question: baseQuestion })
 
     render(<AdminExtraQuestionsClient {...defaultProps} />)
@@ -177,8 +188,48 @@ describe('AdminExtraQuestionsClient', () => {
       expect(createQuestion).toHaveBeenCalledWith('quiniela-1', {
         questionText: 'Who will win?',
         questionType: 'team',
+        pointsValue: 1,
+        answerDeadline: null,
       })
     })
+  })
+
+  it('submits a custom pointsValue and converts a filled-in answerDeadline to an ISO string', async () => {
+    ;(createQuestion as jest.Mock).mockResolvedValue({ success: true, question: baseQuestion })
+
+    render(<AdminExtraQuestionsClient {...defaultProps} />)
+    fireEvent.click(screen.getByText('+ Create Question'))
+
+    fireEvent.change(screen.getByLabelText(/Question text/i), {
+      target: { value: 'Who will win?' },
+    })
+    fireEvent.change(screen.getByLabelText(/Points value/i), { target: { value: '5' } })
+    fireEvent.change(screen.getByLabelText(/Answer deadline/i), {
+      target: { value: '2026-08-01T10:00' },
+    })
+
+    fireEvent.click(screen.getByText('Create'))
+
+    await waitFor(() => {
+      expect(createQuestion).toHaveBeenCalledWith('quiniela-1', {
+        questionText: 'Who will win?',
+        questionType: 'team',
+        pointsValue: 5,
+        answerDeadline: new Date('2026-08-01T10:00').toISOString(),
+      })
+    })
+  })
+
+  it('disables Create and does not call createQuestion when pointsValue is invalid', () => {
+    render(<AdminExtraQuestionsClient {...defaultProps} />)
+    fireEvent.click(screen.getByText('+ Create Question'))
+
+    fireEvent.change(screen.getByLabelText(/Question text/i), {
+      target: { value: 'Who will win?' },
+    })
+    fireEvent.change(screen.getByLabelText(/Points value/i), { target: { value: '0' } })
+
+    expect(screen.getByText('Create')).toBeDisabled()
   })
 
   it('shows inline error when createQuestion returns INVALID_INPUT', async () => {
@@ -265,11 +316,218 @@ describe('AdminExtraQuestionsClient', () => {
   })
 
   // -------------------------------------------------------------------------
+  // Edit deadline
+  // -------------------------------------------------------------------------
+
+  it('shows "No deadline set" for a question without a deadline', () => {
+    render(<AdminExtraQuestionsClient {...defaultProps} questions={[baseQuestion]} />)
+    expect(screen.getByText('No deadline set')).toBeInTheDocument()
+  })
+
+  it('shows the formatted deadline for a question that has one', () => {
+    const withDeadline = { ...baseQuestion, answerDeadline: new Date('2026-08-01T10:00:00Z') }
+    render(<AdminExtraQuestionsClient {...defaultProps} questions={[withDeadline]} />)
+    expect(screen.getByText(withDeadline.answerDeadline!.toLocaleString())).toBeInTheDocument()
+  })
+
+  it('reveals the deadline input when Edit is clicked', () => {
+    render(<AdminExtraQuestionsClient {...defaultProps} questions={[baseQuestion]} />)
+    fireEvent.click(screen.getByText('Edit'))
+    expect(screen.getByLabelText(/Answer deadline/i)).toBeInTheDocument()
+  })
+
+  it('calls updateQuestionDeadline with an ISO string when a deadline is set and saved', async () => {
+    ;(updateQuestionDeadline as jest.Mock).mockResolvedValue({ success: true, question: baseQuestion })
+
+    render(<AdminExtraQuestionsClient {...defaultProps} questions={[baseQuestion]} />)
+    fireEvent.click(screen.getByText('Edit'))
+
+    fireEvent.change(screen.getByLabelText(/Answer deadline/i), {
+      target: { value: '2026-08-01T10:00' },
+    })
+    fireEvent.click(screen.getByText('Save'))
+
+    await waitFor(() => {
+      expect(updateQuestionDeadline).toHaveBeenCalledWith(
+        'quiniela-1',
+        'q-1',
+        new Date('2026-08-01T10:00').toISOString(),
+      )
+    })
+  })
+
+  it('calls updateQuestionDeadline with null when the deadline is cleared and saved', async () => {
+    const withDeadline = { ...baseQuestion, answerDeadline: new Date('2026-08-01T10:00:00Z') }
+    ;(updateQuestionDeadline as jest.Mock).mockResolvedValue({ success: true, question: withDeadline })
+
+    render(<AdminExtraQuestionsClient {...defaultProps} questions={[withDeadline]} />)
+    fireEvent.click(screen.getByText('Edit'))
+
+    fireEvent.change(screen.getByLabelText(/Answer deadline/i), { target: { value: '' } })
+    fireEvent.click(screen.getByText('Save'))
+
+    await waitFor(() => {
+      expect(updateQuestionDeadline).toHaveBeenCalledWith('quiniela-1', 'q-1', null)
+    })
+  })
+
+  it('hides the input again after a successful save', async () => {
+    ;(updateQuestionDeadline as jest.Mock).mockResolvedValue({ success: true, question: baseQuestion })
+
+    render(<AdminExtraQuestionsClient {...defaultProps} questions={[baseQuestion]} />)
+    fireEvent.click(screen.getByText('Edit'))
+    fireEvent.click(screen.getByText('Save'))
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText(/Answer deadline/i)).not.toBeInTheDocument()
+    })
+  })
+
+  it('hides the input when Cancel is clicked without saving', () => {
+    render(<AdminExtraQuestionsClient {...defaultProps} questions={[baseQuestion]} />)
+    fireEvent.click(screen.getByText('Edit'))
+    fireEvent.click(screen.getByText('Cancel'))
+
+    expect(screen.queryByLabelText(/Answer deadline/i)).not.toBeInTheDocument()
+    expect(updateQuestionDeadline).not.toHaveBeenCalled()
+  })
+
+  it('shows an inline error when updateQuestionDeadline returns INVALID_INPUT', async () => {
+    ;(updateQuestionDeadline as jest.Mock).mockResolvedValue({ success: false, error: 'INVALID_INPUT' })
+
+    render(<AdminExtraQuestionsClient {...defaultProps} questions={[baseQuestion]} />)
+    fireEvent.click(screen.getByText('Edit'))
+    fireEvent.click(screen.getByText('Save'))
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/Deadline must be in the future/)
+    })
+  })
+
+  it('allows editing the deadline on a resolved question', () => {
+    render(<AdminExtraQuestionsClient {...defaultProps} questions={[resolvedQuestion]} />)
+    expect(screen.getByText('Edit')).toBeInTheDocument()
+  })
+
+  // -------------------------------------------------------------------------
   // Empty state
   // -------------------------------------------------------------------------
 
   it('shows empty state when there are no questions', () => {
     render(<AdminExtraQuestionsClient {...defaultProps} questions={[]} />)
     expect(screen.getByText(/No extra questions yet/)).toBeInTheDocument()
+  })
+
+  // -------------------------------------------------------------------------
+  // Review answers section
+  // -------------------------------------------------------------------------
+
+  const reviewRows = [
+    {
+      userId: 'user-1',
+      userEmail: 'alice@example.com',
+      answerText: 'Lionel Messi',
+      submittedAt: new Date('2026-06-01'),
+      points: 1,
+      isCorrect: true,
+      isOverridden: false,
+      overriddenBy: null,
+      overriddenAt: null,
+    },
+    {
+      userId: 'user-2',
+      userEmail: 'bob@example.com',
+      answerText: null,
+      submittedAt: null,
+      points: 0,
+      isCorrect: false,
+      isOverridden: false,
+      overriddenBy: null,
+      overriddenAt: null,
+    },
+  ]
+
+  it('does not show a Review answers control for unresolved questions', () => {
+    render(<AdminExtraQuestionsClient {...defaultProps} questions={[baseQuestion]} />)
+    expect(screen.queryByText('Review answers')).not.toBeInTheDocument()
+  })
+
+  it('lazily loads and renders answers when Review answers is clicked', async () => {
+    ;(listAnswersForReview as jest.Mock).mockResolvedValue({ success: true, rows: reviewRows })
+
+    render(<AdminExtraQuestionsClient {...defaultProps} questions={[resolvedQuestion]} />)
+
+    expect(listAnswersForReview).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByText('Review answers'))
+
+    expect(listAnswersForReview).toHaveBeenCalledWith('quiniela-1', 'q-2')
+
+    await waitFor(() => {
+      expect(screen.getByText('alice@example.com')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Lionel Messi')).toBeInTheDocument()
+    expect(screen.getByText('bob@example.com')).toBeInTheDocument()
+    expect(screen.getByText('No answer')).toBeInTheDocument()
+  })
+
+  it('shows an error when listAnswersForReview fails', async () => {
+    ;(listAnswersForReview as jest.Mock).mockResolvedValue({
+      success: false,
+      error: 'DB_ERROR',
+    })
+
+    render(<AdminExtraQuestionsClient {...defaultProps} questions={[resolvedQuestion]} />)
+    fireEvent.click(screen.getByText('Review answers'))
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/Failed to load answers/)
+    })
+  })
+
+  it('calls overrideAnswer with correct args and marks the row overridden on success', async () => {
+    ;(listAnswersForReview as jest.Mock).mockResolvedValue({ success: true, rows: reviewRows })
+    ;(overrideAnswer as jest.Mock).mockResolvedValue({ success: true, points: 1, isCorrect: true })
+
+    render(<AdminExtraQuestionsClient {...defaultProps} questions={[resolvedQuestion]} />)
+    fireEvent.click(screen.getByText('Review answers'))
+
+    await waitFor(() => {
+      expect(screen.getByText('bob@example.com')).toBeInTheDocument()
+    })
+
+    const markCorrectButtons = screen.getAllByRole('button', { name: 'Mark correct' })
+    // Second row belongs to bob (index 1)
+    fireEvent.click(markCorrectButtons[1])
+
+    await waitFor(() => {
+      expect(overrideAnswer).toHaveBeenCalledWith('quiniela-1', 'q-2', 'user-2', true)
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('(overridden)')).toBeInTheDocument()
+    })
+  })
+
+  it('shows an inline error when overrideAnswer returns IMPERSONATING_READ_ONLY', async () => {
+    ;(listAnswersForReview as jest.Mock).mockResolvedValue({ success: true, rows: reviewRows })
+    ;(overrideAnswer as jest.Mock).mockResolvedValue({
+      success: false,
+      error: 'IMPERSONATING_READ_ONLY',
+    })
+
+    render(<AdminExtraQuestionsClient {...defaultProps} questions={[resolvedQuestion]} />)
+    fireEvent.click(screen.getByText('Review answers'))
+
+    await waitFor(() => {
+      expect(screen.getByText('alice@example.com')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Mark incorrect' })[0])
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/impersonating in read-only mode/)
+    })
   })
 })

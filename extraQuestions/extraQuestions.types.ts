@@ -20,6 +20,8 @@ export type ExtraQuestion = {
   createdBy: string
   createdAt: Date
   updatedAt: Date
+  pointsValue: number
+  answerDeadline: Date | null
 }
 
 export type ExtraQuestionAnswer = {
@@ -36,8 +38,12 @@ export type ExtraQuestionResult = {
   questionId: string
   userId: string
   quinielaId: string
-  points: 0 | 1
+  points: number
   scoredAt: Date
+  isCorrect: boolean
+  isOverridden: boolean
+  overriddenBy: string | null
+  overriddenAt: Date | null
 }
 
 export type ExtraQuestionAuditEntry = {
@@ -46,9 +52,13 @@ export type ExtraQuestionAuditEntry = {
   quinielaId: string
   changedBy: string
   previousAnswer: string | null
-  newAnswer: string
+  newAnswer: string | null
   membersRescored: number
   createdAt: Date
+  entryType: 'resolve' | 'override'
+  targetUserId: string | null
+  previousPoints: number | null
+  newPoints: number | null
 }
 
 // ---------------------------------------------------------------------------
@@ -61,15 +71,55 @@ export type CreateQuestionResult =
 
 export type SubmitAnswerResult =
   | { success: true }
-  | { success: false; error: 'UNAUTHORIZED' | 'QUESTION_NOT_FOUND' | 'QUESTION_RESOLVED' | 'INVALID_INPUT' | 'IMPERSONATING_READ_ONLY' | 'DB_ERROR' }
+  | { success: false; error: 'UNAUTHORIZED' | 'QUESTION_NOT_FOUND' | 'QUESTION_RESOLVED' | 'DEADLINE_PASSED' | 'INVALID_INPUT' | 'IMPERSONATING_READ_ONLY' | 'DB_ERROR' }
 
 export type ResolveQuestionResult =
   | { success: true; membersRescored: number }
   | { success: false; error: 'UNAUTHORIZED' | 'QUESTION_NOT_FOUND' | 'INVALID_INPUT' | 'AUDIT_FAILED' | 'IMPERSONATING_READ_ONLY' | 'DB_ERROR' }
 
+export type UpdateQuestionDeadlineResult =
+  | { success: true; question: ExtraQuestion }
+  | { success: false; error: 'UNAUTHORIZED' | 'QUESTION_NOT_FOUND' | 'INVALID_INPUT' | 'IMPERSONATING_READ_ONLY' | 'DB_ERROR' }
+
 export type ListQuestionsResult =
-  | { success: true; questions: ExtraQuestion[]; userAnswers: Record<string, string> }
+  | {
+      success: true
+      questions: ExtraQuestion[]
+      userAnswers: Record<string, string>
+      userResults: Record<string, { points: number; isCorrect: boolean; isOverridden: boolean }>
+    }
   | { success: false; error: 'UNAUTHORIZED' | 'UNKNOWN_ERROR' }
+
+export type ListAnswersForReviewResult =
+  | {
+      success: true
+      rows: {
+        userId: string
+        userEmail: string
+        answerText: string | null
+        submittedAt: Date | null
+        points: number
+        isCorrect: boolean
+        isOverridden: boolean
+        overriddenBy: string | null
+        overriddenAt: Date | null
+      }[]
+    }
+  | { success: false; error: 'UNAUTHORIZED' | 'QUESTION_NOT_FOUND' | 'DB_ERROR' }
+
+export type OverrideAnswerResult =
+  | { success: true; points: number; isCorrect: boolean }
+  | {
+      success: false
+      error:
+        | 'UNAUTHORIZED'
+        | 'QUESTION_NOT_FOUND'
+        | 'QUESTION_NOT_RESOLVED'
+        | 'ANSWER_NOT_FOUND'
+        | 'AUDIT_FAILED'
+        | 'IMPERSONATING_READ_ONLY'
+        | 'DB_ERROR'
+    }
 
 // ---------------------------------------------------------------------------
 // Port interfaces
@@ -81,6 +131,8 @@ export interface IExtraQuestionsRepository {
     questionText: string
     questionType: ExtraQuestionType
     createdBy: string
+    pointsValue: number
+    answerDeadline: Date | null
   }): Promise<ExtraQuestion>
 
   findById(questionId: string): Promise<ExtraQuestion | null>
@@ -107,6 +159,11 @@ export interface IExtraQuestionsRepository {
     correctAnswer: string,
   ): Promise<{ previousAnswer: string | null }>
 
+  updateQuestionDeadline(
+    questionId: string,
+    answerDeadline: Date | null,
+  ): Promise<ExtraQuestion | null>
+
   upsertResults(rows: Omit<ExtraQuestionResult, 'id' | 'scoredAt'>[]): Promise<void>
 
   insertAuditEntry(entry: Omit<ExtraQuestionAuditEntry, 'id' | 'createdAt'>): Promise<void>
@@ -116,6 +173,18 @@ export interface IExtraQuestionsRepository {
   countUnansweredOpenByUser(quinielaId: string, userId: string): Promise<number>
 
   countAll(quinielaId: string): Promise<number>
+
+  findResultsByUserForQuiniela(quinielaId: string, userId: string): Promise<ExtraQuestionResult[]>
+
+  findResultsByQuestion(questionId: string): Promise<ExtraQuestionResult[]>
+
+  overrideResult(input: {
+    questionId: string
+    userId: string
+    points: number
+    isCorrect: boolean
+    overriddenBy: string
+  }): Promise<{ previousPoints: number; previousIsCorrect: boolean } | null>
 }
 
 export interface IExtraQuestionsService {
@@ -123,7 +192,7 @@ export interface IExtraQuestionsService {
 
   createQuestion(
     quinielaId: string,
-    input: { questionText: string; questionType: ExtraQuestionType },
+    input: { questionText: string; questionType: ExtraQuestionType; pointsValue: number; answerDeadline: Date | null },
     callerUserId: string,
   ): Promise<CreateQuestionResult>
 
@@ -140,4 +209,25 @@ export interface IExtraQuestionsService {
     correctAnswer: string,
     callerUserId: string,
   ): Promise<ResolveQuestionResult>
+
+  updateQuestionDeadline(
+    quinielaId: string,
+    questionId: string,
+    answerDeadline: Date | null,
+    callerUserId: string,
+  ): Promise<UpdateQuestionDeadlineResult>
+
+  listAnswersForReview(
+    quinielaId: string,
+    questionId: string,
+    callerUserId: string,
+  ): Promise<ListAnswersForReviewResult>
+
+  overrideAnswer(
+    quinielaId: string,
+    questionId: string,
+    targetUserId: string,
+    isCorrect: boolean,
+    callerUserId: string,
+  ): Promise<OverrideAnswerResult>
 }
