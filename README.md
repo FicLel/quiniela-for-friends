@@ -2,6 +2,13 @@
 
 A SaaS application for running private soccer betting pools (*quinielas*) among friends. Members predict match outcomes, earn points, and compete on a leaderboard — all scoped to their own pool.
 
+<img width="805" height="903" alt="image" src="https://github.com/user-attachments/assets/eeb5a811-c81b-479e-b351-d5f2af44baa2" />
+
+<img width="916" height="665" alt="image" src="https://github.com/user-attachments/assets/269fa939-4473-4006-a92b-205acaecb0e9" />
+
+<img width="468" height="741" alt="image" src="https://github.com/user-attachments/assets/ea76f14e-a0f9-43c2-af5d-9cf93585aef6" />
+
+
 ---
 
 ## Table of Contents
